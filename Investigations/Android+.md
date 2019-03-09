@@ -22,7 +22,7 @@
 ## 如何实现
 安卓系统的结构（2013年时）如下图所示
   
-![Android architecture](https://www.oreilly.com/library/view/android-hackers-handbook/9781118608647/images/c02f001.jpg)
+![Android architecture](https://github.com/fandahao17/OS-Project/blob/master/Investigations/img/AndroidArchitecture.jpeg)
   
 可以看出，安卓虚拟机（Dalvik/ART）的系统调用是通过利用JNI接口调用Linux的.so动态链接库实现的。
   
