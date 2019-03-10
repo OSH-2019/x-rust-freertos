@@ -1,4 +1,4 @@
-#Investigate -- Ray 3.10
+# Investigate -- Ray 3.10
 
 -OS -> 2.Libraries&Runtime -> Application Framework -> Application
 
@@ -18,11 +18,11 @@ Dalvik
 	-shared copy-on-write heap\(mostly not written\)
 NO JIT\(just-in-time compiler\), leads to dirty memory, lots of native code\(??system provides libs, JNI available\)
 
-##深入解析
+## 深入解析
 Java虚拟机标准字节码Bytecode  基于栈的虚拟机
 Dalvik .dex 每一个进程是Linux里的一个Process 基于寄存器的虚拟机 基于硬件实现更大优化
 
-###Android内核与Linux内核区别
+### Android内核与Linux内核区别
 1.Android Binder基于OpenBinder框架的驱动，提供Android平台的进程间通信
 Linux系统上层通信主要是D-bus，使用消息总线的方式来进行IPC
 
