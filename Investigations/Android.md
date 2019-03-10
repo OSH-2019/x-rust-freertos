@@ -6,14 +6,14 @@ Linux2.6为内核&驱动程序
 
 Dalvik
 - clean
-	-- common dex files\(libraries\)
-	-- application-specific dex files
+	- common dex files\(libraries\)
+	- application-specific dex files
 - private dirty
-	-- application "live" dex structures
-	-- application heap
+	- application "live" dex structures
+	- application heap
 - shared dirty\(Zydote\)
-	-- library "live" dex structures
-	-- shared copy-on-write heap\(mostly not written\)
+	- library "live" dex structures
+	- shared copy-on-write heap\(mostly not written\)
 NO JIT\(just-in-time compiler\), leads to dirty memory, lots of native code\(??system provides libs, JNI available\)
 
 ## 深入解析
