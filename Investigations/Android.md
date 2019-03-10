@@ -1,6 +1,6 @@
 # Investigate -- Ray 3.10
 
--OS -> 2.Libraries&Runtime -> Application Framework -> Application
+OS -> Libraries&Runtime -> Application Framework -> Application
 
 Linux2.6为内核&驱动程序
 
