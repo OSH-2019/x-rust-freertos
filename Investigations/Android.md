@@ -14,6 +14,7 @@ Dalvik
 - shared dirty\(Zydote\)
 	- library "live" dex structures
 	- shared copy-on-write heap\(mostly not written\)
+
 NO JIT\(just-in-time compiler\), leads to dirty memory, lots of native code\(??system provides libs, JNI available\)
 
 ## 深入解析
