@@ -1,6 +1,10 @@
 # OS-Project
 
+<<<<<<< HEAD
 可以先学习[git的使用](https://github.com/fandahao17/OS-Project/blob/master/git-指令及其使用.pdf)，并在本网页的Branch一栏创建自己的Branch，未来我们将主要在自己的Branch上工作。
+=======
+可以先学习[git的使用](https://github.com/fandahao17/OS-Project/blob/master/git-指令及其使用.pdf)，并在本网页的Branch一栏创建一个自己的Branch一栏创建自己的Branch，未来我们将主要在自己的Branch上工作。
+>>>>>>> 7e200ac2e2b7d8380965c0bc6a3047ac358d521f
 
 我们使用的Rustc版本是：
 ```
