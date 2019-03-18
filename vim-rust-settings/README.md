@@ -1,5 +1,5 @@
 # vim setup for Rust
-本教程旨在帮同志们安装Vundle，syntastic（同步代码错误检查），Rust.vim（Rust官方的vim支持）和vim-racer（代码自动补全工具）
+本教程旨在帮大家安装Vundle，syntastic（同步代码错误检查），Rust.vim（Rust官方的vim支持）和vim-racer（代码自动补全工具）
   
 ----
 ## 0. 准备
