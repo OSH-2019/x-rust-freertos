@@ -41,13 +41,13 @@ rustup toolchain add nightly
 ## 完成
 此时：
 
-1. 在Rust代码中按下<Ctrl-x><Ctrl-o>时，将弹出自动补全（学名omni-completion），并可以用<Ctrl-N>（上）和<Ctrl-P>（下）来上下选择，该功能在使用结构体的方法时格外有效；
-2. 光标在某个函数上时，按下<Ctrl-d>将弹出该函数的文档；
-3. 每次保存或打开一个新的Rust文件时，vim的最左侧将标示代码出错的位置，最下方将出现报错信息。
+1. 在Rust代码中按下\<Ctrl-x\>\<Ctrl-o\>时，将弹出自动补全（学名omni-completion），并可以用\<Ctrl-N\>（上）和\<Ctrl-P\>（下）来上下选择，该功能在使用结构体的方法时格外有效；
+2. 光标在某个函数上时，按下\<Ctrl-d\>将弹出该函数的文档；
+3. 每次打开一个新的Rust文件或用```:w```保存时，vim的最左侧将标示代码出错的位置，最下方将出现报错信息。
 
 ----
 ## References and Further Reading
-1. [Vundle](https://github.com/VundleVim/Vundle.vim#quick-start)，[Rust.vim](https://github.com/rust-lang/rust.vim)，[Racer](https://github.com/racer-rust/racer)，[vim-racer](https://github.com/racer-rust/vim-racer)，[syntastic](https://github.com/vim-syntastic/syntastic)的详细使用说明请参考其官网（尽量不要看CSDN，因为其中很多内容可能是过时的）。
+1. [Vundle](https://github.com/VundleVim/Vundle.vim#quick-start)，[Rust.vim](https://github.com/rust-lang/rust.vim)，[Racer](https://github.com/racer-rust/racer)，[vim-racer](https://github.com/racer-rust/vim-racer)，[syntastic](https://github.com/vim-syntastic/syntastic)的详细使用说明和配置选项请参考其官网（尽量不要看CSDN，因为其中很多内容可能是过时的）。
 2. omni-completion需要手动触发、syntastic只有在保存文件时才会进行代码检查，[YouCompleteMe](https://github.com/Valloric/YouCompleteMe#rust-semantic-completion)提供了更强大的补全功能和边写代码边检查错误的功能，但该插件的配置十分困难。
 3. [Ultisnips](https://github.com/SirVer/ultisnips)提供了自动插入代码块的功能（用起来挺爽的）。
 
