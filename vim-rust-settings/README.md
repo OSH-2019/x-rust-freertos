@@ -1,5 +1,5 @@
 # vim setup for Rust
-本教程旨在帮同志们安装Vundle，syntactic（同步代码错误检查），Rust.vim（Rust官方的vim支持）和vim-racer（代码自动补全工具）
+本教程旨在帮同志们安装Vundle，syntastic（同步代码错误检查），Rust.vim（Rust官方的vim支持）和vim-racer（代码自动补全工具）
   
 ----
 ## 0. 准备
@@ -8,7 +8,7 @@
 
 ----
 ## 1. 安装并使用Vundle
-Vim有很多插件管理器，类似Ubuntu 的apt。我使用的是Vundle。
+Vim有很多插件管理器，类似Ubuntu的apt。我使用的是Vundle。
 
 安装方法：在命令行输入：
 ```
@@ -18,7 +18,9 @@ git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
 ## 2. 安装各个插件
 将本文件夹中的.vimrc文件复制到``` ~/.vimrc ``` 中：
 
-以上内容包括了Vundle默认需要的插件和我们要安装的几个插件以及其相关配置。复制完成后打开vim，输入命令```:VundleInstall```，会发现vim的窗口被分成了两半，左侧显示的是被安装的插件，窗口下方显示安装的状态。
+以上内容包括了Vundle默认需要的插件和我们要安装的几个插件的相关配置。复制完成后打开vim，输入命令```:VundleInstall```，会发现vim的窗口被分成了两半，左侧显示的是被安装的插件，窗口下方显示安装的状态。
+
+Vundle的具体使用说明可以在vim中输入命令： ``` :h Vundle ```
   
 因为它是在GitHub上下载这些插件，所以该过程会持续很长时间，所以我们打开另一个命令行终端，进行下一步。
 
