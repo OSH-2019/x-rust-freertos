@@ -30,9 +30,10 @@ Racer是Rust的自动补全工具。
 
 Note:如果以下过程下载太慢，建议换用[ustc源](https://lug.ustc.edu.cn/wiki/mirrors/help/rust-crates).
 
-1. 安装[nightly rust](https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#appendix-g---how-rust-is-made-and-nightly-rust):在命令行输入：
+1. 安装[nightly rust](https://doc.rust-lang.org/book/appendix-07-nightly-rust.html#appendix-g---how-rust-is-made-and-nightly-rust)并下载Rust源代码:在命令行输入：
 ```
 rustup toolchain add nightly
+rustup component add rust-src
 ```
 
 2. 安装racer：在命令行输入：```cargo +nightly install racer```
