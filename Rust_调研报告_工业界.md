@@ -4,6 +4,7 @@
 **——npm堆栈管理**
 
 npm是Node.js的包管理工具。得益于强大的功能，npm注册表成为世界上最大的软件注册表。但在规模成指数增长的同时，npm同样面临诸多挑战，其中一个是扩展CPU绑定服务(CPU-bound Service)产生的性能瓶颈：npm执行的大多数操作都是网络绑定的，JavaScript能够较好地支持该功能，但是在检查是否允许用户发布包的授权服务时，npm团队发现JS在执行一些CPU绑定任务时会造成性能下降。因此Node.js中这一服务需要重新实现，而npm团队希望借此机会利用Rust代码来提高性能。
+
  <img src="https://img-blog.csdnimg.cn/20190327183207254.png?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMDQxNjEwMQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" width="70%" alt=""/>
 
 C或C ++解决方案不再是一个合理的选择。这些语言需要内存管理方面的专业知识，以免出现安全问题，崩溃和内存泄漏（事实上，有专业知识的程序员也难免在百万行代码中犯一些这样的错误）。而Java由于需要将JVM和相关库部署在服务器上，这将产生一系列资源开销，不利于性能的提升。
@@ -22,7 +23,9 @@ Rust代码实现的优势：
 Tilde是一家位于波特兰的创业公司，他们开发的产品Skylight能够将Ruby on Rails框架中应用程序的性能数据转化为易于分析的信息，以便开发人员高效地监控和维护应用程序。Skylight代理在客户开发的rails应用程序中运行，以监控实际性能指标。但用户对这款软件的分析性能要求比较高：第一，他们对此代理使用的内存和CPU开销的容差非常低。由于这款代理用于帮助开发人员分析程序为什么变慢，因此很重要的一点是代理本身不会对应用程序的性能产生影响。第二，大多数Skylight的客户在Heroku上托管他们的应用程序，他们受到256或512 MB内存限制。
 
 在先前的Ruby版本中，Skylight的内存使用量经常超过100MB，此时Heroku会报出内存超过限制的错误并重启代理。
+
   <img src="https://img-blog.csdnimg.cn/2019032718455486.png?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMDQxNjEwMQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" width="80%" alt=""/>
+
 而在使用Rus替换Ruby的数据结构并重写代理后，Skylight的内存占用能够保持在8 MB，比Ruby减少了92％，极大地减小了内存开销。
 
 除此之外，Rust在编译时避免了数据竞争的问题。在一个Rust工程师希望使用新的数据结构来优化日志功能、防止消息重复时，Rust编译器报了错，表明这个数据结构中的某一部分不能很好地发挥系统中固有的并发性。修复后，应用程序就能够稳定实现预期的功能。Rust能够在早期开发过程中捕获并提醒程序员解决此类问题。
@@ -38,6 +41,9 @@ Rust还能够很好地处理跨平台差异。在开发Xbox、S4和Nintendo Swit
 
 #### 参考文献
 [1]  《How Rust is Tilde’s Competitive Advantage》
+
 [2]  《Community makes Rust an easy choice for npm》
+
 [3]  《Chucklefish Taps Rust to Bring Safe Concurrency to Video Games》
+
 [4]  《Building a Simple Webapp in Rust》
