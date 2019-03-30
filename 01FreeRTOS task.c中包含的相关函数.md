@@ -259,6 +259,36 @@ BaseType_t xTaskNotifyWait( uint32_t ulBitsToClearOnEntry,
 
 等待广播。
 
+##  xTaskNotifyStateClear
+
+```c
+BaseType_t xTaskNotifyStateClear( TaskHandle_t xTask );
+```
+
+清除信号量。
+
 ## SCHEDULER INTERNALS
 
-TBD...
++ xTaskIncrementTick
++ vTaskPlaceOnEventList
++ vTaskPlaceOnUnorderedEventList
++ vTaskPlaceOnEventListRestricted
++ xTaskRemoveFromEventList
++ vTaskRemoveFromUnorderedEventList
++ vTaskSwitchContext
++ uxTaskResetEventItemValue
++ xTaskGetCurrentTaskHandle
++ vTaskSetTimeOutState
++ xTaskCheckForTimeOut
++ vTaskMissedYield
++ xTaskGetSchedulerState
++ xTaskPriorityInherit
++ xTaskPriorityDisinherit
++ vTaskPriorityDisinheritAfterTimeout
++ uxTaskGetTaskNumber
++ vTaskSetTaskNumber
++ vTaskStepTick
++ eTaskConfirmSleepModeStatus
++ pvTaskIncrementMutexHeldCount
++ vTaskInternalSetTimeOutState
+
