@@ -23,7 +23,7 @@ void vListInsert( List_t * const pxList,
                  ListItem_t * const pxNewListItem );
 ```
 
-列表项插入。
+列表项插入。会按照列表项的`itemvalue`升序排列。
 
 ## vListInsertEnd
 
@@ -41,3 +41,4 @@ UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove );
 ```
 
 从列表中移除一个列表项。
+
