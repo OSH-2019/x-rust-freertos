@@ -15,7 +15,7 @@ RTOS-任务调度器要可预测，做出实时响应，FreeRTOS是通过分配�
 使用了stdint.h
 当编译器没有这个头文件时，include文件夹里有stdint.readme，重命名就行
 
-__命名规则__
+__命名规则__  
 u-unsigned  
 l-long  
 s-short  
@@ -28,9 +28,9 @@ size_t的变量前缀也用x
 char-c  
 char* - pc  
 
--函数
-satic-prv
-API函数 有无返回值的加v，表示void
+-函数  
+satic-prv  
+API函数 有无返回值的加v，表示void  
 API函数前面会告诉自己在哪个文件里，如vTaskDelete在task.c里
 
 -宏
@@ -40,27 +40,30 @@ API函数前面会告诉自己在哪个文件里，如vTaskDelete在task.c里
 -数据类型
 有4个移植层的变量，根据一些宏不同的值表示为不同的类型
 
--注释
-不使用//(???)
-函数的每一行注释前面都要加* (??)
-include有顺序
-{单独一行
+-注释  
+不使用//(???)  
+函数的每一行注释前面都要加* (??)  
+include有顺序  
+{单独一行  
 函数完有分割线
 
-INCLUDE_和config
-还能调解CPU频率？
-有一个空闲任务的是否让让位的宏
+INCLUDE_和config  
+还能调解CPU频率？  
+有一个空闲任务的是否让让位的宏  
 configIDLE_SHOULD_YIELD表示空闲任务是否给同优先级任务让出CPU使用权
 一般不建议让位，因为I和A同使用一块时间片，实际上减少了A运行的时间
 
 ## 第13章 FreeRTOS队列
+
 没有操作系统的时候，两个应用程序传递消息的方式是通过全局变量的方式传递  
 队列是用来实现任务与任务、任务与中断之间的消息传递  
 
-队列里储存有限的、大小固定的数据项目，交流的数据保存在队列中，叫队列项目。
+队列里储存有限的、大小固定的数据项目，交流的数据保存在队列中，叫队列项目。  
 
-队列能保存的最大数据项目的数量叫做队列长度。创建队列会指定数据项目的大小和队列的长度，也称消息队列(不是还有准备队列啥的吗????)
+队列能保存的最大数据项目的数量叫做队列长度。创建队列会指定数据项目的大小和队列的长度，也称消息队列(不是还有准备队列啥的吗????)  
+
 ---  
+
 1. 数据储存  
 FIFO或者LIFO都可以  
 往队列里发送数据的时候，数据被复制，意思是存的是数据的原始值而不是指向它的指针，原数据可以不必须一直保持可见  
@@ -82,18 +85,22 @@ port-MAX_DELAY一直等
 
 5. 队列操作过程  
 在一个任务从队列中读取了一个消息以后，可以清空或者不清空，不请空就还可以给别人读
+
 ---
+
 struct QueueDefinition
 指向头和要下一个空闲区域的指针  
-我们的版本没有指向最后一个字节的指针
+我们的版本没有指向最后一个字节的指针  
 里面包含了一个union，是说作为当这个结构体作为不同的东西(队列或者信号量)的时候，里面的数据类型不同  
-还包含了等待(接受or发送)队列
+还包含了等待(接受or发送)队列  
 当前队列项数量  
-创建时允许的最大队列长度
-创建队列时每个队列项最大长度
-还有队列上锁相关的(????)，当队列上锁时，cRxLock和cTxLock分别统计出队和入队的队列项数量，当没有上锁时，两个值均为queueUNLOCKED
+创建时允许的最大队列长度  
+创建队列时每个队列项最大长度  
+还有队列上锁相关的(????)，当队列上锁时，cRxLock和cTxLock分别统计出队和入队的队列项数量，当没有上锁时，两个值均为queueUNLOCKED  
+
 ---
-xQueueCreate()和xQueueCreateStatic()都是宏，实际上创建函数的是xQueueGenericCreate()和xQueueGenericCreateStatic()
+
+xQueueCreate()和xQueueCreateStatic()都是宏，实际上创建函数的是xQueueGenericCreate()和xQueueGenericCreateStatic()  
 
 创建成功返回句柄，失败返回NULL
 
@@ -119,21 +126,21 @@ xQueueGenericCreate()详解
 prvInitialiseNewQueue()详解  
 有一个神奇的东西(???)  
 首先一进来先定义了一个
-`( void ) ucQueueType;`
+`( void ) ucQueueType;`  
 但是这个ucQueueType同时是传进来的一个参数
-`const uint8_t ucQueueType`
+`const uint8_t ucQueueType`  
 在configUSE_TRACE_FACILITY被设置成1的时候会运行
-`pxNewQueue->ucQueueType = ucQueueType;`
-但是同时void的那个ucQueueType会被编译器报错，叫做unused parameters
-所以我还是不知道定义那个东西有什么用吗，然后(void)又是什么类型?
+`pxNewQueue->ucQueueType = ucQueueType;`  
+但是同时void的那个ucQueueType会被编译器报错，叫做unused parameters  
+所以我还是不知道定义那个东西有什么用吗，然后(void)又是什么类型?  
 
-哦哦哦哦哦！我懂了
-我理解错了意思
+哦哦哦哦哦！我懂了  
+我理解错了意思  
 其实是说，当configUSE_TRACE_FACILITY不等于1时，由于不会编译使用它(指传进来的参数)的那一部分，所以编译器会报unused parameters，如果这时候来一个
-`( void ) ucQueueType;`
+`( void ) ucQueueType;`  
 就不会有讨厌的warning了！！
 
-还有说即使传入参数的列表项为0，但是也不能直接设置PChead为NULL，因为那个代表这个queue被用作互斥锁
+还有说即使传入参数的列表项为0，但是也不能直接设置PChead为NULL，因为那个代表这个queue被用作互斥锁  
 
 最后有个调用traceQUEUE_CREATE()是用来保留什么痕迹的吗?不知道
 
@@ -143,84 +150,86 @@ prvInitialiseNewQueue()详解
 
 xQueueGenericReset()详解
 
-出现了taskENTER_CRITICAL()！！
-等等，有pcTail？？
-？？？我他妈又看了一遍，没有啊？
-对不起那个pcTail不是xQueue里面的，而是在其中union里的QueuePointers_t里面的，pcReadFrom也在里面
+出现了taskENTER_CRITICAL()！！  
+等等，有pcTail？？  
+？？？我他妈又看了一遍，没有啊？  
+对不起那个pcTail不是xQueue里面的，而是在其中union里的QueuePointers_t里面的，pcReadFrom也在里面  
 
-先初始化队列相关成员变量
+先初始化队列相关成员变量  
 由于复位以后队列是空的,所以由于出队而保持阻塞的任务继续阻塞，而由于人队而保持阻塞的要解除阻塞,从列表中移除(没弄明白是什么解除阻塞法,是说让他们入队还是清空这些请求???)  
 
 总体上干的事情：初始化成员变量+决定是否创建新的队列+初始化队列的链表xTasksWaitingToSend和xTasksWaitingToReceive
 
 创建完成的初始队列，前面是队列结构体，储存关于这个队列的信息，而后面是消息储存区，就是实际上队列项所在的位置
+
 ---
-向队列发送消息
+
+向队列发送消息  
 可以分为任务级入队函数和中断级入队函数(FormISR都是中断级的)
 
-可以前向入队和后向入队，还有带覆写功能的(没说从哪里开始覆写)
+可以前向入队和后向入队，还有带覆写功能的(没说从哪里开始覆写)  
 好像我们的版本里没有覆写这个函数？貌似是通过一个
 `xCopyPosition == queueOVERWRITE`来判断的？
 
-中断就是中断服务函数
+中断就是中断服务函数  
 
-其实这几个任务级入队函数又是宏，调用xQueueGenericSend()
-只能用于任务函数，不能用于中断服务函数
-返回值：
-pdPass成功向队列发送消息
+其实这几个任务级入队函数又是宏，调用xQueueGenericSend()  
+只能用于任务函数，不能用于中断服务函数  
+返回值：  
+pdPass成功向队列发送消息  
 errQUEUE_FULL则队列已满
 
 这几个中断服务函数还是宏，调用xQueueGenericSendFromISR()这一个函数，看样子泛型编程在实际中用的真的很多
 
 居然有一个参数是标记是否在退出中断服务函数之后是否进行任务切换。这些函数也不需要阻塞时间的参数
 
-返回值：
-pdTRUE成功
+返回值：  
+pdTRUE成功  
 errQUEUE_FULL失败
 
-**任务级通用入队函数详解**
-首先确定队列是不是满的
-未满或者覆写入队，则可以将消息入队
-选择前向入队或者覆写是直接把数据拷贝到现在u.pcReadFrom指向的数据项目，如果是后向入队则将消息复制进pcWritrTo指向的队列元素，不管是哪种方式，复制后指针都要移动
-若又任务由于请求消息阻塞，则把该任务从等待列表移到就绪列表，如果调度器上锁(???),那么这些任务就会挂到xPendingReadyList上(????),也不知道是啥。
-如果取消任务的优先级高还要标记需要进行任务切换。(注释里说可以在critical section里直接切换,kernel会自己搞定的???)
-用时间结构体和超时结构体来计算阻塞时间?
-队列已满切阻塞时间不为0的情况下：
-先给队列上锁(???)(给队列上锁不能操作事件链表，解锁时会补上操作)
+**任务级通用入队函数详解**  
+首先确定队列是不是满的  
+未满或者覆写入队，则可以将消息入队  
+选择前向入队或者覆写是直接把数据拷贝到现在u.pcReadFrom指向的数据项目，如果是后向入队则将消息复制进pcWritrTo指向的队列元素，不管是哪种方式，复制后指针都要移动  
+若又任务由于请求消息阻塞，则把该任务从等待列表移到就绪列表，如果调度器上锁(???),那么这些任务就会挂到xPendingReadyList上(????),也不知道是啥。  
+如果取消任务的优先级高还要标记需要进行任务切换。(注释里说可以在critical   section里直接切换,kernel会自己搞定的???)  
+用时间结构体和超时结构体来计算阻塞时间?  
+队列已满切阻塞时间不为0的情况下：  
+先给队列上锁(???)(给队列上锁不能操作事件链表，解锁时会补上操作)  
  |
-更新超时结构体，检查阻塞时间是否到了 ———— 没到 —— 检查队列是否是满的 —— 满的 —— 
-1. 将任务从就绪列表中移除，加入TaskWaitingToSend和延时列表
+更新超时结构体，检查阻塞时间是否到了 ———— 没到 —— 检查队列是否是满的 —— 满的 ——   
+1. 将任务从就绪列表中移除，加入TaskWaitingToSend和延时列表  
 2. 若阻塞时间无限且INCLUDE_vTaskSuspend==1，则添加任务到xSuspendedTaskList上
-队列没满 —— 重新试一次
-(若阻塞时间到了直接跳到这一步)
-解锁队列
-恢复任务调度器  
+队列没满 —— 重新试一次  
+(若阻塞时间到了直接跳到这一步)  
+解锁队列  
+恢复任务调度器    
 
-源码的注释里解释说，解锁队列意味着队列事件可以影响事件列表，现在就有可能出现中断，并把这个任务从事件列表里删除，但这是调度器还是被挂起的，所以任务会去到PendingReady列表(last??)而不是真正的就绪列表
+源码的注释里解释说，解锁队列意味着队列事件可以影响事件列表，现在就有可能出现中断，并把这个任务从事件列表里删除，但这是调度器还是被挂起的，所以任务会去到PendingReady列表(last??)而不是真正的就绪列表  
 
-恢复调度器后，任务又从PendingReady列表去到了就绪列表，所以在一个任务yield之前就已经在就绪列表里是可行的，在这种情况下，yield不需要进行上下文切换，除非有一个更高优先级的任务在PendingReady队列里
-(看了这一段，我个人理解，是不是马上要执行的任务就在PendingReady队列里面啊)
+恢复调度器后，任务又从PendingReady列表去到了就绪列表，所以在一个任务yield之前就已经在就绪列表里是可行的，在这种情况下，yield不需要进行上下文切换，除非有一个更高优先级的任务在PendingReady队列里  
+(看了这一段，我个人理解，是不是马上要执行的任务就在PendingReady队列里面啊)  
 
-**中断级通用入队函数**
-跟前面那个差不多
-有一个不同是这里用cTxLock来记录了队列上锁期间像队列发送了数据(有啥用??)
-还有就是任务切换的
-(任务切换要在退出此函数后，退出中断函数之前进行任务切换???意义何在，且这个函数又该怎么保证呢)
+**中断级通用入队函数**  
+跟前面那个差不多  
+有一个不同是这里用cTxLock来记录了队列上锁期间像队列发送了数据(有啥用??)  
+还有就是任务切换的  
+(任务切换要在退出此函数后，退出中断函数之前进行任务切换???意义何在，且这个函数又该怎么保证呢)  
 
 ---
 
-队列上锁解锁
-prvLockQueue()
-是个宏！！！
-非常简单，就是改cRxLock和cTxLock为queueLOCKED_UNMODIFIED
+队列上锁解锁  
+prvLockQueue()  
+是个宏！！！  
+非常简单，就是改cRxLock和cTxLock为queueLOCKED_UNMODIFIED  
 
-prvUnlockQueue()
+prvUnlockQueue()  
 这里说必须要在调度器被挂起的时候调用才能调用这个函数
-lock记录了加入和删除的项，在上锁期间，项可以被删除或者加入，但是相应的事件列表不会更新(????)
-所以我能理解成为说实际上队列里面已经被传入了新的消息，但是由于没有更新列表，所以那些原来在等着接受消息的任务不知道已经有消息了，还在一直等着，这样吗
-如果xTasksWaitingToReceive不为空，则将任务从此列表中移除，如果优先级高，则进行任务切换，实际上的任务切换是在xTaskIncrementTick()实现的
-处理完一条就cTxLock-1，直至完成然后设置成queueUNLOCKED
-用同样类似的方法处理cRxLock
+lock记录了加入和删除的项，在上锁期间，项可以被删除或者加入，但是相应的事件列表不会更新(????)  
+所以我能理解成为说实际上队列里面已经被传入了新的消息，但是由于没有更新列表，所以那些原来在等着接受消息的任务不知道已经有消息了，还在一直等着，这样吗  
+如果xTasksWaitingToReceive不为空，则将任务从此列表中移除，如果优先级高，则进行任务切换，实际上的任务切换是在xTaskIncrementTick()实现的  
+处理完一条就cTxLock-1，直至完成然后设置成queueUNLOCKED  
+用同样类似的方法处理cRxLock  
 
 ---
 
@@ -228,59 +237,59 @@ lock记录了加入和删除的项，在上锁期间，项可以被删除或者�
 
 同样也还是任务和中断，还分读取消息后删不删队列项
 
-又是两个宏
-读取数据是进行数据复制，所以用户需要提供数组或者缓冲区保存数据
+又是两个宏  
+读取数据是进行数据复制，所以用户需要提供数组或者缓冲区保存数据  
 也有阻塞时间的参数，但是不用提供一个数据项的大小
-死等时，要求INCLUDE_vTaskSuspend必须为1
-返回值：
-pdTRUE成功
-pdFALSE失败
+死等时，要求INCLUDE_vTaskSuspend必须为1  
+返回值：  
+pdTRUE成功  
+pdFALSE失败  
 
 两个读的函数都是只能用在任务中
 
 之前还看见一个PRIVILEGED_FUNCTIONS貌似是告诉MPU把这个函数储存在专门的内存里
 
-**任务级通用函数**
-xQueueGenericReceive()
-有一个xJustPeek参数决定是否删除队列项
-妈的，我错了，由于版本问题，我妈这里的xQueuePeek和xQueueReceive还是分开实现的，我哭了
+**任务级通用函数**  
+xQueueGenericReceive()  
+有一个xJustPeek参数决定是否删除队列项  
+妈的，我错了，由于版本问题，我妈这里的xQueuePeek和xQueueReceive还是分开实现的，我哭了  
 
-Peek里面还用了一个变量来暂存ReadFrom以保证读取前后指针位置无变化，还检查是否还有其他任务要这个数据
+Peek里面还用了一个变量来暂存ReadFrom以保证读取前后指针位置无变化，还检查是否还有其他任务要这个数据  
 
-**中断级函数**
-在xQueueReceiveFromISR里面简单介绍了为什么要搞成不同的函数(指中断级和任务级)，总而言之是因为优先级的问题，所以特别为中断写了专用的函数
+**中断级函数**   
+在xQueueReceiveFromISR里面简单介绍了为什么要搞成不同的函数(指中断级和任务级)，总而言之是因为优先级的问题，所以特别为中断写了专用的函数  
 
-在ISR中不能阻塞，所以检查数据是否是可用的(???没太明白)
+在ISR中不能阻塞，所以检查数据是否是可用的(???没太明白)  
 
-操作cRxLock
+操作cRxLock  
 
 ---
 ---
 
 ## 14章 信号量
-一般用来进行资源管理和任务同步
+一般用来进行资源管理和任务同步  
 二值信号量、计数型信号量、互斥信号量、递归互斥信号量
 
 中断服务函数一定要快进快出，不能有太多的代码，否则影响中断的实时性。裸机编写的时候，一般是在中断中打标记(信号量)，在其他地方根据标记执行具体过程
 
-**二值信号量**
-用于互斥访问或者同步
-互斥信号量有优先级继承机制,二值没有
-因此二值适用同步
-高优先级任务优先获得信号量
+**二值信号量**  
+用于互斥访问或者同步  
+互斥信号量有优先级继承机制,二值没有  
+因此二值适用同步  
+高优先级任务优先获得信号量  
 
-二值信号量 —— 只有一个队列项的队列(要么满要么空)
+二值信号量 —— 只有一个队列项的队列(要么满要么空)  
 
-示意图还挺清楚的
+示意图还挺清楚的  
 
-二值信号量创建函数
-vSemaphoreCreateBinary()
-我们的版本里并没有这个函数
-实际上的创建过程是由xQueueGenericBinary()来实现的，应该是在union里有不一样
+二值信号量创建函数  
+vSemaphoreCreateBinary()  
+我们的版本里并没有这个函数  
+实际上的创建过程是由xQueueGenericBinary()来实现的，应该是在union里有不一样  
 
-返回值:
-NULL失败
-其他值成功
+返回值:  
+NULL失败  
+其他值成功  
 
 怪了，是不是在我们这个版本里压根就没有二值信号量这个东西呀，根本找不到在哪里创建
 
@@ -294,56 +303,56 @@ NULL失败
 
 实际上通过xQueueSemaphoreTake来获取信号量
 
-**计数型信号量**
-xQueueCreateCountingSemaphore()
-可传入计数信号量最大计数值和初始量
-返回值：
-NULL-失败
-句柄-成功
+**计数型信号量**  
+xQueueCreateCountingSemaphore()  
+可传入计数信号量最大计数值和初始量   
+返回值：  
+NULL-失败  
+句柄-成功  
 
 ---
 
-优先级翻转
-实时系统中不允许这种现象，会破坏任务的预期顺序
-示例：L优先级最低却先拿到了信号量，dangH剥夺CPU使用权，相当于L和H同一优先级，而当M剥夺了L的CPU使用权时，相当于M的优先级高于H，出现优先级翻转
+优先级翻转  
+实时系统中不允许这种现象，会破坏任务的预期顺序  
+示例：L优先级最低却先拿到了信号量，dangH剥夺CPU使用权，相当于L和H同一优先级，而当M剥夺了L的CPU使用权时，相当于M的优先级高于H，出现优先级翻转  
 
 ---
 
-互斥信号量
-其实是拥有优先级继承的二值信号量
+互斥信号量  
+其实是拥有优先级继承的二值信号量  
 
-在调用xQueueCreateMutex的时候，居然可以传ucQueueType的参数进去，说不定用这个来创建二值???
+在调用xQueueCreateMutex的时候，居然可以传ucQueueType的参数进去，说不定用这个来创建二值???  
+ 
+但是这个函数多了一个对互斥信号量的初始化prvInitialiseMutex  
 
-但是这个函数多了一个对互斥信号量的初始化prvInitialiseMutex
-
-返回值：
-NULL-失败
-句柄-成功
+返回值：  
+NULL-失败  
+句柄-成功  
 
 
-prvInitialiseMutex()
+prvInitialiseMutex()  
 对队列中一些成员进行了必要的赋值(跟优先级继承有关系)
-定义了三个宏专为互斥信号量准备，
-xMutexHolder - pcTail
-uxQueueType - pcHead
-queueQUEUE_IS_MUTEX - NULL
-用于表示互斥信号量时，将pcHead指向NULL来表示pcTail保存着互斥队列的所有者，pcMutexHolder指向拥有互斥信号量的任务块
-重命名是为了增强可读性
-函数的最后调用了一次xQueueGenericSend，说明互斥信号量默认有效
+定义了三个宏专为互斥信号量准备，  
+xMutexHolder - pcTail  
+uxQueueType - pcHead  
+queueQUEUE_IS_MUTEX - NULL  
+用于表示互斥信号量时，将pcHead指向NULL来表示pcTail保存着互斥队列的所有者，pcMutexHolder指向拥有互斥信号量的任务块  
+重命名是为了增强可读性  
+函数的最后调用了一次xQueueGenericSend，说明互斥信号量默认有效  
 
-**释放互斥信号量**
+**释放互斥信号量**  
 
 我找不到SemaphoreGive，难受
 
-prvCopyDataToQueue()中有if configUSE_MUTEXS == 1，最重要的是要uxMessageWaiting+1
-用xTaskPriorityDisinherit来进行优先级继承
+prvCopyDataToQueue()中有if configUSE_MUTEXS == 1，最重要的是要uxMessageWaiting+1  
+用xTaskPriorityDisinherit()来进行优先级继承
 
-xTaskPriorityDisinherit()
+xTaskPriorityDisinherit()  
 若存在优先级，则当前任务的优先级和任务的基优先级不同
-若没有其他的互斥锁，则改变其优先级
-如果一个mutex是一个被held的状态，那么一定不是从中断给出的，如果mutex是从它的holding task给出的，那么那个task一定正在运行。
-于是把holding task从就绪列表中移除
-使用新的优先级将任务重新添加到就绪列表(解除优先级??因为实际上是以BasePriority来新加入的)
+若没有其他的互斥锁，则改变其优先级  
+如果一个mutex是一个被held的状态，那么一定不是从中断给出的，如果mutex是从它的holding task给出的，那么那个task一定正在运行。  
+于是把holding task从就绪列表中移除  
+使用新的优先级将任务重新添加到就绪列表(解除优先级??因为实际上是以BasePriority来新加入的)  
 
 xMutexHolder表示拥有此互斥信号量任务控制块，所以先判断是否已经被其他任务获取
 
@@ -358,29 +367,29 @@ xMutexHolder表示拥有此互斥信号量任务控制块，所以先判断是�
 当获取的顺序和释放的顺序不同的时候要进行
 上下文的切换(????)
 
-**获取互斥信号量**
-xQueueSemaphoreTake()
-用prvCopyDataFromQueue，用数据复制的方式从队列中提取数据
-获取了互斥信号量后uxMessagesWaiting-1，将数据删除掉
-获取信号量成功以后，pxMutexHolder要标记互斥信号量所有者，调用pvTaskIncrementMutexHeldCount，就是使任务控制块中uxMutexHeld加一，并且返回是当前任务的控制块
+**获取互斥信号量**  
+xQueueSemaphoreTake()  
+用prvCopyDataFromQueue，用数据复制的方式从队列中提取数据  
+获取了互斥信号量后uxMessagesWaiting-1，将数据删除掉  
+获取信号量成功以后，pxMutexHolder要标记互斥信号量所有者，调用pvTaskIncrementMutexHeldCount，就是使任务控制块中uxMutexHeld加一，并且返回是当前任务的控制块  
 
 如果运行到，发现互斥信号量被其他任务占用，如果当前任务的优先级比正在拥有互斥信号量的任务优先级高，则把拥有互斥信号量的低优先级任务调整为与当前任务相同的优先级
 
-**递归互斥信号量**
+**递归互斥信号量**  
 递归信号量很神奇，已经获取了互斥信号量的任务还能再次获取这个递归互斥信号量(互斥信号量就不行)，并且次数不限，获取的次数要跟释放的次数一样
 
-递归互斥信号量也有优先级继承的机制，所以用完递归互斥记得释放，同互斥一样，此信号量也不能用在中断服务函数中(????因为优先级继承的存在，中断服务函数不能设置阻塞时间)
+递归互斥信号量也有优先级继承的机制，所以用完递归互斥记得释放，同互斥一样，此信号量也不能用在中断服务函数中(????因为优先级继承的存在，中断服务函数不能设置阻塞时间)  
 需要某个宏为1以使用递归互斥信号量
 
-**释放递归互斥信号量**
+**释放递归互斥信号量**  
 xQueueGiveMutexRecursive()
 
-要检查递归互斥信号量是不是当前任务获取的，必须是递归互斥信号量的拥有者才能释放
-uxRecursiveCallCount这个是用来记录递归调用了几次，所以-1，其他的时候都是-1，只有在最后一次释放的时候调用xQueueGenericSend完成释放过程
+要检查递归互斥信号量是不是当前任务获取的，必须是递归互斥信号量的拥有者才能释放  
+uxRecursiveCallCount这个是用来记录递归调用了几次，所以-1，其他的时候都是-1，只有在最后一次释放的时候调用xQueueGenericSend完成释放过程  
 
-释放成功返回pdPASS
-失败返回pdFALL
+释放成功返回pdPASS  
+失败返回pdFALL  
 
-**获取递归互斥信号量**
-xQueueTakeMutexRecursive()
-判断是不是递归互斥信号量拥有者，如果是，说明是重复获取，那么简单,只需要uxRecursiveCallCount+1就可以了，如果是第一次获取，那么调用xQueueSemaphoreTake来获取信号量，记得还是要把uxRecursiveCallCount+1(所以这种信号量的意义何在????)
+**获取递归互斥信号量**  
+xQueueTakeMutexRecursive()  
+判断是不是递归互斥信号量拥有者，如果是，说明是重复获取，那么简单,只需要uxRecursiveCallCount+1就可以了，如果是第一次获取，那么调用xQueueSemaphoreTake来获取信号量，记得还是要把uxRecursiveCallCount+1(所以这种信号量的意义何在????)  
