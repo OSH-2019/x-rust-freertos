@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.14159265-2.6-0.99999 (TeX Live 2019/dev/Debian) (preloaded format=xelatex 2019.3.28)  31 MAR 2019 00:15
+This is XeTeX, Version 3.14159265-2.6-0.99999 (TeX Live 2019/dev/Debian) (preloaded format=xelatex 2019.3.28)  7 APR 2019 13:04
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1253,89 +1253,69 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 (Font)              <8> on input line 4.
 LaTeX Font Info:    External font `cmex10' loaded for size
 (Font)              <6> on input line 4.
- [2
-
-])
+)
 \tf@toc=\write4
 \openout4 = `开题报告.toc'.
 
- [3] [4
+ [2
 
-] [5]
-Overfull \hbox (51.46413pt too wide) in paragraph at lines 109--126
+]
+
+Package hyperref Warning: Difference (2) between bookmark levels is greater 
+(hyperref)                than one, level fixed on input line 45.
+
+[3
+
+]
+Missing character: There is no   in font [lmroman12-regular]:mapping=tex-text;!
+ [4]
+Missing character: There is no   in font [lmroman12-regular]:mapping=tex-text;!
+ [5] [6] [7] [8] [9]
+Overfull \hbox (51.46413pt too wide) in paragraph at lines 240--257
 [][] 
  []
 
 File: n1.png Graphic file (type bmp)
 <n1.png>
-[6]
 File: n2.png Graphic file (type bmp)
 <n2.png>
+[10]
 File: n3.png Graphic file (type bmp)
 <n3.png>
- [7] [8]
+ [11]
 File: R1.jpeg Graphic file (type bmp)
 <R1.jpeg>
- [9] [10]
-Missing character: There is no   in font [lmroman12-regular]:mapping=tex-text;!
- [11]
-Missing character: There is no   in font [lmroman12-regular]:mapping=tex-text;!
- [12] [13] [14] [15] [16]
+ [12] [13] [14]
 File: c2rust-overview.png Graphic file (type bmp)
 <c2rust-overview.png>
- [17]
+ [15] [16]
 File: Z1.png Graphic file (type bmp)
 <Z1.png>
- [18]
+ [17]
 File: Z2.png Graphic file (type bmp)
 <Z2.png>
- [19]
+ [18]
 File: n4.png Graphic file (type bmp)
 <n4.png>
- [20] [21]
-(/usr/share/texlive/texmf-dist/tex/xelatex/listings/lstlang1.sty
-File: lstlang1.sty 2015/06/04 1.6 listings language file
-)
-(/usr/share/texlive/texmf-dist/tex/xelatex/listings/lstmisc.sty
-File: lstmisc.sty 2015/06/04 1.6 (Carsten Heinz)
-)
-*************************************************
-* fontspec warning: "script-not-exist"
-* 
-* Font 'FandolHei-Regular' does not contain script 'CJK'.
-*************************************************
-.................................................
-. fontspec info: "defining-font"
-. 
-. Font family 'FandolHei-Regular(0)' created for font 'FandolHei-Regular' with
-. options [Script={CJK},Extension={.otf},BoldFont={FandolHei-Bold}].
-.  
-.  This font family consists of the following NFSS series/shapes:
-.  
-. - 'normal' (m/n) with NFSS spec.: <->"[FandolHei-Regular.otf]/OT"
-. - 'small caps'  (m/sc) with NFSS spec.: 
-. - 'bold' (bx/n) with NFSS spec.: <->"[FandolHei-Bold.otf]/OT"
-. - 'bold small caps'  (bx/sc) with NFSS spec.: 
-.................................................
-[22] [23] [24] [25] [26] [27] [28] [29]
+ [19] [20] [21]
 Missing character: There is no 昇 in font [FandolSong-Regular.otf]/OT!
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 886.
- [30]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 886.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 529.
+ [22]
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 529.
  (./开题报告.aux)
-Package atveryend Info: Empty hook `AtVeryEndDocument' on input line 886.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 886.
+Package atveryend Info: Empty hook `AtVeryEndDocument' on input line 529.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 529.
 Package rerunfilecheck Info: File `开题报告.out' has not changed.
-(rerunfilecheck)             Checksum: 9E3C0ACBE3154B9FF80FCE10E492F0A7.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 886.
+(rerunfilecheck)             Checksum: 801391CDFDAA1D8EDFA748358310D968.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 529.
  ) 
 Here is how much of TeX's memory you used:
- 24027 strings out of 494485
- 475763 string characters out of 6165052
- 662936 words of memory out of 5000000
- 27723 multiletter control sequences out of 15000+600000
- 536515 words of font info for 58 fonts, out of 8000000 for 9000
+ 23718 strings out of 494485
+ 469939 string characters out of 6165052
+ 611192 words of memory out of 5000000
+ 27428 multiletter control sequences out of 15000+600000
+ 536491 words of font info for 55 fonts, out of 8000000 for 9000
  264 hyphenation exceptions out of 8191
- 41i,12n,73p,476b,1077s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 41i,12n,64p,477b,489s stack positions out of 5000i,500n,10000p,200000b,80000s
 
-Output written on 开题报告.pdf (30 pages).
+Output written on 开题报告.pdf (22 pages).

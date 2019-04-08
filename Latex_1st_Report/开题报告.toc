@@ -1,85 +1,33 @@
 \babel@toc {english}{}
-\contentsline {section}{\numberline {1}项目背景}{4}{section.1}
-\contentsline {section}{\numberline {2}立项依据}{4}{section.2}
-\contentsline {subsection}{\numberline {2.1}C语言安全性问题与Rust的可靠性}{4}{subsection.2.1}
-\contentsline {subsection}{\numberline {2.2}Rust并发模型}{5}{subsection.2.2}
-\contentsline {subsection}{\numberline {2.3}Rust的高效性}{6}{subsection.2.3}
-\contentsline {subsection}{\numberline {2.4}越来越多的用户体会到Rust语言的高效性}{7}{subsection.2.4}
-\contentsline {subsection}{\numberline {2.5}Rust使用规模增大}{7}{subsection.2.5}
-\contentsline {subsection}{\numberline {2.6}使用Rust的目标平台趋于多样化}{8}{subsection.2.6}
-\contentsline {subsection}{\numberline {2.7}RTOS现今的需求}{8}{subsection.2.7}
-\contentsline {subsubsection}{\numberline {2.7.1}资源管理需求}{8}{subsubsection.2.7.1}
-\contentsline {subsubsection}{\numberline {2.7.2}安全性需求}{9}{subsubsection.2.7.2}
-\contentsline {section}{\numberline {3}前瞻性报告}{9}{section.3}
-\contentsline {subsection}{\numberline {3.1}嵌入式操作系统}{9}{subsection.3.1}
-\contentsline {subsubsection}{\numberline {3.1.1}嵌入式系统简述}{9}{subsubsection.3.1.1}
-\contentsline {subsubsection}{\numberline {3.1.2}嵌入式系统特点}{10}{subsubsection.3.1.2}
-\contentsline {subsubsection}{\numberline {3.1.3}嵌入式系统的发展趋势}{11}{subsubsection.3.1.3}
-\contentsline {subsubsection}{\numberline {3.1.4}嵌入式系统的脆弱性}{12}{subsubsection.3.1.4}
-\contentsline {subsubsection}{\numberline {3.1.5}嵌入式系统面临的(软件)安全问题}{13}{subsubsection.3.1.5}
-\contentsline {subsubsection}{\numberline {3.1.6}嵌入式系统安全对策(软件)}{14}{subsubsection.3.1.6}
-\contentsline {subsection}{\numberline {3.2}用Rust编写嵌入式操作系统的优势}{15}{subsection.3.2}
-\contentsline {section}{\numberline {4}相关工作}{16}{section.4}
-\contentsline {subsection}{\numberline {4.1}学术界相关工作调研}{16}{subsection.4.1}
-\contentsline {subsection}{\numberline {4.2}工业界相关工作调研}{18}{subsection.4.2}
-\contentsline {subsubsection}{\numberline {4.2.1}Rust in Optimization——npm堆栈管理}{18}{subsubsection.4.2.1}
-\contentsline {subsubsection}{\numberline {4.2.2}Rust in Analysis——Skylight代理的优化}{19}{subsubsection.4.2.2}
-\contentsline {subsubsection}{\numberline {4.2.3}Rust in Entertainment——大型游戏安全流畅的并发性}{20}{subsubsection.4.2.3}
-\contentsline {subsubsection}{\numberline {4.2.4}目前已使用Rust开发的项目}{20}{subsubsection.4.2.4}
-\contentsline {section}{\numberline {5}Rust调研}{21}{section.5}
-\contentsline {subsection}{\numberline {5.1}人们对Rust语言的兴趣与日俱增}{21}{subsection.5.1}
-\contentsline {subsubsection}{\numberline {5.1.1}Rust目前的挑战}{21}{subsubsection.5.1.1}
-\contentsline {subsubsection}{\numberline {5.1.2}Rust用于嵌入式设备开发的优势}{21}{subsubsection.5.1.2}
-\contentsline {section}{\numberline {6}FreeRTOS调研}{22}{section.6}
-\contentsline {subsection}{\numberline {6.1}FreeRTOS v10.2.0 task.c 中任务创建API}{22}{subsection.6.1}
-\contentsline {subsubsection}{\numberline {6.1.1}xTaskCreate}{22}{subsubsection.6.1.1}
-\contentsline {subsubsection}{\numberline {6.1.2}xTaskCreateStatic}{22}{subsubsection.6.1.2}
-\contentsline {subsubsection}{\numberline {6.1.3}xTaskCreateRestricted}{22}{subsubsection.6.1.3}
-\contentsline {subsubsection}{\numberline {6.1.4}xTaskCreateRestrictedStatic}{22}{subsubsection.6.1.4}
-\contentsline {subsubsection}{\numberline {6.1.5}vTaskAllocateMPURegions}{23}{subsubsection.6.1.5}
-\contentsline {subsubsection}{\numberline {6.1.6}vTaskDelete}{23}{subsubsection.6.1.6}
-\contentsline {subsection}{\numberline {6.2}FreeRTOS v10.2.0 task.c 中任务控制API}{23}{subsection.6.2}
-\contentsline {subsubsection}{\numberline {6.2.1}vTaskDelay}{23}{subsubsection.6.2.1}
-\contentsline {subsubsection}{\numberline {6.2.2}vTaskDelayUntil}{23}{subsubsection.6.2.2}
-\contentsline {subsubsection}{\numberline {6.2.3}xTaskAbortDelay}{23}{subsubsection.6.2.3}
-\contentsline {subsubsection}{\numberline {6.2.4}uxTaskPriorityGet}{23}{subsubsection.6.2.4}
-\contentsline {subsubsection}{\numberline {6.2.5}eTaskGetState}{24}{subsubsection.6.2.5}
-\contentsline {subsubsection}{\numberline {6.2.6}vTaskGetInfo}{24}{subsubsection.6.2.6}
-\contentsline {subsubsection}{\numberline {6.2.7}vTaskPrioritySet}{24}{subsubsection.6.2.7}
-\contentsline {subsubsection}{\numberline {6.2.8}vTaskSuspend}{24}{subsubsection.6.2.8}
-\contentsline {subsubsection}{\numberline {6.2.9}vTaskResume}{24}{subsubsection.6.2.9}
-\contentsline {subsection}{\numberline {6.3}FreeRTOS v10.2.0 task.c 中程序调度API}{24}{subsection.6.3}
-\contentsline {subsubsection}{\numberline {6.3.1}vTaskStartScheduler}{24}{subsubsection.6.3.1}
-\contentsline {subsubsection}{\numberline {6.3.2}vTaskEndScheduler}{25}{subsubsection.6.3.2}
-\contentsline {subsubsection}{\numberline {6.3.3}vTaskSuspendAll}{25}{subsubsection.6.3.3}
-\contentsline {subsubsection}{\numberline {6.3.4}xTaskResumeAll}{25}{subsubsection.6.3.4}
-\contentsline {subsubsection}{\numberline {6.3.5}xTaskGetTickCount}{25}{subsubsection.6.3.5}
-\contentsline {subsubsection}{\numberline {6.3.6}uxTaskGetNumberOfTasks}{25}{subsubsection.6.3.6}
-\contentsline {subsubsection}{\numberline {6.3.7}pcTaskGetName}{25}{subsubsection.6.3.7}
-\contentsline {subsubsection}{\numberline {6.3.8}xTaskGetHandle}{25}{subsubsection.6.3.8}
-\contentsline {subsubsection}{\numberline {6.3.9}uxTaskGetStackHighWaterMark}{26}{subsubsection.6.3.9}
-\contentsline {subsubsection}{\numberline {6.3.10}xTaskCallApplicationTaskHook}{26}{subsubsection.6.3.10}
-\contentsline {subsubsection}{\numberline {6.3.11}xTaskGetIdleTaskHandle}{26}{subsubsection.6.3.11}
-\contentsline {subsubsection}{\numberline {6.3.12}xTaskGetIdleRunTimeCounter}{26}{subsubsection.6.3.12}
-\contentsline {subsubsection}{\numberline {6.3.13}xTaskNotify}{26}{subsubsection.6.3.13}
-\contentsline {subsubsection}{\numberline {6.3.14}xTaskNotifyWait}{26}{subsubsection.6.3.14}
-\contentsline {subsection}{\numberline {6.4}queue.c文件中的重要函数}{27}{subsection.6.4}
-\contentsline {subsubsection}{\numberline {6.4.1}xQueueCreate}{27}{subsubsection.6.4.1}
-\contentsline {subsubsection}{\numberline {6.4.2}xQueueCreateStatic}{27}{subsubsection.6.4.2}
-\contentsline {subsubsection}{\numberline {6.4.3}xQueueSendToToFront}{27}{subsubsection.6.4.3}
-\contentsline {subsubsection}{\numberline {6.4.4}xQueueSendToBack}{27}{subsubsection.6.4.4}
-\contentsline {subsubsection}{\numberline {6.4.5}xQueueSend}{27}{subsubsection.6.4.5}
-\contentsline {subsubsection}{\numberline {6.4.6}xQueueOverwrite}{27}{subsubsection.6.4.6}
-\contentsline {subsubsection}{\numberline {6.4.7}xQueueGenericSend}{27}{subsubsection.6.4.7}
-\contentsline {subsubsection}{\numberline {6.4.8}xQueuePeek}{27}{subsubsection.6.4.8}
-\contentsline {subsubsection}{\numberline {6.4.9}xQueueReceive}{27}{subsubsection.6.4.9}
-\contentsline {subsubsection}{\numberline {6.4.10}uxQueueMessagesWaiting}{27}{subsubsection.6.4.10}
-\contentsline {subsubsection}{\numberline {6.4.11}uxQueueSpacesAvailable}{28}{subsubsection.6.4.11}
-\contentsline {subsubsection}{\numberline {6.4.12}vQueueDelete}{28}{subsubsection.6.4.12}
-\contentsline {subsection}{\numberline {6.5}list.c 中的主要函数}{28}{subsection.6.5}
-\contentsline {subsubsection}{\numberline {6.5.1}vListInitialise}{28}{subsubsection.6.5.1}
-\contentsline {subsubsection}{\numberline {6.5.2}vListInitialiseItem}{28}{subsubsection.6.5.2}
-\contentsline {subsubsection}{\numberline {6.5.3}vListInsert}{28}{subsubsection.6.5.3}
-\contentsline {subsubsection}{\numberline {6.5.4}vListInsertEnd}{28}{subsubsection.6.5.4}
-\contentsline {subsubsection}{\numberline {6.5.5}uxListRemove}{28}{subsubsection.6.5.5}
-\contentsline {section}{\numberline {7}参考文献}{29}{section.7}
+\contentsline {section}{\numberline {1}项目背景}{3}{section.1}
+\contentsline {section}{\numberline {2}立项依据}{3}{section.2}
+\contentsline {subsubsection}{\numberline {2.0.1}嵌入式系统特点}{3}{subsubsection.2.0.1}
+\contentsline {subsubsection}{\numberline {2.0.2}嵌入式系统的发展趋势}{4}{subsubsection.2.0.2}
+\contentsline {subsubsection}{\numberline {2.0.3}嵌入式系统的脆弱性}{5}{subsubsection.2.0.3}
+\contentsline {subsubsection}{\numberline {2.0.4}嵌入式系统面临的(软件)安全问题}{6}{subsubsection.2.0.4}
+\contentsline {subsection}{\numberline {2.1}C语言安全性问题与Rust的可靠性}{7}{subsection.2.1}
+\contentsline {subsection}{\numberline {2.2}Rust并发模型}{7}{subsection.2.2}
+\contentsline {subsection}{\numberline {2.3}RTOS现今的需求}{9}{subsection.2.3}
+\contentsline {subsubsection}{\numberline {2.3.1}资源管理需求}{9}{subsubsection.2.3.1}
+\contentsline {subsubsection}{\numberline {2.3.2}安全性需求}{9}{subsubsection.2.3.2}
+\contentsline {section}{\numberline {3}前瞻性报告}{10}{section.3}
+\contentsline {subsection}{\numberline {3.1}Rust的高效性}{10}{subsection.3.1}
+\contentsline {subsection}{\numberline {3.2}越来越多的用户体会到Rust语言的高效性}{10}{subsection.3.2}
+\contentsline {subsection}{\numberline {3.3}Rust使用规模增大}{11}{subsection.3.3}
+\contentsline {subsection}{\numberline {3.4}使用Rust的目标平台趋于多样化}{11}{subsection.3.4}
+\contentsline {section}{\numberline {4}相关工作}{12}{section.4}
+\contentsline {subsection}{\numberline {4.1}嵌入式操作系统}{12}{subsection.4.1}
+\contentsline {subsubsection}{\numberline {4.1.1}嵌入式系统简述}{12}{subsubsection.4.1.1}
+\contentsline {subsubsection}{\numberline {4.1.2}嵌入式系统安全对策}{13}{subsubsection.4.1.2}
+\contentsline {subsection}{\numberline {4.2}用Rust编写嵌入式操作系统的优势}{14}{subsection.4.2}
+\contentsline {subsection}{\numberline {4.3}学术界相关工作调研}{15}{subsection.4.3}
+\contentsline {subsection}{\numberline {4.4}工业界相关工作调研}{17}{subsection.4.4}
+\contentsline {subsubsection}{\numberline {4.4.1}Rust in Optimization——npm堆栈管理}{17}{subsubsection.4.4.1}
+\contentsline {subsubsection}{\numberline {4.4.2}Rust in Analysis——Skylight代理的优化}{18}{subsubsection.4.4.2}
+\contentsline {subsubsection}{\numberline {4.4.3}Rust in Entertainment——大型游戏安全流畅的并发性}{18}{subsubsection.4.4.3}
+\contentsline {subsubsection}{\numberline {4.4.4}目前已使用Rust开发的项目}{19}{subsubsection.4.4.4}
+\contentsline {section}{\numberline {5}Rust调研}{20}{section.5}
+\contentsline {subsection}{\numberline {5.1}人们对Rust语言的兴趣与日俱增}{20}{subsection.5.1}
+\contentsline {subsubsection}{\numberline {5.1.1}Rust目前的挑战}{20}{subsubsection.5.1.1}
+\contentsline {subsubsection}{\numberline {5.1.2}Rust用于嵌入式设备开发的优势}{20}{subsubsection.5.1.2}
+\contentsline {section}{\numberline {6}参考文献}{21}{section.6}
