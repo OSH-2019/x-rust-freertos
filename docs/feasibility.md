@@ -4,7 +4,7 @@
 * [理论依据](#理论依据)
   * [适用于系统编程的Rust语言特性](#适用于系统编程的Rust语言特性)
     * [条件编译](#条件编译)
-    * [Unsafe Rust](#Unsafe Rust)
+    * [Unsafe Rust](#Unsafe-Rust)
   * [FreeRTOS架构分析](#FreeRTOS架构分析)
     * [FreeRTOS的编码风格](#FreeRTOS的编码风格)
     * [与任务相关的函数](#与任务相关的函数)
@@ -34,8 +34,6 @@
 ## 理论依据
 
 ### 适用于系统编程的Rust语言特性
-
-----
 
 #### 条件编译
 
@@ -90,9 +88,9 @@ println!("I'm running on a {} machine!", machine_kind);
 
 使用`Unsafe Rust`会在一定程度上减少Rust编译器的安全检查，但牺牲的稍许安全性却可以换来灵活性的巨大提高。在与硬件抽象（定义于`portmacros.h`中）进行交互时，我们可能需要使用这个特性。
 
-### FreeRTOS架构分析
+----
 
-------
+### FreeRTOS架构分析
 
 #### FreeRTOS的编码风格
 
@@ -360,9 +358,6 @@ xQueueReceiveFromISR 介绍了为什么要搞成不同的函数(指中断级和�
 高优先级任务优先获得信号量
 
 二值信号量 —— 只有一个队列项的队列(要么满要么空)
-
-[![image7]()](https://github.com/OSH-2019/x-rust-freertos/blob/Ray/FreeRTOS_Source_Code.md)
-[![image8]()](https://github.com/OSH-2019/x-rust-freertos/blob/Ray/FreeRTOS_Source_Code.md)
 
 二值信号量创建函数
 vSemaphoreCreateBinary()
