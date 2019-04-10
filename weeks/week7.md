@@ -9,15 +9,15 @@
 
 组长已经在仓库中为以上四部分分别创建了分支（`list`，`task`，`queue`，`port`），在其中已经建立好了Cargo工程`rust_freertos`，大家在其中修改即可。
 
-在编写完成且测试无误后，请大家在自己的分支提出`Pull request`，并邀请至少两个人对代码进行`review`（这主要是为了提高大家对不同模块的熟悉程度），根据意见修改后就可以merge进`master`分支了。
+在编写完成且测试无误后，请大家push到对应的分支，并提出`Pull request`，邀请至少两个人对代码进行`review`（这主要是为了提高大家对不同模块的熟悉程度），根据意见修改后就可以merge进`master`分支了。
 
 以上工作应当在**下周二**组会前完成，希望大家早日开工（特别是两人合作的，要尽快分工），周日碰头的时候我们讨论一下写代码过程中遇到的困难。
 
 
 
-PS：Rust的宏定义也很强大，它也可以用来替代常见的代码块，[在这里](https://doc.rust-lang.org/rust-by-example/macros.html)有介绍。
+PS：Rust的宏定义也很强大，Rust里的宏也可以用来替代常见的代码块，[在这里](https://doc.rust-lang.org/rust-by-example/macros.html)有介绍。
 
-PS：大家在声明函数时可以参考[freertos.rs](https://github.com/hashmismatch/freertos.rs/tree/master/src)。
+PS：大家在设计函数声明时可以参考[freertos.rs](https://github.com/hashmismatch/freertos.rs/tree/master/src)。
 
 ## 代码风格
 
