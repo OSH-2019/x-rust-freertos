@@ -1,0 +1,7 @@
+[package]
+name = "freeRTOS_list"
+version = "0.1.0"
+authors = ["zsstrike <2439758713@qq.com>"]
+edition = "2018"
+
+[dependencies]
