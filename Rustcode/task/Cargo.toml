@@ -1,0 +1,7 @@
+[package]
+name = "task"
+version = "0.1.0"
+authors = ["Chivier <huangyeqi@mail.ustc.edu.cn>"]
+edition = "2018"
+
+[dependencies]
