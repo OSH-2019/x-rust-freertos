@@ -12,6 +12,7 @@
 #endif
 
 #include <stdint.h>
+#include <stdlib.h>
 /******************************************************************************
 	Defines
 ******************************************************************************/
@@ -25,7 +26,6 @@
 #define portBASE_TYPE	long
 #define portPOINTER_SIZE_TYPE size_t
 
-typedef unsigned size_t ;
 typedef void (*TaskFunction_t)( void * );
 typedef portSTACK_TYPE StackType_t;
 typedef long BaseType_t;

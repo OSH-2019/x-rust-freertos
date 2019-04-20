@@ -42,21 +42,18 @@
  * Implementation of functions defined in portable.h for the Posix port.
  *----------------------------------------------------------*/
 
-#include <pthread.h>
+
 #include <sched.h>
 #include <signal.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <time.h>
 #include <sys/times.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <limits.h>
-
 /* Scheduler includes. */
-#include "FreeRTOS.h"
-#include "task.h"
+#include "port_defs.h"
 /*-----------------------------------------------------------*/
 #ifndef MAX_NUMBER_OF_TASKS
 #define MAX_NUMBER_OF_TASKS 		( _POSIX_THREAD_THREADS_MAX )
@@ -361,7 +358,7 @@ void vPortClearInterruptMask( portBASE_TYPE xMask )
 void prvSetupTimerInterrupt( void )
 {
 struct itimerval itimer, oitimer;
-portTickType xMicroSeconds = portTICK_PERIOD_MS * 1000;
+TickType_t xMicroSeconds = portTICK_PERIOD_MS * 1000;
 
 	/* Initialise the structure with the current timer information. */
 	if ( 0 == getitimer( TIMER_TYPE, &itimer ) )

@@ -1,3 +1,4 @@
+// trace.rs - Trace macros.
 // This file is created by Fan Jinhao.
 // All the trace macros are defined in this file, along with mtCOVERAGE_*
 // These macros may be useful when debugging.
@@ -9,7 +10,9 @@
 into which trace is to be written. */
 #[macro_export]
 macro_rules! traceSTART {
-    () => {};
+    () => {
+        println!("traceSTART!() called!");
+    };
 }
 
 /* Use to close a trace, for example close a file into which trace has been

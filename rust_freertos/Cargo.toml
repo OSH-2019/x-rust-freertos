@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Fandahao <fandahao17@mail.ustc.edu.cn>"]
 edition = "2018"
 
+[build-dependencies]
+bindgen = "0.42.2"
+cc = "1.0"
+
 [dependencies]
 
 # The [features] section is written by Fan Jinhao.
