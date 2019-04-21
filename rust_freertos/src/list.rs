@@ -2,12 +2,7 @@
 
 use std::rc::Rc;
 use std::cell::{RefCell, Ref, RefMut};
-
-/// this should be defined is port.rs
-type BaseType = u16;    // unsighed short
-type TickType = u16;  
-// type TCB = TskTCB;   // not declared
-type StackType = u16;
+use crate::port::*;
 
 /// thing now get better understood here!
 /// suppose we have a list vec, we call it `list`.

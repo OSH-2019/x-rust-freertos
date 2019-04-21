@@ -9,6 +9,7 @@ mod config;
 mod projdefs;
 mod trace;
 mod ffi;
+mod list;
 
 #[cfg(test)]
 mod tests {
