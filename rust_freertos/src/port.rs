@@ -9,10 +9,8 @@ pub type BaseType = i64;
 pub type UBaseType = u64;
 pub type TickType = u32;
 
-// TODO: A better way to define "TaskFunction".
-// This type alias is taken from FreeRTOS.rs.
-// see https://github.com/hashmismatch/freertos.rs/blob/master/src/task.rs
-pub type TaskFunction = &'static FnOnce() -> ();
+// Keep the same definition with bindgen.
+pub type TaskFunction = Box<extern "C" fn(arg1: *mut ::std::os::raw::c_void)>;
 
 #[cfg(configUSE_16_BIT_TICKS)]
 pub const portMAX_DELAY: TickType = 0xffff;
@@ -294,13 +292,19 @@ pub fn port_end_scheduler() {
     }
 }
 
-// TODO: wrap pxInitialiseStack(). I didn't wrap this function,
-// because its parameters contains too much raw pointers.
-// See portable.h, line 143.
-
 /*
  * Setup the stack of a new task so it is ready to be placed under the
  * scheduler control.  The registers have to be placed on the stack in
  * the order that the port expects to find them.
  *
  */
+pub fn port_initialise_stack(
+    pxTopOfStack: *mut StackType,
+    pxCode: TaskFunction,
+    pvParameters: *mut ::std::os::raw::c_void) -> *mut StackType {
+    unsafe {
+        pxPortInitialiseStack(pxTopOfStack, 
+                              Some(*pxCode), 
+                              pvParameters)
+    }
+}
