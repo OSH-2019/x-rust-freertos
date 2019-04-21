@@ -1,12 +1,40 @@
+// #![crate_name = "doc"]
+
 use std::rc::Rc;
 use std::cell::{RefCell, Ref, RefMut};
 
+/// this should be defined is port.rs
 type BaseType = u16;    // unsighed short
 type TickType = u16;  
 // type TCB = TskTCB;   // not declared
 type StackType = u16;
 
-
+/// thing now get better understood here!
+/// suppose we have a list vec, we call it `list`.
+/// now that we have two list, `lista` and `listb`.
+/// we could push the `lista` and `listb` in the `list` given above, meaning that 
+/// lista == list[0]
+/// listb == list[1]
+/// we now have three list item named item1, item2, item3, which are created by the method `ListItem::new`
+/// every thim we want insert an item to a list, we should first call `set_list_item_container!` macro, for example:
+/// `
+/// //insert item1 to the lista, since the lista is the first value in list, the index should be 0 --> ListName::LIST0
+/// set_list_item_container!(item1, ListName::LIST0);
+/// insert_end!(lista, item1);
+/// `
+/// and in this way, we could easily find the **actural** container.
+/// `
+/// let mut index = get_list_item_container!(item1);
+/// let mut container = match index {
+///     Some(index) => {
+///         let i = index as u32;   // ListName --> u32
+///         &mut list[i]
+///     },
+///     None => {
+///         panic!("no container found!");    
+///     }
+/// }
+/// `
 #[derive(Debug, Copy, Clone)]
 pub enum ListName {
     LIST0,
@@ -16,15 +44,22 @@ pub enum ListName {
     LIST4,
 }
 
+
 #[derive(Debug)]
 pub struct ListItem {
     item_value: TickType,
     container: Option<ListName>,
-    // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated
-    // owner: Option<Rc<RefCell<TCB>>,
+    // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated, deprecateed
+    // owner: Option<Rc<RefCell<TCB>>,      // the TCB declaration is not defined
 }
 
 impl ListItem {
+    /// # Description
+    /// * constructor
+    /// # Argument
+    /// * `item_value` - item_value
+    /// # Return
+    /// * Rc<RefCell<Self>>
     pub fn new(item_value: TickType) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(ListItem {
             item_value: item_value,
@@ -33,6 +68,13 @@ impl ListItem {
     }
 }
 
+/// # Description
+/// * append $item to the $list
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * Nothing
 macro_rules! list_insert_end {
     ($list:ident, $item:ident) => ({
         {
@@ -42,6 +84,13 @@ macro_rules! list_insert_end {
     })
 }
 
+/// # Description
+/// * get $item's index in $list, based on the given oprator
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * Option<u32>
 macro_rules! get_item_index {
     ($list:ident, $item:ident, eq) => ({
         {
@@ -57,6 +106,13 @@ macro_rules! get_item_index {
     });
 }
 
+/// # Description
+/// * insert $item in $list in descending order 
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * Nothing
 macro_rules! list_insert {
     ($list:ident, $item:ident) => ({
         {
@@ -69,6 +125,13 @@ macro_rules! list_insert {
     })
 }
 
+/// # Description
+/// * set list item container
+/// # Argument
+/// * `$item` - list item
+/// * `$Name::$name` - ListName
+/// # Return
+/// * Nothing
 macro_rules! set_list_item_container {
     ($item:ident, $Name:ident::$name:ident) => ({
         {
@@ -77,6 +140,12 @@ macro_rules! set_list_item_container {
     })
 }
 
+/// # Description
+/// * get list item container
+/// # Argument
+/// * `$item` - list item
+/// # Return
+/// * Option<ListName>
 macro_rules! get_list_item_container {
     ($item:ident) => ({
         {
@@ -85,6 +154,13 @@ macro_rules! get_list_item_container {
     })
 }
 
+/// # Description
+/// * remove the $item in $list, panic if the $item not in $list
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * Nothing
 macro_rules! list_remove {
     ($list:ident, $item:ident) => ({
         {
@@ -97,6 +173,12 @@ macro_rules! list_remove {
     })
 }
 
+/// # Description
+/// * set $item's container None
+/// # Argument
+/// * `$item` - list item
+/// # Return
+/// * Nothing
 macro_rules! list_initialise_item {
     ($item:ident) => ({
         {
@@ -105,6 +187,12 @@ macro_rules! list_initialise_item {
     })
 }
 
+/// # Description
+/// * make $list empty with no item in it
+/// # Argument
+/// * `$list` - list
+/// # Return
+/// * Nothing
 macro_rules! list_initialise {
     ($list:ident) => ({
         {
@@ -113,6 +201,13 @@ macro_rules! list_initialise {
     })
 }
 
+/// # Description
+/// * return true if $list contain $item, otherwise false
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * is_contained: bool
 macro_rules! is_contained_within {
     ($list:ident, $item:ident) => ({
         {
@@ -126,6 +221,12 @@ macro_rules! is_contained_within {
     })
 }
 
+/// # Description
+/// * return true if $list is empty, otherwise false
+/// # Argument
+/// * `$list` - list
+/// # Return
+/// * is_empty: bool
 macro_rules! list_is_empty {
     ($list:ident) => ({
         {
@@ -134,6 +235,12 @@ macro_rules! list_is_empty {
     })
 }
 
+/// # Description
+/// * get current list length
+/// # Argument
+/// * `$list` - list
+/// # Return
+/// * len: u32
 macro_rules! current_list_length {
     ($list:ident) => ({
         {
@@ -142,6 +249,13 @@ macro_rules! current_list_length {
     })
 }
 
+/// # Description
+/// * get the next item of $list, and the current item is $item. If $item is not in $list, panic!.
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * item: &Rc<RefCell<ListItem>>
 macro_rules! get_next {
     ($list:ident, $item:ident) => ({
         {
@@ -154,6 +268,13 @@ macro_rules! get_next {
     })
 }
 
+/// # Description
+/// * set list item value
+/// # Argument
+/// * `$item` - list item
+/// * `$value` - item_value
+/// # Return
+/// * No return
 macro_rules! set_list_item_value {
     ($item:ident, $value:expr) => ({
         {
@@ -162,6 +283,12 @@ macro_rules! set_list_item_value {
     })
 }
 
+/// # Description
+/// * get list item value
+/// # Argument
+/// * `$item` - list item
+/// # Return
+/// * item_value: TickType
 macro_rules! get_list_item_value {
     ($item:ident) => ({
         {
@@ -170,6 +297,12 @@ macro_rules! get_list_item_value {
     })
 }
 
+/// # Description
+/// * get item_value of the head_entry of the list. If the list is empty, panic!
+/// # Argument
+/// * `$list` - list
+/// # Return
+/// * item_value: TickType 
 macro_rules! get_item_value_of_head_entry {
     ($list:ident) => ({
         {
