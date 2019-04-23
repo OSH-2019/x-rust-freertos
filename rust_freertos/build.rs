@@ -8,14 +8,19 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    run_bindgen();
-    run_cc();
+    // Do not use bindgen because it's too time-consuming.
+    // run_bindgen();
+
+    // Do not generate c library again.
+    // run_cc();
 }
 
 // Run bindgen to genernate C bindings in portable.h to Rust.
 fn run_bindgen() {
     let bindings = bindgen::Builder::default()
         .header("portable/portable.h")
+        .whitelist_function(".+Port.+")
+        .whitelist_type("^[A-Z].+_t")
         .generate()
         .expect("Unable to generate bindings");
 
