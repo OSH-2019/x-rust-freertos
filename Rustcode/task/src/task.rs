@@ -2,23 +2,32 @@
 //! We need list.h
 use crate::base::*;
 
-pub struct tskTaskControlBlock
-{
-	pxTopOfStack: FreeRtosStackType;
-	xStateListItem: ListItem;
-	xEventListItem: ListItem;
-	uxPriority: FreeRtosUBaseType;
-	pxEndOfStack: FreeRtosStackType;
-	pcTaskName: String;
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
+pub enum task_state {
+    running   = 0,
+    ready     = 1,
+    blocked   = 2,
+    suspended = 3,
+    deleted   = 4
+}
+
+pub struct task_control_block{
+	top_of_stack   : StackType;
+	state_list_item: ListItem;
+	evnet_list_item: ListItem;
+	priority       : UBaseType;
+	end_of_stack   : UBaseType;
+	task_name      : String;
 
 	//? Reverse Priority
-	uxBasePriority: FreeRtosUBaseType;
-	uxMutexesHeld: FreeRtosUBaseType;
-	ulRunTimeCounter: FreeRtosUnsignedLong;
+	base_priority  : UBaseType;
+	mutexes_held   : UBaseType;
+	runtime_counter: TickType;
 
-	ulNotifiedValue: FreeRtosUnsignedLong;
-	ucNotifyState: FreeRtosUnsignedShort;
 	//* chang ucNotifyState from u8 to u16
+	notified_value: u32;
+	notify_state  : u8;
 }
 
 impl struct tskTaskControlBlock {
