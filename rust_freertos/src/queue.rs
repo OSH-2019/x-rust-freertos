@@ -1,14 +1,17 @@
 use std::collections::VecDeque;
 use crate::list::*;
 use crate::port::*;
+use crate::trace::*;
+use std::rc::Rc;
+use std::cell::{RefCell, Ref, RefMut};
+use crate::*;
 //use volatile::Volatile;
 //
+
 pub const queueUNLOCKED:i8 = -1;
 pub const queueLOCKED_UNMODIFIED:i8 = 0;
 pub const queueSEND_TO_BACK:BaseType = 0;
 
-type UBaseType = u64;
-type BaseType = i64;
 
 pub enum QueueUnion {
     pcReadFrom(UBaseType),
@@ -18,14 +21,14 @@ pub enum QueueUnion {
 pub struct QueueDefinition<T>{
     pcQueue: VecDeque<T>,
     
-    pcHead: UBaseType,
-    pcTail: UBaseType,
-    pcWriteTo: UBaseType,
+    pcHead: UBaseType,//usize?
+    pcTail: UBaseType,//usize?
+    pcWriteTo: UBaseType,//usize?
 
     u: QueueUnion,
 
-    xTaskWaitingToSend:& Vec<Rc<RefCell<ListItem>>>,
-    xTaskWaitingToReceive: ListItem,
+    xTaskWaitingToSend:Vec<Rc<RefCell<ListItem>>>,//&?
+    xTaskWaitingToReceive:Vec<Rc<RefCell<ListItem>>> ,//&?
 
     uxMessagesWaiting: UBaseType,
     uxLength: UBaseType,
@@ -46,41 +49,67 @@ pub struct QueueDefinition<T>{
     ucQueueType: u8,
 
 }
+
 type xQueue<T> = QueueDefinition<T>;
 type Queue<T> = QueueDefinition<T>;
 
 
 
 impl <T>QueueDefinition<T>{
-
-    #[cfg(configSUPPORT_DYNAMIC_ALLOCATION)]
-    fn xQueueGenericCreate<T>(&self, uxQueueLength:UBaseType, uxItem:T, ucQueueType:u8) -> Queue<T> {
     
-        let NewQueue = Queue {
-            pcQueue: VecDeque::with_capacity(uxQueueLength)
-        };
-        
+    /// # Description
+    /// * 
+    /// * Implemented by:Lei Siqi
+    /// # Argument
+    ///
+    /// # Return
+    ///
+    #[cfg(configSUPPORT_DYNAMIC_ALLOCATION)]
+    fn queue_generic_create<T>( uxQueueLength:UBaseType, uxItem:T, ucQueueType:u8) -> Queue<T> {
+        let queue:Queue;
+
+        queue.pcQueue =  VecDeque::with_capacity(uxQueueLength);
+
         #[cfg(configSUPPORT_STATIC_ALLOCATION)]
-        self.ucStaticallyAllocated = false;
+        queue.ucStaticallyAllocated = false;
         
-        NewQueue
+        queue.initialise_new_queue(uxQueueLength,ucQueueType);
+        queue
     }
 
-    fn prvInitialiseNewQueue(&self, uxQueueLength: UBaseType, ucQueueType: u8)  {
+    /// # Description
+    /// *
+    /// * Implemented by:Lei Siqi
+    /// # Argument
+    ///
+    /// # Return
+    ///
+    fn initialise_new_queue(&self, uxQueueLength: UBaseType, ucQueueType: u8)  {
         self. pcHead = 0;
         self.uxLength = uxQueueLength;
-        self.xQueueGenericReset(true);
-
-        if cfg!(configUSE_TRACE_FACILITY) {
-        self.ucQueueType = ucQueueType;}
-        #[cfg(configUSE_QUEUE_SETS)]
+        self.queue_generic_reset(true);
+        
+        {
+        #![cfg(configUSE_TRACE_FACILITY)]
+        self.ucQueueType = ucQueueType;
+        }
+        
+        {
+        #![cfg(configUSE_QUEUE_SETS)]
         self.pxQueueSetContainer  = None;
+        }
 
         traceQUEUE_CREATE!(self);
     }
 
-
-    fn xQueueGenericReset(&self, xNewQueue: bool) -> bool{
+    /// # Description
+    /// * reset the queue
+    /// * Implemented by:Ning Yuting
+    /// # Argument
+    /// * `xNewQueue` - whether the queue is a new queue
+    /// # Return
+    /// * bool
+    fn queue_generic_reset(&self, xNewQueue: bool) -> bool{
         //xNewQueue源码中为BaseType，改为bool
         //返回值原为BaseType，改为bool
         taskENTER_CRITICAL();
@@ -94,7 +123,7 @@ impl <T>QueueDefinition<T>{
             self.cTxLock = queueUNLOCKED;
             self.pcQueue.clear();//初始化空队列
             if xNewQueue == false {
-                if list_is_empty!( &(self.xTasksWaitingToSend)) == false {
+                if list_is_empty!(self.xTasksWaitingToSend) == false {
                     if xTaskRemoveFromEventList( &(self.xTasksWaitingToSend)) != false{
                         queueYIELD_IF_USING_PREEMPTION();
                     }
@@ -115,20 +144,32 @@ impl <T>QueueDefinition<T>{
         true
     }
 
-    fn xQueueGenericSend(&self, pvItemToQueue: T, xTicksToWait: TickType, xCopyPosition: BaseType) {
+    /// # Description
+    ///
+    /// * Implemented by:Lei Siqi
+    /// # Argument
+    ///
+    /// # Return
+    ///
+    fn queue_generic_send(&self, pvItemToQueue: T, xTicksToWait: TickType, xCopyPosition: BaseType) {
         let xEntryTimeSet: bool = false;
         let xYieldRequired: BaseType;
         let xTimeOut: TimeOut;
     }
-
-    fn xQueueGenericSendFromISR(&self, pvItemToQueue: T, xCopyPosition: BaseType) ->(BaseType, bool){
+    
+    /// # Description
+    /// 
+    /// * Implemented by:Ning Yuting
+    /// # Argument
+    ///
+    /// # Return
+    /// * (BaseType,bool)
+    fn queue_generic_send_from_isr(&self, pvItemToQueue: T, xCopyPosition: BaseType) ->(BaseType, bool){
         //原先参数const pxHigherPriorityTaskWoken: BaseType作为返回值的第二个元素，bool型
         //返回值改为struct
 
         let xReturn: BaseType;
         let pxHigherPriorityTaskWoken:bool = false;//默认为false,下面一些情况改为true
-
-        //少了三句assert
 
         portASSERT_IF_INTERRUPT_PRIORITY_INVALID!();
         let uxSavedInterruptStatus: UBaseType = portSET_INTERRUPT_MASK_FROM_ISR!();
@@ -186,30 +227,44 @@ impl <T>QueueDefinition<T>{
                 xReturn = pdPASS;
             }
             else {
-                traceQueue_SEND_FROM_ISR_FAILED!(self);
+                traceQUEUE_SEND_FROM_ISR_FAILED!(self);
                 xReturn = errQUEUE_FULL;
             }
         }
         portCLEAR_INTERRUPT_MASK_FROM_ISR!( uxSavedInterruptStatus );
         (xReturn,pxHigherPriorityTaskWoken)
-   }
-
-   fn prvLockQueue (&self){
-    //源码中为宏，改为Queue的方法
-    taskENTER_CRITICAL();
-    {
-        if self.cRxLock == queueUNLOCKED{
-            self.cRxLock = queueLOCKED_UNMODIFIED;
-        }
-        if self.cTxLock == queueUNLOCKED{
-            self.cTxLock = queueLOCKED_UNMODIFIED;
-        }
     }
-    taskEXIT_CRITICAL();
-   }
 
-   fn prvUnlockQueue (&self){
-
+    /// # Description
+    /// * lock the queue
+    /// * Implemented by:Ning Yuting
+    /// # Argument
+    /// * `&self` - queue
+    /// # Return
+    /// * Nothing
+    fn lock_queue (&self){
+        //源码中为宏，改为Queue的方法
+        taskENTER_CRITICAL();
+        {
+            if self.cRxLock == queueUNLOCKED{
+                self.cRxLock = queueLOCKED_UNMODIFIED;
+            }
+            if self.cTxLock == queueUNLOCKED{
+                self.cTxLock = queueLOCKED_UNMODIFIED;
+            }
+        }
+        taskEXIT_CRITICAL();
+        }
+    
+    /// # Description
+    /// * unlock the queue
+    /// * Implemented by:Ning Yuting
+    /// # Argument
+    /// * `&self` - queue
+    /// # Return
+    /// * Nothing
+    fn unlock_queue (&self){
+        
         taskENTER_CRITICAL();
         {
             let cTxLock:i8 = self.cTxLock;
