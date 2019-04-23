@@ -1,5 +1,28 @@
 //* task API
 //! We need list.h
+use crate::base::*;
+
+pub struct tskTaskControlBlock
+{
+	pxTopOfStack: FreeRtosStackType;
+	xStateListItem: ListItem;
+	xEventListItem: ListItem;
+	uxPriority: FreeRtosUBaseType;
+	pxEndOfStack: FreeRtosStackType;
+	pcTaskName: String;
+
+	//? Reverse Priority
+	uxBasePriority: FreeRtosUBaseType;
+	uxMutexesHeld: FreeRtosUBaseType;
+	ulRunTimeCounter: FreeRtosUnsignedLong;
+
+	ulNotifiedValue: FreeRtosUnsignedLong;
+	ucNotifyState: FreeRtosUnsignedShort;
+	//* chang ucNotifyState from u8 to u16
+}
+
+impl struct tskTaskControlBlock {
+}
 
 // * Chapter 8 : Basic task function
 //TODO: Start a task
