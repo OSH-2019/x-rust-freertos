@@ -10,6 +10,11 @@ mod projdefs;
 mod trace;
 mod ffi;
 mod list;
+mod queue;
+mod kernel;
+
+use std::rc::Rc;
+use std::cell::RefCell;
 
 #[cfg(test)]
 mod tests {
@@ -34,15 +39,21 @@ mod tests {
     }
     */
 
-    /*
     #[test]
     fn test_trace() {
-        traceSTART!();
+        traceQUEUE_CREATE!(1);
     }
-    */
 
     #[test]
     fn test_pdMS_TO_TICKS() {
         assert_eq!(1000, pdMS_TO_TICKS!(1000));
+    }
+
+    use list::*;
+    #[test]
+    fn test_list() {
+        let item = ListItem::new(1);
+        let list: Vec<Rc<RefCell<ListItem>>> = vec![];
+        assert_eq!(true, list_is_empty!(list));
     }
 }
