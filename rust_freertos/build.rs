@@ -8,11 +8,11 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    // Do not use bindgen because it's too time-consuming.
-    // run_bindgen();
+    // NOTE: Running bindgen in every build is quite time-consuming.
+    // The solution is to comment out the following line after the first time you've generated the bindings.
+    run_bindgen();
 
-    // Do not generate c library again.
-    // run_cc();
+    run_cc();
 }
 
 // Run bindgen to genernate C bindings in portable.h to Rust.
