@@ -1,11 +1,11 @@
 // projdefs.rs - Basic (maybe useless) constant definitions.
 use crate::port::BaseType;
 
-pub const pdTrue: BaseType = 1;
-pub const pdFalse: BaseType = 0;
+pub const pdTRUE: BaseType = 1;
+pub const pdFALSE: BaseType = 0;
 
-pub const pdPass: BaseType = pdTrue;
-pub const pdFail: BaseType = pdFalse;
+pub const pdPASS: BaseType = pdTRUE;
+pub const pdFAIL: BaseType = pdFALSE;
 
 #[macro_export]
 macro_rules! pdMS_TO_TICKS {
