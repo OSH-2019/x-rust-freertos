@@ -1,10 +1,10 @@
 // kernel.rs, FreeRTOS scheduler control APIs.
 // This file is created by Fan Jinhao.
-
-// Functions defined in this file are explained in Chapter 10.
+// Functions defined in this file are explained in Chapter 9 and 10.
 
 use crate::*; // TODO: Is this line necessary?
-use crate::port::TickType;
+use crate::port::{TickType, UBaseType};
+use crate::projdefs::pdFALSE;
 
 /*
  * Originally from task. h
@@ -19,6 +19,13 @@ macro_rules! taskYIELD {
     )
 }
 
+#[macro_export]
+macro_rules! taskYIELD_IF_USING_PREEMPTION {
+    () => (
+        #[cfg(configUSE_PREEMPTION)]
+        portYIELD_WITHIN_API!()
+    )
+}
 /*
  * Originally from task. h
  *
@@ -128,14 +135,96 @@ macro_rules! taskENABLE_INTERRUPTS {
 	 // Will not get here unless a task calls vTaskEndScheduler ()
  }
    </pre>
- *
- * \defgroup vTaskStartScheduler vTaskStartScheduler
- * \ingroup SchedulerControl
  */
 pub fn task_start_scheduler() {
-    
+    /* Add the idle task at the lowest priority. */
+    create_idle_task();
+
+    #[cfg(configUSE_TIMERS)]
+    create_timer_task();
+
+    call_port_start_scheduler();
 }
 
+/// # Description:
+/// The fist  part of task_start_scheduler(), creates the idle task. 
+/// Will panic if task creation fails.
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: tasks.c 1831-1866
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
+fn create_idle_task() {
+    // TODO: Wait for task_create.
+    // On fail, panic!("Heap not enough to allocate idle task");
+}
+
+/// # Description:
+/// The second (optional) part of task_start_scheduler(), 
+/// creates the timer task. Will panic if task creation fails.
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: tasks.c 1868-1879
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
+fn create_timer_task() {
+    // TODO: Wait for task_create.
+    // timer::create_timer_task()
+    // On fail, panic!("Heap not enough to allocate timer task.");
+}
+
+/// # Description:
+/// The third part of task_step_scheduler, do some initialziation
+/// and call port_start_scheduler() to set up the timer tick.
+///
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: tasks.c 1881-1918.
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
+fn call_port_start_scheduler() {
+    /* Interrupts are turned off here, to ensure a tick does not occur
+       before or during the call to xPortStartScheduler().  The stacks of
+       the created tasks contain a status word with interrupts switched on
+       so interrupts will automatically get re-enabled when the first task
+       starts to run. */
+    portDISABLE_INTERRUPTS!();
+
+    // TODO: NEWLIB
+
+    set_next_task_unblock_time!(port::portMAX_DELAY);
+    set_scheduler_running!(true);
+    set_tick_count!(0);
+
+    /* If configGENERATE_RUN_TIME_STATS is defined then the following
+       macro must be defined to configure the timer/counter used to generate
+       the run time counter time base. */
+    portCONFIGURE_TIMER_FOR_RUN_TIME_STATS!();
+
+    /* Setting up the timer tick is hardware specific and thus in the
+       portable interface. */
+    if port::port_start_scheduler() != pdFALSE
+    {
+        /* Should not reach here as if the scheduler is running the
+           function will not return. */
+    }
+    else
+    {
+        /* Should only reach here if a task calls xTaskEndScheduler(). */
+    }
+}
 /*
  * task. h
  * <pre>void vTaskEndScheduler( void );</pre>
@@ -191,7 +280,12 @@ pub fn task_start_scheduler() {
  * \ingroup SchedulerControl
  */
 pub fn task_end_scheduler() {
-    
+    /* Stop the scheduler interrupts and call the portable scheduler end
+       routine so the original ISRs can be restored if necessary.  The port
+       layer must ensure interrupts enable bit is left in the correct state. */
+    portDISABLE_INTERRUPTS!();
+    set_scheduler_running!(false);
+    port::port_end_scheduler();
 }
 
 /*
@@ -244,7 +338,13 @@ pub fn task_end_scheduler() {
  * \ingroup SchedulerControl
  */
 pub fn task_suspend_all() {
-    
+    /* A critical section is not required as the variable is of type
+       BaseType_t.  Please read Richard Barry's reply in the following link to a
+       post in the FreeRTOS support forum before reporting this as a bug! -
+       http://goo.gl/wu4acr */
+
+    // Increment SCHEDULER_SUSPENDED.
+    set_scheduler_suspended!(get_scheduler_suspended!() + 1);
 }
 
 /*
@@ -300,7 +400,140 @@ pub fn task_suspend_all() {
  * \ingroup SchedulerControl
  */
 pub fn task_resume_all() -> bool {
+    let already_yielded = false;
+
+    // TODO: This is a recoverable error, so should use Result<>.
+    assert!(get_scheduler_suspended!() > pdFALSE as UBaseType,
+    "The call to task_resume_all() does not match \
+    a previous call to vTaskSuspendAll().");
+
+
+    /* It is possible that an ISR caused a task to be removed from an event
+       list while the scheduler was suspended.  If this was the case then the
+       removed task will have been added to the xPendingReadyList.  Once the
+       scheduler has been resumed it is safe to move all the pending ready
+       tasks from this list into their appropriate ready list. */
+    taskENTER_CRITICAL!();
+    {
+        // Decrement SCHEDULER_SUSPENDED.
+        set_scheduler_suspended!(get_scheduler_suspended!() - 1);
+        if get_scheduler_suspended!() == pdFALSE as UBaseType {
+            if get_current_number_of_tasks!() > 0 {
+                /* Move any readied tasks from the pending list into the
+                   appropriate ready list. */
+                if move_tasks_to_ready_list() {
+                    /* A task was unblocked while the scheduler was suspended,
+                       which may have prevented the next unblock time from being
+                       re-calculated, in which case re-calculate it now.  Mainly
+                       important for low power tickless implementations, where
+                       this can prevent an unnecessary exit from low power
+                       state. */
+                    reset_next_task_unblock_time();
+                }
+
+                /* If any ticks occurred while the scheduler was suspended then
+                   they should be processed now.  This ensures the tick count does
+                   not	slip, and that any delayed tasks are resumed at the correct
+                   time. */
+                process_pended_ticks();
+
+                if get_yield_pending!() {
+
+                    {
+                        #![cfg(configUSE_PREEMPTION)]
+                        already_yielded = true;
+                    }
+
+                    taskYIELD_IF_USING_PREEMPTION!();
+                } else {
+                    mtCOVERAGE_TEST_MARKER!();
+                }
+
+            }
+
+        } else {
+            mtCOVERAGE_TEST_MARKER!();
+        }
+    }
+
+    already_yielded
+}
+
+fn move_tasks_to_ready_list() -> bool {
+    /*
+     * TODO: Wait until list and TCB is defined.
+    while( listLIST_IS_EMPTY( &xPendingReadyList ) == pdFALSE )
+    {
+        pxTCB = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( ( &xPendingReadyList ) );
+        ( void ) uxListRemove( &( pxTCB->xEventListItem ) );
+        ( void ) uxListRemove( &( pxTCB->xStateListItem ) );
+        prvAddTaskToReadyList( pxTCB );
+
+        /* If the moved task has a priority higher than the current
+           task then a yield must be performed. */
+        if( pxTCB->uxPriority >= pxCurrentTCB->uxPriority )
+        {
+            xYieldPending = pdTRUE;
+        }
+        else
+        {
+            mtCOVERAGE_TEST_MARKER();
+        }
+    }
+    */
     false
+}
+
+fn reset_next_task_unblock_time() {
+    /*
+     * TODO: Wait for list and task.
+
+    TCB_t *pxTCB;
+
+    if( listLIST_IS_EMPTY( pxDelayedTaskList ) != pdFALSE )
+    {
+        /* The new current delayed list is empty.  Set xNextTaskUnblockTime to
+           the maximum possible value so it is	extremely unlikely that the
+           if( xTickCount >= xNextTaskUnblockTime ) test will pass until
+           there is an item in the delayed list. */
+        xNextTaskUnblockTime = portMAX_DELAY;
+    }
+    else
+    {
+        /* The new current delayed list is not empty, get the value of
+           the item at the head of the delayed list.  This is the time at
+           which the task at the head of the delayed list should be removed
+           from the Blocked state. */
+        ( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
+        xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
+    }
+
+    */
+}
+
+fn process_pended_ticks() {
+    let pended_counts = get_pended_ticks!();
+
+    if pended_counts > 0 {
+        loop {
+            if task_increment_tick() {
+                set_yield_pending!(true);
+            } else {
+                mtCOVERAGE_TEST_MARKER!();
+            }
+
+            pended_counts -= 1;
+
+            if pended_counts <= 0 {
+                break;
+            }
+        }
+
+        set_pended_ticks!(0);
+
+    } else {
+        mtCOVERAGE_TEST_MARKER!();
+    }
 }
 
 /// Only available when configUSE_TICKLESS_IDLE is set to 1.
@@ -319,8 +552,20 @@ pub fn task_resume_all() -> bool {
 /// # Return
 /// 
 /// Nothing
+#[cfg(configUSE_TICKLESS_IDLE)]
 pub fn task_step_tick(ticks_to_jump: TickType) {
-    
+    /* Correct the tick count value after a period during which the tick
+       was suppressed.  Note this does *not* call the tick hook function for
+       each stepped tick. */
+    let cur_tick_count = get_tick_count!(); // NOTE: Is this a bug in FreeRTOS?
+    let next_task_unblock_time = get_next_task_unblock_time!();
+
+    // TODO: Add explanations about this assertion.
+    assert!(cur_tick_count + ticks_to_jump <= next_task_unblock_time);
+
+    set_tick_count!(cur_tick_count + ticks_to_jump);
+
+    traceINCREASE_TICK_COUNT!( xTicksToJump );
 }
 
 /// THIS FUNCTION MUST NOT BE USED FROM APPLICATION CODE.  IT IS ONLY
@@ -339,5 +584,78 @@ pub fn task_step_tick(ticks_to_jump: TickType) {
 ///
 /// Nothing
 pub fn task_switch_context() {
-    
+    if get_scheduler_suspended!() > pdFALSE as UBaseType {
+        /* The scheduler is currently suspended - do not allow a context
+           switch. */
+        set_yield_pending!(true);
+    } else {
+        set_yield_pending!(false);
+        traceTASK_SWITCHED_OUT!();
+
+        #[cfg(configGENERATE_RUN_TIME_STATS)]
+        generate_context_switch_stats();
+
+        /* Check for stack overflow, if configured. */
+        taskCHECK_FOR_STACK_OVERFLOW!();
+
+        /* Select a new task to run using either the generic Rust or port
+           optimised asm code. */
+        task_select_highest_priority_task();
+        traceTASK_SWITCHED_IN!();
+
+        // TODO: configUSE_NEWLIB_REENTRANT 
+    }
+}
+
+fn task_select_highest_priority_task() {
+    let top_priority: UBaseType = get_top_ready_priority!();
+    /*
+     * TODO: Wait until these functions and variables are defined.
+
+    /* Find the highest priority queue that contains ready tasks. */
+    while( listLIST_IS_EMPTY( &( pxReadyTasksLists[ uxTopPriority ] ) ) )
+    {
+        assert!(top_prioity > 0, "No task found with a non-zero priority");
+        top_priority -= 1;
+    }
+    /* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of
+       the same priority get an equal share of the processor time. */
+    listGET_OWNER_OF_NEXT_ENTRY( pxCurrentTCB, &( pxReadyTasksLists[ uxTopPriority ] ) );
+
+    */
+    set_top_ready_priority!(top_priority);
+}
+
+#[cfg(configGENERATE_RUN_TIME_STATS)]
+fn generate_context_switch_stats() {
+    // TODO: Wait until CurrentTCB is defined.
+    /*
+    #ifdef portALT_GET_RUN_TIME_COUNTER_VALUE
+    portALT_GET_RUN_TIME_COUNTER_VALUE( ulTotalRunTime );
+    #else
+    ulTotalRunTime = portGET_RUN_TIME_COUNTER_VALUE();
+    #endif
+
+    /* Add the amount of time the task has been running to the
+       accumulated time so far.  The time the task started running was
+       stored in ulTaskSwitchedInTime.  Note that there is no overflow
+       protection here so count values are only valid until the timer
+       overflows.  The guard against negative values is to protect
+       against suspect run time stat counter implementations - which
+       are provided by the application, not the kernel. */
+    if( ulTotalRunTime > ulTaskSwitchedInTime )
+    {
+        pxCurrentTCB->ulRunTimeCounter += ( ulTotalRunTime - ulTaskSwitchedInTime );
+    }
+    else
+    {
+        mtCOVERAGE_TEST_MARKER();
+    }
+    ulTaskSwitchedInTime = ulTotalRunTime;
+    */
+}
+
+pub fn task_increment_tick() -> bool {
+    // TODO: tasks.c 2500
+    false
 }

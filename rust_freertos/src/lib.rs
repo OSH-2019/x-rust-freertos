@@ -11,6 +11,7 @@ mod trace;
 mod ffi;
 mod list;
 mod queue;
+mod task;
 mod kernel;
 
 use std::rc::Rc;
