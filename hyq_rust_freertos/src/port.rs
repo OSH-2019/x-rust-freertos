@@ -303,8 +303,8 @@ pub fn port_initialise_stack(
     pxCode: TaskFunction,
     pvParameters: *mut ::std::os::raw::c_void) -> *mut StackType {
     unsafe {
-        pxPortInitialiseStack(pxTopOfStack, 
-                              Some(*pxCode), 
+        pxPortInitialiseStack(pxTopOfStack,
+                              Some(*pxCode),
                               pvParameters)
     }
 }

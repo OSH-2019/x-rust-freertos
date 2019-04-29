@@ -13,13 +13,13 @@ CFLAGS = None
 CRATE_CC_NO_DEFAULTS = None
 DEBUG = Some("true")
 CARGO_CFG_TARGET_FEATURE = Some("fxsr,sse,sse2")
-running: "cc" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-Wall" "-Wextra" "-o" "/home/chivier_humber/Documents/rust_freertos/target/debug/build/libloading-728a7050ec179524/out/src/os/unix/global_static.o" "-c" "src/os/unix/global_static.c"
+running: "cc" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-Wall" "-Wextra" "-o" "/home/chivier_humber/Documents/hyq_rust_freertos/target/debug/build/libloading-728a7050ec179524/out/src/os/unix/global_static.o" "-c" "src/os/unix/global_static.c"
 exit code: 0
 AR_x86_64-unknown-linux-gnu = None
 AR_x86_64_unknown_linux_gnu = None
 HOST_AR = None
 AR = None
-running: "ar" "crs" "/home/chivier_humber/Documents/rust_freertos/target/debug/build/libloading-728a7050ec179524/out/libglobal_static.a" "/home/chivier_humber/Documents/rust_freertos/target/debug/build/libloading-728a7050ec179524/out/src/os/unix/global_static.o"
+running: "ar" "crs" "/home/chivier_humber/Documents/hyq_rust_freertos/target/debug/build/libloading-728a7050ec179524/out/libglobal_static.a" "/home/chivier_humber/Documents/hyq_rust_freertos/target/debug/build/libloading-728a7050ec179524/out/src/os/unix/global_static.o"
 exit code: 0
 cargo:rustc-link-lib=static=global_static
-cargo:rustc-link-search=native=/home/chivier_humber/Documents/rust_freertos/target/debug/build/libloading-728a7050ec179524/out
+cargo:rustc-link-search=native=/home/chivier_humber/Documents/hyq_rust_freertos/target/debug/build/libloading-728a7050ec179524/out
