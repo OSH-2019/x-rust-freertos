@@ -6,7 +6,7 @@ use std::cell::{RefCell, Ref, RefMut};
 /// this should be defined is port.rs
 type BaseType = u16;    // unsighed short
 type TickType = u16;  
-// type TCB = TskTCB;   // not declared
+type TCB = TskTCB;   // not declared
 type StackType = u16;
 
 /// thing now get better understood here!
@@ -35,6 +35,16 @@ type StackType = u16;
 ///     }
 /// }
 /// `
+#[derive(Debug)]
+pub struct TskTCB {
+    topOfStack: *mut StackType,         // Points to the location of the last item placed on the tasks stack.
+    genericListItem: ListItem,     // The list that the state list item of a task is reference from denotes the state of that task (Ready, Blocked, Suspended ). 
+    eventListItem: ListItem,       // Used to reference a task from an event list. 
+    priority: BaseType,                 
+    stack: *mut StackType,                   // // Points to the start of the stack.
+    taskName: String,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum ListName {
     LIST0,
@@ -50,7 +60,7 @@ pub struct ListItem {
     item_value: TickType,
     container: Option<ListName>,
     // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated, deprecateed
-    // owner: Option<Rc<RefCell<TCB>>,      // the TCB declaration is not defined
+    owner: Option<Rc<RefCell<TCB>>>,      // the TCB declaration is not defined
 }
 
 impl ListItem {
@@ -64,10 +74,79 @@ impl ListItem {
         Rc::new(RefCell::new(ListItem {
             item_value: item_value,
             container: None,
+            owner: None,
         }))
     }
 }
+/// # Description
+/// set list item's owner
+/// # Arguments
+/// $item: Rc<RefCell<ListItem>>
+/// $owner: Rc<RefCell<TCB>>
+/// #Return
+/// Nothing
+macro_rules! set_list_item_owner {
+    ($item:ident, $owner:ident) => ({
+        $item.borrow_mut().owner = Some(Rc::clone(&$owner));
+    });
+}
 
+/// # Description
+/// get list item's owner
+/// # Arguments
+/// $ietm: Rc<Refcell<ListItem>>
+/// #Return
+/// Option<Rc<RefCell<TCB>>>
+macro_rules! get_list_item_owner {
+    ($item:ident) => ({
+        match $item.borrow().owner {
+            Some(owner) => {
+                Rc::clone(&owner)
+            },
+            None => {
+                None
+            }
+        }
+    });
+}
+
+/// # Description
+/// get owner of next entry
+/// # Arguments
+/// $list: List
+/// $item: Rc<RefCell<ListItem>>
+/// #Return
+/// Option<Rc<RefCell<TCB>>>
+macro_rules! get_owner_of_next_entry {
+    ($list:ident, $item:ident) => ({
+        let index = get_item_index!($list, $item, eq);
+        match index {
+            Some(index) => {
+                match $list[(index + 1) % current_list_length!($list)].borrow().owner {
+                    Some(owner) => Rc::clone(&owner),
+                    None => None,
+                }
+            },
+            None => None,
+        }  
+    });
+}
+
+/// # Description
+/// get owner of head entry
+/// # Arguments
+/// $list: List
+/// #Return
+/// Option<Rc<RefCell<TCB>>>
+macro_rules! get_owner_of_head_entry {
+    ($list:ident) => ({
+        if current_list_length!($list) == 0 {
+            None
+        }else{
+            Some(Rc::clone(&$list[0]))
+        }  
+    });
+}
 /// # Description
 /// * append $item to the $list
 /// # Argument
@@ -75,6 +154,7 @@ impl ListItem {
 /// * `$item` - list item
 /// # Return
 /// * Nothing
+
 macro_rules! list_insert_end {
     ($list:ident, $item:ident) => ({
         {
