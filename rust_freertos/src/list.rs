@@ -2,12 +2,13 @@
 
 use std::rc::Rc;
 use std::cell::{RefCell, Ref, RefMut};
+use crate::*;
 
 /// this should be defined is port.rs
-type BaseType = u16;    // unsighed short
+// type BaseType = u16;    // unsighed short
 type TickType = u16;  
-// type TCB = TskTCB;   // not declared
-type StackType = u16;
+type TCB = TskTCB;   // not declared
+// type StackType = u16;
 
 /// thing now get better understood here!
 /// suppose we have a list vec, we call it `list`.
@@ -43,14 +44,17 @@ pub enum ListName {
     LIST3,
     LIST4,
 }
+#[derive(Debug)]
+struct TskTCB {
 
+}
 
 #[derive(Debug)]
 pub struct ListItem {
     item_value: TickType,
     container: Option<ListName>,
     // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated, deprecateed
-    // owner: Option<Rc<RefCell<TCB>>,      // the TCB declaration is not defined
+    owner: Option<Rc<RefCell<TCB>>>,      // the TCB declaration is not defined
 }
 
 impl ListItem {
@@ -64,8 +68,82 @@ impl ListItem {
         Rc::new(RefCell::new(ListItem {
             item_value: item_value,
             container: None,
+            owner: None
         }))
     }
+}
+/// # Description
+/// set list item's owner
+/// # Arguments
+/// $item: Rc<RefCell<ListItem>>
+/// $owner: Rc<RefCell<TCB>>
+/// #Return
+/// Nothing
+#[macro_export]
+macro_rules! set_list_item_owner {
+    ($item:ident, $owner:ident) => ({
+        $item.borrow_mut().owner = Some(Rc::clone(&$owner));
+    });
+}
+
+/// # Description
+/// get list item's owner
+/// # Arguments
+/// $ietm: Rc<Refcell<ListItem>>
+/// #Return
+/// Option<Rc<RefCell<TCB>>>
+#[macro_export]
+macro_rules! get_list_item_owner {
+    ($item:ident) => ({
+        match $item.borrow().owner {
+            Some(owner) => {
+                Rc::clone(&owner)
+            },
+            None => {
+                None
+            }
+        }
+    });
+}
+
+/// # Description
+/// get owner of next entry
+/// # Arguments
+/// $list: List
+/// $item: Rc<RefCell<ListItem>>
+/// #Return
+/// Option<Rc<RefCell<TCB>>>
+#[macro_export]
+macro_rules! get_owner_of_next_entry {
+    ($list:ident, $item:ident) => ({
+        let index = get_item_index!($list, $item, eq);
+        match index {
+            Some(index) => {
+                match $list[(index + 1) % current_list_length!($list)].borrow().owner {
+                    Some(owner) => Rc::clone(&owner),
+                    None => None,
+                }
+            },
+            None => None,
+        }  
+    });
+}
+
+/// # Description
+/// get owner of head entry
+/// # Arguments
+/// $list: List
+/// #Return
+/// Option<Rc<RefCell<TCB>>>
+#[macro_export]
+macro_rules! get_owner_of_head_entry {
+    ($list:ident) => ({
+        if current_list_length!($list) == 0 {
+            None
+        }else{
+            Some(Rc::clone(&$list[0]))
+        }  
+    });
 }
 
 /// # Description
@@ -75,6 +153,7 @@ impl ListItem {
 /// * `$item` - list item
 /// # Return
 /// * Nothing
+#[macro_export]
 macro_rules! list_insert_end {
     ($list:ident, $item:ident) => ({
         {
@@ -91,6 +170,7 @@ macro_rules! list_insert_end {
 /// * `$item` - list item
 /// # Return
 /// * Option<u32>
+#[macro_export]
 macro_rules! get_item_index {
     ($list:ident, $item:ident, eq) => ({
         {
@@ -113,6 +193,7 @@ macro_rules! get_item_index {
 /// * `$item` - list item
 /// # Return
 /// * Nothing
+#[macro_export]
 macro_rules! list_insert {
     ($list:ident, $item:ident) => ({
         {
@@ -132,6 +213,7 @@ macro_rules! list_insert {
 /// * `$Name::$name` - ListName
 /// # Return
 /// * Nothing
+#[macro_export]
 macro_rules! set_list_item_container {
     ($item:ident, $Name:ident::$name:ident) => ({
         {
@@ -146,6 +228,7 @@ macro_rules! set_list_item_container {
 /// * `$item` - list item
 /// # Return
 /// * Option<ListName>
+#[macro_export]
 macro_rules! get_list_item_container {
     ($item:ident) => ({
         {
@@ -161,6 +244,7 @@ macro_rules! get_list_item_container {
 /// * `$item` - list item
 /// # Return
 /// * Nothing
+#[macro_export]
 macro_rules! list_remove {
     ($list:ident, $item:ident) => ({
         {
@@ -179,6 +263,7 @@ macro_rules! list_remove {
 /// * `$item` - list item
 /// # Return
 /// * Nothing
+#[macro_export]
 macro_rules! list_initialise_item {
     ($item:ident) => ({
         {
@@ -193,6 +278,7 @@ macro_rules! list_initialise_item {
 /// * `$list` - list
 /// # Return
 /// * Nothing
+#[macro_export]
 macro_rules! list_initialise {
     ($list:ident) => ({
         {
@@ -208,6 +294,7 @@ macro_rules! list_initialise {
 /// * `$item` - list item
 /// # Return
 /// * is_contained: bool
+#[macro_export]
 macro_rules! is_contained_within {
     ($list:ident, $item:ident) => ({
         {
@@ -227,6 +314,7 @@ macro_rules! is_contained_within {
 /// * `$list` - list
 /// # Return
 /// * is_empty: bool
+#[macro_export]
 macro_rules! list_is_empty {
     ($list:ident) => ({
         {
@@ -241,6 +329,7 @@ macro_rules! list_is_empty {
 /// * `$list` - list
 /// # Return
 /// * len: u32
+#[macro_export]
 macro_rules! current_list_length {
     ($list:ident) => ({
         {
@@ -256,6 +345,7 @@ macro_rules! current_list_length {
 /// * `$item` - list item
 /// # Return
 /// * item: &Rc<RefCell<ListItem>>
+#[macro_export]
 macro_rules! get_next {
     ($list:ident, $item:ident) => ({
         {
@@ -275,6 +365,7 @@ macro_rules! get_next {
 /// * `$value` - item_value
 /// # Return
 /// * No return
+#[macro_export]
 macro_rules! set_list_item_value {
     ($item:ident, $value:expr) => ({
         {
@@ -289,6 +380,7 @@ macro_rules! set_list_item_value {
 /// * `$item` - list item
 /// # Return
 /// * item_value: TickType
+#[macro_export]
 macro_rules! get_list_item_value {
     ($item:ident) => ({
         {
@@ -302,7 +394,8 @@ macro_rules! get_list_item_value {
 /// # Argument
 /// * `$list` - list
 /// # Return
-/// * item_value: TickType 
+/// * item_value: TickType
+#[macro_export] 
 macro_rules! get_item_value_of_head_entry {
     ($list:ident) => ({
         {

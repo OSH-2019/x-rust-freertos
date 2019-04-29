@@ -1,0 +1,26 @@
+TARGET = Some("x86_64-unknown-linux-gnu")
+OPT_LEVEL = Some("0")
+HOST = Some("x86_64-unknown-linux-gnu")
+CC_x86_64-unknown-linux-gnu = None
+CC_x86_64_unknown_linux_gnu = None
+HOST_CC = None
+CC = None
+CFLAGS_x86_64-unknown-linux-gnu = None
+CFLAGS_x86_64_unknown_linux_gnu = None
+HOST_CFLAGS = None
+CFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+DEBUG = Some("true")
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,sse,sse2")
+running: "cc" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-Wall" "-Wextra" "-o" "/home/strike/Desktop/rust_freertos/target/debug/build/rust_freertos-cd448e5d8200d676/out/portable/port.o" "-c" "portable/port.c"
+exit code: 0
+running: "cc" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-Wall" "-Wextra" "-o" "/home/strike/Desktop/rust_freertos/target/debug/build/rust_freertos-cd448e5d8200d676/out/portable/heap_3.o" "-c" "portable/heap_3.c"
+exit code: 0
+AR_x86_64-unknown-linux-gnu = None
+AR_x86_64_unknown_linux_gnu = None
+HOST_AR = None
+AR = None
+running: "ar" "crs" "/home/strike/Desktop/rust_freertos/target/debug/build/rust_freertos-cd448e5d8200d676/out/libport.a" "/home/strike/Desktop/rust_freertos/target/debug/build/rust_freertos-cd448e5d8200d676/out/portable/port.o" "/home/strike/Desktop/rust_freertos/target/debug/build/rust_freertos-cd448e5d8200d676/out/portable/heap_3.o"
+exit code: 0
+cargo:rustc-link-lib=static=port
+cargo:rustc-link-search=native=/home/strike/Desktop/rust_freertos/target/debug/build/rust_freertos-cd448e5d8200d676/out

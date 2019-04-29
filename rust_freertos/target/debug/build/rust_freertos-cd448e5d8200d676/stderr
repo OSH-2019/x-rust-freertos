@@ -1,0 +1,3 @@
+error: 'rustfmt' is not installed for the toolchain 'stable-x86_64-unknown-linux-gnu'
+To install, run `rustup component add rustfmt --toolchain stable-x86_64-unknown-linux-gnu`
+Custom { kind: Other, error: StringError("Internal rustfmt error") }

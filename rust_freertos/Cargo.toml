@@ -4,4 +4,60 @@ version = "0.1.0"
 authors = ["Fandahao <fandahao17@mail.ustc.edu.cn>"]
 edition = "2018"
 
+[build-dependencies]
+bindgen = "0.42.2"
+cc = "1.0"
+
 [dependencies]
+
+# The [features] section is written by Fan Jinhao.
+[features]
+
+# Configuations starting with "INCLUDE_"
+# For more information, read Chapter 3 of the book.
+# Comment out the functions you don't need.
+INCLUDE_vTaskPrioritySet = []
+INCLUDE_uxTaskPriorityGet = []
+INCLUDE_vTaskDelete = []     
+INCLUDE_vTaskSuspend = []
+INCLUDE_vTaskDelayUntil = []
+INCLUDE_vTaskDelay = []
+# INCLUDE_uxTaskGetStackHighWaterMark = []
+INCLUDE_xTaskGetSchedulerState = []
+INCLUDE_xTaskGetCurrentTaskHandle = []
+INCLUDE_xTaskGetIdleTaskHandle = []
+INCLUDE_eTaskGetState = []
+INCLUDE_xSemaphoreGetMutexHolder = []
+INCLUDE_xTimerPendFunctionCall = []
+INCLUDE_xTaskAbortDelay = []
+INCLUDE_xTaskGetHandle = []
+INCLUDE_xTaskResumeFromISR = []
+
+# Configuations starting with "config_"
+# 
+# IMPORTANT NOTE!
+# ONLY those config_* that represents a True/False value are defined here.
+# Those that represent numeric values are defined as macros in config.rs
+configUSE_PREEMPTION = []
+configUSE_IDLE_HOOK = []
+configUSE_TICK_HOOK = []
+# configUSE_TRACE_FACILITY = []
+# configUSE_16_BIT_TICKS = []
+configIDLE_SHOULD_YIELD	= []
+configUSE_MUTEXES = []
+# configCHECK_FOR_STACK_OVERFLOW = []
+configUSE_RECURSIVE_MUTEXES	= []
+configUSE_MALLOC_FAILED_HOOK = []
+configUSE_APPLICATION_TASK_TAG = []
+configUSE_COUNTING_SEMAPHORES = []
+configGENERATE_RUN_TIME_STATS = []
+# configUSE_CO_ROUTINES = []
+configUSE_TIMERS = []
+# configUSE_TICKLESS_IDLE = []
+configUSE_TIME_SLICING = []
+# configUSE_PORT_OPTIMISED_TASK_SELECTION = []
+# configAPPLICATION_ALLOCATED_HEAP = []
+configUSE_TASK_NOTIFICATIONS = []
+# configSUPPORT_STATIC_ALLOCATION = []
+configSUPPORT_DYNAMIC_ALLOCATION = []
+configUSE_TASK_FPU_SUPPORT = []
