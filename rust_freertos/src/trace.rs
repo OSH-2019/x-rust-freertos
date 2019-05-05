@@ -5,6 +5,7 @@
 // Macros in this file are adapted from FreeRTOS.h
 
 /* Remove any unused trace macros. */
+// #[macro_use]
 
 /* Used to perform any necessary initialisation - for example, open a file
 into which trace is to be written. */

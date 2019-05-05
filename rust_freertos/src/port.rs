@@ -98,7 +98,7 @@ macro_rules! portCLEAR_INTERRUPT_MASK {
 macro_rules! portDISABLE_INTERRUPTS {
     () => {
         unsafe {
-            portSET_INTERRUPT_MASK()
+            portSET_INTERRUPT_MASK!()
         }
     };
 }

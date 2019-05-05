@@ -112,30 +112,38 @@ macro_rules! taskENABLE_INTERRUPTS {
 }
 
 
-/*
- * task. h
- * <pre>void vTaskStartScheduler( void );</pre>
- *
- * Starts the real time kernel tick processing.  After calling the kernel
- * has control over which tasks are executed and when.
- *
- * See the demo application file main.c for an example of creating
- * tasks and starting the kernel.
- *
- * Example usage:
-   <pre>
- void vAFunction( void )
- {
-	 // Create at least one task before starting the kernel.
-	 xTaskCreate( vTaskCode, "NAME", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
-
-	 // Start the real time kernel with preemption.
-	 vTaskStartScheduler ();
-
-	 // Will not get here unless a task calls vTaskEndScheduler ()
- }
-   </pre>
- */
+/// # Description:
+/// 
+/// Starts the real time kernel tick processing.  After calling the kernel
+/// has control over which tasks are executed and when.
+/// 
+/// See the demo application file main.c for an example of creating
+/// tasks and starting the kernel.
+/// 
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: 
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
+///
+/// # Example
+/// TODO: Finish the example.
+/// ```
+///  void vAFunction( void )
+///  {
+///	 // Create at least one task before starting the kernel.
+///	 xTaskCreate( vTaskCode, "NAME", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
+///
+///	 // Start the real time kernel with preemption.
+///	 vTaskStartScheduler ();
+///
+///	 // Will not get here unless a task calls vTaskEndScheduler ()
+/// }
+/// ```
 pub fn task_start_scheduler() {
     /* Add the idle task at the lowest priority. */
     create_idle_task();
@@ -143,7 +151,7 @@ pub fn task_start_scheduler() {
     #[cfg(configUSE_TIMERS)]
     create_timer_task();
 
-    call_port_start_scheduler();
+    initialize_scheduler();
 }
 
 /// # Description:
@@ -178,7 +186,7 @@ fn create_idle_task() {
 fn create_timer_task() {
     // TODO: Wait for task_create.
     // timer::create_timer_task()
-    // On fail, panic!("Heap not enough to allocate timer task.");
+    // On fail, panic!("No enough heap space to allocate timer task.");
 }
 
 /// # Description:
@@ -194,7 +202,7 @@ fn create_timer_task() {
 /// # Return
 /// 
 /// Nothing
-fn call_port_start_scheduler() {
+fn initialize_scheduler() {
     /* Interrupts are turned off here, to ensure a tick does not occur
        before or during the call to xPortStartScheduler().  The stacks of
        the created tasks contain a status word with interrupts switched on
@@ -222,63 +230,68 @@ fn call_port_start_scheduler() {
     }
     else
     {
+        // TODO: Maybe a trace here?
         /* Should only reach here if a task calls xTaskEndScheduler(). */
     }
 }
-/*
- * task. h
- * <pre>void vTaskEndScheduler( void );</pre>
- *
- * NOTE:  At the time of writing only the x86 real mode port, which runs on a PC
- * in place of DOS, implements this function.
- *
- * Stops the real time kernel tick.  All created tasks will be automatically
- * deleted and multitasking (either preemptive or cooperative) will
- * stop.  Execution then resumes from the point where vTaskStartScheduler ()
- * was called, as if vTaskStartScheduler () had just returned.
- *
- * See the demo application file main. c in the demo/PC directory for an
- * example that uses vTaskEndScheduler ().
- *
- * vTaskEndScheduler () requires an exit function to be defined within the
- * portable layer (see vPortEndScheduler () in port. c for the PC port).  This
- * performs hardware specific operations such as stopping the kernel tick.
- *
- * vTaskEndScheduler () will cause all of the resources allocated by the
- * kernel to be freed - but will not free resources allocated by application
- * tasks.
- *
- * Example usage:
-   <pre>
- void vTaskCode( void * pvParameters )
- {
-	 for( ;; )
-	 {
-		 // Task code goes here.
 
-		 // At some point we want to end the real time kernel processing
-		 // so call ...
-		 vTaskEndScheduler ();
-	 }
- }
+/// # Description:
+/// NOTE:  At the time of writing only the x86 real mode port, which runs on a PC
+/// in place of DOS, implements this function.
+/// 
+/// Stops the real time kernel tick.  All created tasks will be automatically
+/// deleted and multitasking (either preemptive or cooperative) will
+/// stop.  Execution then resumes from the point where vTaskStartScheduler ()
+/// was called, as if vTaskStartScheduler () had just returned.
+/// 
+/// See the demo application file main. c in the demo/PC directory for an
+/// example that uses vTaskEndScheduler ().
+/// 
+/// vTaskEndScheduler () requires an exit function to be defined within the
+/// portable layer (see vPortEndScheduler () in port. c for the PC port).  This
+/// performs hardware specific operations such as stopping the kernel tick.
+/// 
+/// vTaskEndScheduler () will cause all of the resources allocated by the
+/// kernel to be freed - but will not free resources allocated by application
+/// tasks.
+/// 
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: 
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
+///
+/// # Example
+/// TODO: Finish the doctest.
+/// ```
+///
+/// void vTaskCode( void * pvParameters )
+/// {
+/// for( ;; )
+/// {
+/// // Task code goes here.
+/// // At some point we want to end the real time kernel processing
+/// // so call ...
+/// println!("Task Code called successfully!");
+/// vTaskEndScheduler ();
+/// }
+/// }
+/// void vAFunction( void )
+/// {
+///     // Create at least one task before starting the kernel.
+///     xTaskCreate( vTaskCode, "NAME", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
+///     // Start the real time kernel with preemption.
+///     vTaskStartScheduler ();
+///     // Will only get here when the vTaskCode () task has called
+///     // vTaskEndScheduler ().  When we get here we are back to single task
+///     // execution.
+/// }
+/// ```
 
- void vAFunction( void )
- {
-	 // Create at least one task before starting the kernel.
-	 xTaskCreate( vTaskCode, "NAME", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
-
-	 // Start the real time kernel with preemption.
-	 vTaskStartScheduler ();
-
-	 // Will only get here when the vTaskCode () task has called
-	 // vTaskEndScheduler ().  When we get here we are back to single task
-	 // execution.
- }
-   </pre>
- *
- * \defgroup vTaskEndScheduler vTaskEndScheduler
- * \ingroup SchedulerControl
- */
 pub fn task_end_scheduler() {
     /* Stop the scheduler interrupts and call the portable scheduler end
        routine so the original ISRs can be restored if necessary.  The port
@@ -402,7 +415,7 @@ pub fn task_suspend_all() {
 pub fn task_resume_all() -> bool {
     let already_yielded = false;
 
-    // TODO: This is a recoverable error, so should use Result<>.
+    // TODO: This is a recoverable error, use Result<> instead.
     assert!(get_scheduler_suspended!() > pdFALSE as UBaseType,
     "The call to task_resume_all() does not match \
     a previous call to vTaskSuspendAll().");
