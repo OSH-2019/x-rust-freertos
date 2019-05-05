@@ -35,7 +35,6 @@ pub enum updated_top_priority{
 
 pub struct task_control_block{
     //* basic information
-    is_none        : bool,
 	state_list_item: ListItem,
 	evnet_list_item: ListItem,
 	task_priority  : UBaseType,
@@ -44,26 +43,26 @@ pub struct task_control_block{
 	stack_pos      : *mut StackType,
 
     //* end of stack
-    #[cfg(portStack_GROWTH > 0)]
-    end_of_stack: *mut StackType,
+    // #[cfg(portStack_GROWTH)]{}
+    // end_of_stack: *mut StackType,
 
     //* nesting
-    #[cfg(portCRITICAL_NESTING_IN_TCB == 1)]
+    #[cfg(portCRITICAL_NESTING_IN_TCB)]
     critical_nesting: UBaseType,
 
     //* reverse priority
-    #[cfg(configUSE_MUTEXES == 1)]
+    #[cfg(configUSE_MUTEXES)]
 	base_priority  : UBaseType,
-	#[cfg(configUSE_MUTEXES == 1)]
+	#[cfg(configUSE_MUTEXES)]
 	mutexes_held   : UBaseType,
 
-    #[cfg(configGENERATE_RUN_TIME_STATUS == 1)]
+    #[cfg(configGENERATE_RUN_TIME_STATUS)]
 	runtime_counter: TickType,
 
     //* notify information
-    #[cfg(config_USE_TASK_NOTIFICATIONS == 1)]
+    #[cfg(config_USE_TASK_NOTIFICATIONS)]
 	notified_value: u32,
-	#[cfg(config_USE_TASK_NOTIFICATIONS == 1)]
+	#[cfg(config_USE_TASK_NOTIFICATIONS)]
 	notify_state  : u8,
 }
 
@@ -87,12 +86,12 @@ pub fn initialize_task_list () {
 	list_initialise( pending_ready_list );
 
 	{
-        #![cfg( INCLUDE_vTaskDelete == 1 )]
+        #![cfg( INCLUDE_vTaskDelete)]
 		list_initialise( task_watching_termination );
 	}
 
 	{
-        #![cfg( INCLUDE_vTaskSuspend == 1 )]
+        #![cfg( INCLUDE_vTaskSuspend)]
 		list_initialise( suspend_task_list );
 	}
 
@@ -117,22 +116,24 @@ pub fn add_task_to_ready_list (new_tcb: &task_control_block) {
     //* post for trace
 }
 
-pub fn add_new_task_to_ready_list (new_tcb: &task_control_block) {
+pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
     taskENTER_CRITCAL();
     {
         set_current_number_of_tasks!(get_current_number_of_tasks!() + 1);
-        if current_tcb.is_none {
-            current_tcb = new_tcb;
-            if get_current_number_of_tasks!() == 1 {
-                initialize_task_list ();
+        match current_tcb
+        {
+            None => {
+                current_tcb = new_tcb;
+                if get_current_number_of_tasks!() == 1 {
+                    initialize_task_list ();
+                }
+                else {
+                    mtCOVERAGE_TEST_MARKER!();
+                }
             }
-            else {
-                mtCOVERAGE_TEST_MARKER!();
-            }
-        }
-        else {
+            Some (a) => {
             if !scheduler_running {
-                if current_tcb.priority <= new_tcb.priority {
+                if a.priority <= new_tcb.priority {
                     current_tcb = new_tcb;
                 }
                 else {
@@ -161,6 +162,23 @@ pub fn task_suspend_all () {
     set_scheduler_suspended!(get_scheduler_suspended!() + 1);
 }
 
+/*
+
+ * Several functions take an TaskHandle_t parameter that can optionally be NULL,
+ * where NULL is used to indicate that the handle of the currently executing
+ * task should be used in place of the parameter.  This macro simply checks to
+ * see if the parameter is NULL and returns a pointer to the appropriate TCB.
+
+ * #define prvGetTCBFromHandle( pxHandle ) ( ( ( pxHandle ) == NULL ) ? ( TCB_t * ) pxCurrentTCB : ( TCB_t * ) ( pxHandle ) )
+*/
+
+pub fn get_tcb_from_handle (handle: Option<task_control_block>) -> task_control_block{
+    match (handle) {
+        Some (t) => t,
+        None => current_tcb
+    }
+}
+
 impl task_control_block {
     pub fn modify_name (&mut self, name:&str) -> &mut Self {
         self.task_name = name.to_owned().to_string();
@@ -185,7 +203,6 @@ impl task_control_block {
         //FIXME fix it later: pcname string
         mtCOVERAGE_TEST_MARKER! ();
 
-        self.is_none = false;
         self.task_name = pcname;
 
         if priority >= configMAX_PRIORITIES {
@@ -196,22 +213,28 @@ impl task_control_block {
 
         self.task_priority = priority;
 
-        #cfg[(configUSE_MUTEXES == 1)] {
+        {
+            #！cfg[(configUSE_MUTEXES)]
             self.mutexes_held = 0;
             self.base_priority = priority;
         }
+
         //FIXME list_initialise_item usage?
         self.state_list_item = list_initialise_item ();
         self.evnet_list_item = list_initialise_item ();
 
-        #cfg[(portCRITICAL_NESTING_IN_TCB == 1)] {
+        {
+            #！cfg[(portCRITICAL_NESTING_IN_TCB)]
             self.critical_nesting = 0;
         }
 
-        #cfg[(configGENERATE_RUN_TIME_STATUS == 1)] {
+        {
+            #！cfg[(configGENERATE_RUN_TIME_STATUS)]
             self.runtime_counter = 0;
         }
-        #cfg[(config_USE_TASK_NOTIFICATIONS == 1)] {
+
+        {
+            #！cfg[(config_USE_TASK_NOTIFICATIONS == 1)]
             self.notify_state = taskNOT_WAITING_NOTIFICATION;
             self.notified_value = 0;
         }
@@ -231,10 +254,10 @@ impl task_control_block {
         return_status
     }
 
-    pub fn task_delete (task_to_delete: *mut task_control_block){
-        taskENTER_CRITCAL! (){
-            let tcb = get_tcb_from_handle (task_to_delete);
-            if list_remove ()
+    pub fn task_delete (task_to_delete: &task_control_block){
+        taskENTER_CRITCAL!(){
+            let tcb = get_tcb_from_handle(task_to_delete);
+
         }
     }
 }
