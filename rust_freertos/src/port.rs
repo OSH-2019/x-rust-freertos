@@ -17,14 +17,11 @@ pub const portMAX_DELAY: TickType = 0xffff;
 #[cfg(not(configUSE_16_BIT_TICKS))]
 pub const portMAX_DELAY: TickType = 0xffffffff;
 
-
 /* -------------------- Macros starting with "port_" ----------------- */
 #[macro_export]
 macro_rules! portYIELD {
     () => {
-        unsafe {
-            crate::bindings::vPortYield()
-        }
+        unsafe { crate::bindings::vPortYield() }
     };
 }
 
@@ -32,9 +29,7 @@ macro_rules! portYIELD {
 #[macro_export]
 macro_rules! portYIELD_WITHIN_API {
     () => {
-        unsafe {
-            portYIELD()
-        }
+        unsafe { portYIELD() }
     };
 }
 
@@ -52,81 +47,63 @@ macro_rules! portEND_SWITCHING_ISR {
 #[macro_export]
 macro_rules! portYIELD_FROM_ISR {
     ($xSwitchRequired: expr) => {
-        unsafe {
-            portEND_SWITCHING_ISR($xSwitchRequired)
-        }
+        unsafe { portEND_SWITCHING_ISR($xSwitchRequired) }
     };
 }
 
 #[macro_export]
 macro_rules! portSET_INTERRUPT_MASK_FROM_ISR {
     () => {
-        unsafe {
-            (crate::bindings::xPortSetInterruptMask() as BaseType)
-        }
+        unsafe { (crate::bindings::xPortSetInterruptMask() as BaseType) }
     };
 }
 
 #[macro_export]
 macro_rules! portCLEAR_INTERRUPT_MASK_FROM_ISR {
     ($xMask: expr) => {
-        unsafe {
-            crate::bindings::vPortClearInterruptMask(xMask as BaseType_t)
-        }
+        unsafe { crate::bindings::vPortClearInterruptMask(xMask as BaseType_t) }
     };
 }
 
 #[macro_export]
 macro_rules! portSET_INTERRUPT_MASK {
     () => {
-        unsafe {
-            crate::bindings::vPortDisableInterrupts()
-        }
+        unsafe { crate::bindings::vPortDisableInterrupts() }
     };
 }
 
 #[macro_export]
 macro_rules! portCLEAR_INTERRUPT_MASK {
     () => {
-        unsafe {
-            crate::bindings::vPortEnableInterrupts()
-        }
+        unsafe { crate::bindings::vPortEnableInterrupts() }
     };
 }
 
 #[macro_export]
 macro_rules! portDISABLE_INTERRUPTS {
     () => {
-        unsafe {
-            portSET_INTERRUPT_MASK!()
-        }
+        unsafe { portSET_INTERRUPT_MASK!() }
     };
 }
 
 #[macro_export]
 macro_rules! portENABLE_INTERRUPTS {
     () => {
-        unsafe {
-            portCLEAR_INTERRUPT_MASK()
-        }
+        unsafe { portCLEAR_INTERRUPT_MASK() }
     };
 }
 
 #[macro_export]
 macro_rules! portENTER_CRITICAL {
     () => {
-        unsafe {
-            crate::bindings::vPortEnterCritical()
-        }
+        unsafe { crate::bindings::vPortEnterCritical() }
     };
 }
 
 #[macro_export]
 macro_rules! portEXIT_CRITICAL {
     () => {
-        unsafe {
-            crate::bindings::vPortExitCritical()
-        }
+        unsafe { crate::bindings::vPortExitCritical() }
     };
 }
 
@@ -146,18 +123,14 @@ macro_rules! portNOP {
 #[macro_export]
 macro_rules! portCONFIGURE_TIMER_FOR_RUN_TIME_STATS {
     () => {
-        unsafe {
-            crate::bindings::vPortFindTicksPerSecond()
-        }
+        unsafe { crate::bindings::vPortFindTicksPerSecond() }
     };
 }
 
 #[macro_export]
 macro_rules! portGET_RUN_TIME_COUNTER_VALUE {
     () => {
-        unsafe {
-            crate::bindings::ulPortGetTimerValue()
-        }
+        unsafe { crate::bindings::ulPortGetTimerValue() }
     };
 }
 
@@ -221,6 +194,12 @@ macro_rules! portASSERT_IF_IN_ISR {
     () => {};
 }
 
+#[macro_export]
+macro_rules! portRESET_READY_PRIORITY {
+    ($uxPriority: expr, $uxTopReadyPriority: expr) => {
+        // This macro does nothing.
+    };
+}
 
 /*------------------- Functions starting with "Port_" ----------------- */
 
@@ -230,15 +209,11 @@ macro_rules! portASSERT_IF_IN_ISR {
  * Map to the memory management routines required for the port.
  */
 pub fn port_malloc(size: usize) -> *mut ::std::os::raw::c_void {
-    unsafe {
-        pvPortMalloc(size)
-    }
+    unsafe { pvPortMalloc(size) }
 }
 
 pub fn port_free(pv: *mut ::std::os::raw::c_void) {
-    unsafe {
-        vPortFree(pv)
-    }
+    unsafe { vPortFree(pv) }
 }
 
 /* NOTE: vPortInitialiseBlocks() was declared but not implemented.
@@ -276,9 +251,7 @@ pub fn port_free(pv: *mut ::std::os::raw::c_void) {
  * sets up a tick interrupt and sets timers for the correct tick frequency.
  */
 pub fn port_start_scheduler() -> BaseType {
-    unsafe {
-        xPortStartScheduler()
-    }
+    unsafe { xPortStartScheduler() }
 }
 
 /*
@@ -287,9 +260,7 @@ pub fn port_start_scheduler() -> BaseType {
  * executing.
  */
 pub fn port_end_scheduler() {
-    unsafe {
-        vPortEndScheduler()
-    }
+    unsafe { vPortEndScheduler() }
 }
 
 /*
@@ -301,10 +272,7 @@ pub fn port_end_scheduler() {
 pub fn port_initialise_stack(
     pxTopOfStack: *mut StackType,
     pxCode: TaskFunction,
-    pvParameters: *mut ::std::os::raw::c_void) -> *mut StackType {
-    unsafe {
-        pxPortInitialiseStack(pxTopOfStack, 
-                              Some(*pxCode), 
-                              pvParameters)
-    }
+    pvParameters: *mut ::std::os::raw::c_void,
+) -> *mut StackType {
+    unsafe { pxPortInitialiseStack(pxTopOfStack, Some(*pxCode), pvParameters) }
 }

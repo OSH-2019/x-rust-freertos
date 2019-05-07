@@ -525,7 +525,7 @@ fn reset_next_task_unblock_time() {
 }
 
 fn process_pended_ticks() {
-    let pended_counts = get_pended_ticks!();
+    let mut pended_counts = get_pended_ticks!();
 
     if pended_counts > 0 {
         loop {
