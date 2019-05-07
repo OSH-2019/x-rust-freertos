@@ -1,3 +1,2 @@
-rust_freertos/target
 rust_freertos/src/bindings.rs
-get/target
+**/target
