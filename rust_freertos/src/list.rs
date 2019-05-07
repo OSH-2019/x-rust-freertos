@@ -84,7 +84,7 @@ impl ListItem {
 /// Nothing
 #[macro_export]
 macro_rules! set_list_item_owner {
-    ($item:ident, $owner:ident) => ({
+    ($item:expr, $owner:expr) => ({
         $item.borrow_mut().owner = Some(Rc::clone(&$owner));
     });
 }
@@ -97,7 +97,7 @@ macro_rules! set_list_item_owner {
 /// Option<Rc<RefCell<TCB>>>
 #[macro_export]
 macro_rules! get_list_item_owner {
-    ($item:ident) => ({
+    ($item:expr) => ({
         match $item.borrow().owner {
             Some(owner) => {
                 Rc::clone(&owner)
@@ -118,7 +118,7 @@ macro_rules! get_list_item_owner {
 /// Option<Rc<RefCell<TCB>>>
 #[macro_export]
 macro_rules! get_owner_of_next_entry {
-    ($list:ident, $item:ident) => ({
+    ($list:expr, $item:expr) => ({
         let index = get_item_index!($list, $item, eq);
         match index {
             Some(index) => {
@@ -140,7 +140,7 @@ macro_rules! get_owner_of_next_entry {
 /// Option<Rc<RefCell<TCB>>>
 #[macro_export]
 macro_rules! get_owner_of_head_entry {
-    ($list:ident) => ({
+    ($list:expr) => ({
         if current_list_length!($list) == 0 {
             None
         }else{
@@ -158,7 +158,7 @@ macro_rules! get_owner_of_head_entry {
 /// * Nothing
 #[macro_export]
 macro_rules! list_insert_end {
-    ($list:ident, $item:ident) => ({
+    ($list:expr, $item:expr) => ({
         {
 
             $list.push(Rc::clone(&$item));
@@ -175,13 +175,13 @@ macro_rules! list_insert_end {
 /// * Option<u32>
 #[macro_export]
 macro_rules! get_item_index {
-    ($list:ident, $item:ident, eq) => ({
+    ($list:expr, $item:expr, eq) => ({
         {
             let index = $list.iter().position(|x| x.borrow().item_value == $item.borrow().item_value);
             index
         }
     });
-    ($list:ident, $item:ident, gt) => ({
+    ($list:expr, $item:expr, gt) => ({
         {
             let index = $list.iter().position(|x| x.borrow().item_value > $item.borrow().item_value);
             index
@@ -198,7 +198,7 @@ macro_rules! get_item_index {
 /// * Nothing
 #[macro_export]
 macro_rules! list_insert {
-    ($list:ident, $item:ident) => ({
+    ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, gt);
             match index {
@@ -218,7 +218,7 @@ macro_rules! list_insert {
 /// * Nothing
 #[macro_export]
 macro_rules! set_list_item_container {
-    ($item:ident, $Name:ident::$name:ident) => ({
+    ($item:expr, $Name:expr::$name:expr) => ({
         {
             $item.borrow_mut().container = Some($Name::$name);
         }
@@ -233,7 +233,7 @@ macro_rules! set_list_item_container {
 /// * Option<ListName>
 #[macro_export]
 macro_rules! get_list_item_container {
-    ($item:ident) => ({
+    ($item:expr) => ({
         {
             $item.borrow().container
         }
@@ -249,7 +249,7 @@ macro_rules! get_list_item_container {
 /// * Nothing
 #[macro_export]
 macro_rules! list_remove_inner {
-    ($list:ident, $item:ident) => ({
+    ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, eq);
             match index {
@@ -269,7 +269,7 @@ macro_rules! list_remove_inner {
 /// Nothing
 #[macro_export]
 macro_rules!  get_list_container_mapped_index {
-        ($item:ident) => ({
+        ($item:expr) => ({
             {
                 match $item.container {
                 ListName::LIST0 => 0,
@@ -292,7 +292,7 @@ macro_rules!  get_list_container_mapped_index {
 /// current list item
 #[macro_export]
 macro_rules! list_remove {
-    ($item:ident) => ({
+    ($item:expr) => ({
         {
             let list_mapped_index = get_list_container_mapped_index!($item);
             let mut list = &mut LIST[list_mapped_index];
@@ -310,7 +310,7 @@ macro_rules! list_remove {
 /// * Nothing
 #[macro_export]
 macro_rules! list_initialise_item {
-    ($item:ident) => ({
+    ($item:expr) => ({
         {
             $item.borrow_mut().container = None;
         }
@@ -325,7 +325,7 @@ macro_rules! list_initialise_item {
 /// * Nothing
 #[macro_export]
 macro_rules! list_initialise {
-    ($list:ident) => ({
+    ($list:expr) => ({
         {
             $list.clear();
         }
@@ -341,7 +341,7 @@ macro_rules! list_initialise {
 /// * is_contained: bool
 #[macro_export]
 macro_rules! is_contained_within {
-    ($list:ident, $item:ident) => ({
+    ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, eq);
             match index {
@@ -361,7 +361,7 @@ macro_rules! is_contained_within {
 /// * is_empty: bool
 #[macro_export]
 macro_rules! list_is_empty {
-    ($list:ident) => ({
+    ($list:expr) => ({
         {
             $list.is_empty()
         }
@@ -376,7 +376,7 @@ macro_rules! list_is_empty {
 /// * len: u32
 #[macro_export]
 macro_rules! current_list_length {
-    ($list:ident) => ({
+    ($list:expr) => ({
         {
             $list.len()
         }
@@ -392,7 +392,7 @@ macro_rules! current_list_length {
 /// * item: &Rc<RefCell<ListItem>>
 #[macro_export]
 macro_rules! get_next {
-    ($list:ident, $item:ident) => ({
+    ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, eq);
             match index {
@@ -412,7 +412,7 @@ macro_rules! get_next {
 /// * No return
 #[macro_export]
 macro_rules! set_list_item_value {
-    ($item:ident, $value:expr) => ({
+    ($item:expr, $value:expr) => ({
         {
             $item.borrow_mut().item_value = $value;
         }
@@ -427,12 +427,20 @@ macro_rules! set_list_item_value {
 /// * item_value: TickType
 #[macro_export]
 macro_rules! get_list_item_value {
-    ($item:ident) => ({
+    ($item:expr) => ({
         {
             $item.borrow().item_value
         }
     })
 }
+
+// test the functions
+pub fn get_list_item_value_fn(item: &ListItem) -> BaseType {
+    item.borrow().item_value
+}
+
+
+
 
 /// # Description
 /// * get item_value of the head_entry of the list. If the list is empty, panic!
@@ -442,7 +450,7 @@ macro_rules! get_list_item_value {
 /// * item_value: TickType
 #[macro_export]
 macro_rules! get_item_value_of_head_entry {
-    ($list:ident) => ({
+    ($list:expr) => ({
         {
             if !list_is_empty!($list) {
                 $list[0].borrow().item_value
