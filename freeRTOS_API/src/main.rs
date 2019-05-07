@@ -60,7 +60,7 @@ fn task_priority_get(xTask:Option<&TaskHandle>) -> UBaseType
         uxReturn = pxTCB.task_priority ;
     }
     taskEXIT_CRITICAL() ;
-    uxReturn ;
+    return uxReturn ;
 }
 
 fn task_priority_set(xTask:TaskHandle , uxNewPriority:UBaseType)
@@ -273,16 +273,16 @@ fn task_get_application_task_tag(xTask:TaskHandle) -> TaskHookFunction
     xReturn ;
 }
 
-fn task_get_current_task_handle() -> TaskHandle
+fn task_get_current_task_handle() -> &TaskHandle
 {
-    let mut xReturn:TaskHandle = CurrentTCB ;
-    xReturn ;
+    let mut xReturn:&TaskHandle = &CurrentTCB ;
+    return xReturn ;
 }
 
 // ???
 fn task_get_handle(pcNameToQuery:&char) -> TaskHandle
 {
-    let mut uxQueue:UBaseTyle = configMAX_PRIORITIES;
+    let mut uxQueue:UBaseType = configMAX_PRIORITIES;
     let mut pxTCB:&TCB = 0 ;
 
     /* Task names will be truncated to configMAX_TASK_NAME_LEN - 1 bytes. */
@@ -333,6 +333,25 @@ fn task_get_idle_task_handle() -> TaskHandle
     return IdleTaskHandle;
 }
 
-//fn task_get_stack_high_water_mark
+fn task_get_stack_high_water_mark(xtask:Option<&TaskHandle>) -> UBaseType
+{
+    let mut pucEndOfStack = 0;
+    let mut uxReturn:UBaseType = 0;
+
+    let pxTCB:&TCB = get_tcb_from_handle(xtask);
+
+    {
+    #[cfg( portSTACK_GROWTH < 0 )]
+            pucEndOfStack = pxTCB.pxStack;
+    }
+    {
+    #![cfg( portSTACK_GROWTH < 0 )]
+            pucEndOfStack = pxTCB.pxEndOfStack;
+    }
+
+    uxReturn = ( UBaseType )prvTaskCheckFreeStackSpace( pucEndOfStack );
+
+    return uxReturn;
+}
 
 //fn task_get_state
