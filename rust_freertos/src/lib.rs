@@ -18,6 +18,8 @@ mod task_global;
 mod task_control;
 mod task_api;
 mod kernel;
+mod queue;
+mod queue_h;
 
 use std::rc::Rc;
 use std::cell::RefCell;
