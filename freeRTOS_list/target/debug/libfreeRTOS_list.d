@@ -1,1 +1,0 @@
-/media/strike/LENOVO/USTC/大二下/操作系统原理与设计(H)/stu_zsstrike/OS-Project/freeRTOS_list/target/debug/libfreeRTOS_list.rlib: /media/strike/LENOVO/USTC/大二下/操作系统原理与设计(H)/stu_zsstrike/OS-Project/freeRTOS_list/src/lib.rs /media/strike/LENOVO/USTC/大二下/操作系统原理与设计(H)/stu_zsstrike/OS-Project/freeRTOS_list/src/list_7th.rs
