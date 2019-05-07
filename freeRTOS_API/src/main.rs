@@ -2,6 +2,11 @@
 extern crate lazy_static ;
 use crate::port::* ;
 
+pub type StackType = usize;
+pub type BaseType = i64;
+pub type UBaseType = u64;
+pub type TickType = u32;
+
 struct TCB{
     state_list_item : ListItem ,
     event_list_item : ListItem ,
@@ -27,8 +32,11 @@ struct TCB{
 	#[cfg(config_USE_TASK_NOTIFICATIONS)]
 	notify_state  : u8,
 }
+//缺少 task_name task_handle task_tag task_state tcb_number???
 
 pub type TaskHandle = TCB ;
+pub type TaskStatus = TCB ;  // ???  another struct
+pub type TaskState  = UBaseType ;   // ???
 
 lazy_static!{
     static ref CurrentTCB: TCB = something ;// 从何处获取当前TCB
@@ -43,12 +51,12 @@ fn get_tcb_from_handle(task:Option<&TCB>) -> &TCB{
 
 
 
-fn task_priority_get(xTask:TaskHandle) -> UBaseType
+fn task_priority_get(xTask:Option<&TaskHandle>) -> UBaseType
 {
-    let mut uxReturn : UBaseType = 0 ;
+    let mut uxReturn:UBaseType = 0 ;
     taskENTER_CRITICAL() ;
     {
-        let pxTCB: &TCB = get_tcb_from_handle(&xTask) ;
+        let pxTCB: &TCB = get_tcb_from_handle(xTask) ;
         uxReturn = pxTCB.task_priority ;
     }
     taskEXIT_CRITICAL() ;
@@ -85,7 +93,7 @@ fn task_priority_set(xTask:TaskHandle , uxNewPriority:UBaseType)
             }
             else
             // 当前正在执行的task已是最高优先级
-                ；
+                ;
         }
         else if (pxTCB == CurrentTCB)
             xYieldRequired = pdTRUE ;
@@ -131,9 +139,9 @@ fn task_priority_set(xTask:TaskHandle , uxNewPriority:UBaseType)
     taskEXIT_CRITICAL() ;
 }
 
-fn task_get_system_state()
+fn task_get_system_state(pxTaskStatusArray:&TaskStatus , uxArraySize:UBaseType , pulTotalRunTime:u32) -> uBaseType
 {
-    let mut uxTask:UBaseType = 0
+    let mut uxTask:UBaseType = 0 ;
     let mut uxQueue = configMAX_PRIORITIES;
     vTaskSuspendAll();      // ???
     {
@@ -177,8 +185,83 @@ fn task_get_system_state()
     return uxTask;
 }
 
+// 乱七八糟的functions和参数
+fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetFreeStackSpace:BaseType, eState:TaskState)
+{
 
-//fn TaskGetInfo()
+    /* xTask is NULL then get the state of the calling task. */
+    let pxTCB : &TCB = get_tcb_from_handle( xTask );
+
+    pxTaskStatus.xHandle = pxTCB;
+    pxTaskStatus.task_name = &( pxTCB.task_name [ 0 ] );
+    pxTaskStatus.uxCurrentPriority = pxTCB.task_priority;
+    pxTaskStatus.pxStackBase = pxTCB.stack_pose;
+    pxTaskStatus.xTaskNumber = pxTCB.tcb_Number;
+
+    #[cfg( configUSE_MUTEXES )]
+        pxTaskStatus.base_priority = pxTCB.base_priority;
+    #![cfg(configUSE_MUTEXES )]
+        pxTaskStatus.base_priority = 0;
+
+    #[cfg ( configGENERATE_RUN_TIME_STATS )]
+        pxTaskStatus.ulRunTimeCounter = pxTCB.ulRunTimeCounter;
+    #![cfg ( configGENERATE_RUN_TIME_STATS )]
+        pxTaskStatus.ulRunTimeCounter = 0;
+
+    /* Obtaining the task state is a little fiddly, so is only done if the
+    value of eState passed into this function is eInvalid - otherwise the
+    state is just set to whatever is passed in. */
+    if( eState != eInvalid )
+    {
+            if( pxTCB == &CurrentTCB )
+                    pxTaskStatus.eCurrentState = eRunning;
+            else
+            {
+                    pxTaskStatus.eCurrentState = eState;
+
+                    #[cfg( INCLUDE_vTaskSuspend )]
+                    {
+                            /* If the task is in the suspended list then there is a
+                            chance it is actually just blocked indefinitely - so really
+                            it should be reported as being in the Blocked state. */
+                            if( eState == eSuspended )
+                            {
+                                    vTaskSuspendAll();
+                                    {
+                                            if( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) != NULL )
+                                            {
+                                                    pxTaskStatus->eCurrentState = eBlocked;
+                                            }
+                                    }
+                                    ( void ) xTaskResumeAll();
+                            }
+                    }
+            }
+    }
+    else
+    {
+            pxTaskStatus->eCurrentState = eTaskGetState( pxTCB );
+    }
+
+    /* Obtaining the stack space takes some time, so the xGetFreeStackSpace
+    parameter is provided to allow it to be skipped. */
+    if( xGetFreeStackSpace != pdFALSE )
+    {
+            #[cfg( portSTACK_GROWTH > 0 )]
+            {
+                    pxTaskStatus->usStackHighWaterMark = prvTaskCheckFreeStackSpace( ( uint8_t * ) pxTCB->pxEndOfStack );
+            }
+            #![cfg( portSTACK_GROWTH > 0 )]
+            {
+                    pxTaskStatus->usStackHighWaterMark = prvTaskCheckFreeStackSpace( ( uint8_t * ) pxTCB->pxStack );
+            }
+    }
+    else
+    {
+            pxTaskStatus->usStackHighWaterMark = 0;
+    }
+}
+
 
 fn task_get_application_task_tag(xTask:TaskHandle) -> TaskHookFunction
 {
@@ -195,3 +278,61 @@ fn task_get_current_task_handle() -> TaskHandle
     let mut xReturn:TaskHandle = CurrentTCB ;
     xReturn ;
 }
+
+// ???
+fn task_get_handle(pcNameToQuery:&char) -> TaskHandle
+{
+    let mut uxQueue:UBaseTyle = configMAX_PRIORITIES;
+    let mut pxTCB:&TCB = 0 ;
+
+    /* Task names will be truncated to configMAX_TASK_NAME_LEN - 1 bytes. */
+    configASSERT( strlen( pcNameToQuery ) < configMAX_TASK_NAME_LEN );
+
+    vTaskSuspendAll();
+    {
+            /* Search the ready lists. */
+            do
+            {
+                    uxQueue--;
+                    pxTCB = prvSearchForNameWithinSingleList( ( List_t * ) &( pxReadyTasksLists[ uxQueue ] ), pcNameToQuery );
+
+                    if( pxTCB != NULL )
+                    {
+                            /* Found the handle. */
+                            break;
+                    }
+
+            } while( uxQueue > ( UBaseType_t ) tskIDLE_PRIORITY ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
+
+            /* Search the delayed lists. */
+            if( pxTCB == NULL )
+                    pxTCB = prvSearchForNameWithinSingleList( ( List_t * ) pxDelayedTaskList, pcNameToQuery );
+
+            if( pxTCB == NULL )
+                    pxTCB = prvSearchForNameWithinSingleList( ( List_t * ) pxOverflowDelayedTaskList, pcNameToQuery );
+
+            #[cfg ( INCLUDE_vTaskSuspend == 1 )]
+                    if( pxTCB == NULL )
+			pxTCB = prvSearchForNameWithinSingleList( &xSuspendedTaskList, pcNameToQuery );         
+
+            #[cfg( INCLUDE_vTaskDelete == 1 )]
+                    if( pxTCB == NULL )
+                            /* Search the deleted list. */
+                            pxTCB = prvSearchForNameWithinSingleList( &xTasksWaitingTermination, pcNameToQuery );
+    }
+    xTaskResumeAll();
+
+    return pxTCB;
+}
+
+fn task_get_idle_task_handle() -> TaskHandle
+{
+    /* If xTaskGetIdleTaskHandle() is called before the scheduler has been
+    started, then xIdleTaskHandle will be NULL. */
+    configASSERT( ( IdleTaskHandle != NULL ) );         // 这玩意儿是个全局变量???
+    return IdleTaskHandle;
+}
+
+//fn task_get_stack_high_water_mark
+
+//fn task_get_state
