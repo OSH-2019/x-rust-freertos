@@ -10,7 +10,8 @@ mod projdefs;
 mod trace;
 mod ffi;
 mod list;
-
+mod queue;
+mod queue_h;
 #[cfg(test)]
 mod tests {
     use super::*;

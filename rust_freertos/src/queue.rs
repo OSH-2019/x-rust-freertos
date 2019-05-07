@@ -5,13 +5,14 @@ use crate::trace::*;
 use std::rc::Rc;
 use std::cell::{RefCell, Ref, RefMut};
 use crate::*;
+use crate::queue_h::*;
 //use volatile::Volatile;
 //
 
 pub const queueUNLOCKED:i8 = -1;
 pub const queueLOCKED_UNMODIFIED:i8 = 0;
-pub const queueSEND_TO_BACK:BaseType = 0;
-
+pub const queueSEMAPHORE_QUEUE_ITEM_LENGTH:UBaseType = 0;
+pub const queueMUTEX_GIVE_BLOCK_TIME:TickType = 0;
 
 pub enum QueueUnion {
     pcReadFrom(UBaseType),
@@ -21,14 +22,14 @@ pub enum QueueUnion {
 pub struct QueueDefinition<T>{
     pcQueue: VecDeque<T>,
     
-    pcHead: UBaseType,//usize?
-    pcTail: UBaseType,//usize?
-    pcWriteTo: UBaseType,//usize?
+    pcHead: UBaseType,
+    pcTail: UBaseType,
+    pcWriteTo: UBaseType,
 
     u: QueueUnion,
 
-    xTaskWaitingToSend:Vec<Rc<RefCell<ListItem>>>,//&?
-    xTaskWaitingToReceive:Vec<Rc<RefCell<ListItem>>> ,//&?
+    xTasksWaitingToSend:Vec<Rc<RefCell<ListItem>>>,
+    xTasksWaitingToReceive:Vec<Rc<RefCell<ListItem>>> ,
 
     uxMessagesWaiting: UBaseType,
     uxLength: UBaseType,
@@ -118,7 +119,7 @@ impl <T>QueueDefinition<T>{
             self.pcTail = self.pcHead + self.uxLength;
             self.uxMessagesWaiting = 0 as UBaseType;
             self.pcWriteTo = self.pcHead;
-            self.pcReadFrom = self.pcHead + self.uxLength - (1 as UBaseType);
+            self.u = QueueUnion::pcReadFrom(self.pcHead + self.uxLength - (1 as UBaseType));
             self.cRxLock = queueUNLOCKED;
             self.cTxLock = queueUNLOCKED;
             self.pcQueue.clear();//初始化空队列
@@ -136,8 +137,8 @@ impl <T>QueueDefinition<T>{
                 }
             }
             else{
-                list_initialise!(&(self.xTasksWaitingToSend));
-                list_initialise!(&(self.xTasksWaitingToReceive));
+                list_initialise!(self.xTasksWaitingToSend);
+                list_initialise!(self.xTasksWaitingToReceive);
             }
         }
         taskEXIT_CRITICAL();
@@ -193,7 +194,7 @@ impl <T>QueueDefinition<T>{
                             }
                         }
                         None => {
-                            if list_is_empty!( &self.xTasksWaitingToReceive ) == false{
+                            if list_is_empty!(self.xTasksWaitingToReceive ) == false{
                                 if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive ) != false{
                                     pxHigherPriorityTaskWoken = true;
                                 }
@@ -208,7 +209,7 @@ impl <T>QueueDefinition<T>{
                     }
 
                     if cfg!(not(configUSE_QUEUE_SETS)) {
-                        if list_is_empty!(&self.xTasksWaitingToReceive) == false{
+                        if list_is_empty!(self.xTasksWaitingToReceive) == false{
                             if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive) != false{
                                 pxHigherPriorityTaskWoken = true;
                             }
@@ -281,7 +282,7 @@ impl <T>QueueDefinition<T>{
                         }
                     }
                     None =>{
-                        if list_is_empty!(&self.xTasksWaitingToReceive) == false{
+                        if list_is_empty!(self.xTasksWaitingToReceive) == false{
                             if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive) != false{
                                 vTaskMissedYield();
                             }
@@ -296,7 +297,7 @@ impl <T>QueueDefinition<T>{
                 }
 
                 if cfg!(not(configUSE_QUEUE_SETS)) {
-                    if list_is_empty!(&self.xTasksWaitingToReceive) == false{
+                    if list_is_empty!(self.xTasksWaitingToReceive) == false{
                         if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive) != false{
                             vTaskMissedYield();
                         }
@@ -319,7 +320,7 @@ impl <T>QueueDefinition<T>{
         {
             let cRxLock:i8 = self.cRxLock;
             while cRxLock > queueLOCKED_UNMODIFIED{
-                if list_is_empty!(&self.xTasksWaitingToReceive) == false{
+                if list_is_empty!(self.xTasksWaitingToReceive) == false{
                     if xTaskRemoveFromEventList(&self.xTasksWaitingToReceive) != false{
                         vTaskMissedYield();
                     }
