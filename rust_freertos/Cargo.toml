@@ -13,7 +13,39 @@ lazy_static = "1.3.0"
 
 # The [features] section is written by Fan Jinhao.
 [features]
-
+default = [
+	"configUSE_TASK_FPU_SUPPORT",
+	"configSUPPORT_DYNAMIC_ALLOCATION",
+	"configUSE_TASK_NOTIFICATIONS",
+	"configUSE_TIME_SLICING",
+	"configUSE_TIMERS",
+	"configGENERATE_RUN_TIME_STATS",
+	"configUSE_COUNTING_SEMAPHORES",
+	"configUSE_APPLICATION_TASK_TAG",
+	"configUSE_MALLOC_FAILED_HOOK",
+	"configUSE_RECURSIVE_MUTEXES",
+	"configUSE_MUTEXES",
+	"configIDLE_SHOULD_YIELD",
+	"configUSE_TICK_HOOK",
+	"configUSE_IDLE_HOOK",
+	"configUSE_PREEMPTION",
+	"INCLUDE_xTaskResumeFromISR",
+	"INCLUDE_xTaskGetHandle",
+	"INCLUDE_xTaskAbortDelay",
+	"INCLUDE_xTimerPendFunctionCall",
+	"INCLUDE_xSemaphoreGetMutexHolder",
+	"INCLUDE_xSemaphoreGetMutexHolder",
+	"INCLUDE_eTaskGetState",
+	"INCLUDE_xTaskGetIdleTaskHandle",
+	"INCLUDE_xTaskGetCurrentTaskHandle",
+	"INCLUDE_xTaskGetSchedulerState",
+	"INCLUDE_vTaskDelay",
+	"INCLUDE_vTaskDelayUntil",
+	"INCLUDE_vTaskSuspend",
+	"INCLUDE_vTaskDelete",
+	"INCLUDE_uxTaskPriorityGet",
+	"INCLUDE_vTaskPrioritySet"
+]
 # Configuations starting with "INCLUDE_"
 # For more information, read Chapter 3 of the book.
 # Comment out the functions you don't need.
@@ -23,7 +55,7 @@ INCLUDE_vTaskDelete = []
 INCLUDE_vTaskSuspend = []
 INCLUDE_vTaskDelayUntil = []
 INCLUDE_vTaskDelay = []
-# INCLUDE_uxTaskGetStackHighWaterMark = []
+INCLUDE_uxTaskGetStackHighWaterMark = []
 INCLUDE_xTaskGetSchedulerState = []
 INCLUDE_xTaskGetCurrentTaskHandle = []
 INCLUDE_xTaskGetIdleTaskHandle = []
@@ -42,23 +74,23 @@ INCLUDE_xTaskResumeFromISR = []
 configUSE_PREEMPTION = []
 configUSE_IDLE_HOOK = []
 configUSE_TICK_HOOK = []
-# configUSE_TRACE_FACILITY = []
-# configUSE_16_BIT_TICKS = []
+configUSE_TRACE_FACILITY = []
+configUSE_16_BIT_TICKS = []
 configIDLE_SHOULD_YIELD	= []
 configUSE_MUTEXES = []
-# configCHECK_FOR_STACK_OVERFLOW = []
+configCHECK_FOR_STACK_OVERFLOW = []
 configUSE_RECURSIVE_MUTEXES	= []
 configUSE_MALLOC_FAILED_HOOK = []
 configUSE_APPLICATION_TASK_TAG = []
 configUSE_COUNTING_SEMAPHORES = []
 configGENERATE_RUN_TIME_STATS = []
-# configUSE_CO_ROUTINES = []
+configUSE_CO_ROUTINES = []
 configUSE_TIMERS = []
-# configUSE_TICKLESS_IDLE = []
+configUSE_TICKLESS_IDLE = []
 configUSE_TIME_SLICING = []
-# configUSE_PORT_OPTIMISED_TASK_SELECTION = []
-# configAPPLICATION_ALLOCATED_HEAP = []
+configUSE_PORT_OPTIMISED_TASK_SELECTION = []
+configAPPLICATION_ALLOCATED_HEAP = []
 configUSE_TASK_NOTIFICATIONS = []
-# configSUPPORT_STATIC_ALLOCATION = []
+configSUPPORT_STATIC_ALLOCATION = []
 configSUPPORT_DYNAMIC_ALLOCATION = []
 configUSE_TASK_FPU_SUPPORT = []
