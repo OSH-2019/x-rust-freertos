@@ -1,4 +1,55 @@
+use crate::*;
 use crate::port::{BaseType, UBaseType, TickType};
+use crate::task_control::TCB;
+use crate::list::LIST;
+
+// Define all the necessary global task lists.
+lazy_static! {
+    /* NOTE! CURRENT_TCB isn't a pointer anymore,
+     * It's a MOVED value!
+     */
+    pub static ref CURRENT_TCB: TCB = kernel::create_idle_task();
+
+    /* Lists for ready and blocked tasks. --------------------*/
+    // Prioritised ready tasks.
+    pub static ref READY_TASK_LISTS: [LIST; configMAX_PRIORITIES!()] =
+        [LIST::new(), configMAX_PRIORITIES!()];
+
+    /* Delayed tasks (two lists are used -
+     * one for delays that have overflowed the current tick count.
+     */
+    pub static ref DELAYED_TASK_LIST1: LIST = LIST::new();
+    pub static ref DELAYED_TASK_LIST2: LIST = LIST::new();
+
+    // Points to the delayed task list currently being used.
+    pub static ref DELAYED_TASK_LIST: &'static LIST = &DELAYED_TASK_LIST1;
+
+    /* Points to the delayed task list currently being used 
+     * to hold tasks that have overflowed the current tick count.
+     */
+    pub static ref OVERFLOW_DELAYED_TASK_LIST: &'static LIST = &DELAYED_TASK_LIST2;
+
+    /* Tasks that have been readied while the scheduler was suspended.
+     * They will be moved to the ready list when the scheduler is resumed. 
+     */
+    pub static ref PENDING_READY_LIST: LIST = LIST::new();
+}
+
+// Conditionally compiled global lists.
+#[cfg(feature = "INCLUDE_vTaskDelete")]
+lazy_static! {
+    // Tasks that have been deleted - but their memory not yet freed.
+    pub static ref TASKS_WAITING_TERMINATION: LIST = LIST::new();
+    pub static ref DELETED_TASKS_WAITING_CLEAN_UP: UBaseType = 0;
+}
+
+#[cfg(feature = "INCLUDE_vTaskSuspend")]
+lazy_static! {
+    // Tasks that are currently suspended.
+    pub static ref SUSPENDED_TASK_LIST: LIST = LIST::new();
+}
+
+/* ------------------ End global lists ------------------- */
 
 /* Some global variables. */
 pub static mut CURRENT_NUMBER_OF_TASKS: UBaseType = 0;
