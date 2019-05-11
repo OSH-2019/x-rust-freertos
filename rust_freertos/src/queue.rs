@@ -38,15 +38,15 @@ pub struct QueueDefinition<T>{
     cRxLock: i8,
     cTxLock: i8,
     
-    #[cfg(all(configSUPPORT_STATIC_ALLOCATION, configSUPPORT_DYNAMIC_ALLOCATION))]
+    #[cfg(all(feature = "configSUPPORT_STATIC_ALLOCATION",feature = " configSUPPORT_DYNAMIC_ALLOCATION"))]
     ucStaticallyAllocated: u8,
     
-    #[cfg(configUSE_QUEUE_SETS)]
+    #[cfg(feature = "configUSE_QUEUE_SETS")]
     pxQueueSetContainer:Option<Box<QueueDefinition>>,
     
-    #[cfg(configUSE_TRACE_FACILITY)] 
+    #[cfg(feature = "configUSE_TRACE_FACILITY")] 
     uxQueueNumber: UBaseType,
-    #[cfg(configUSE_TRACE_FACILITY)]
+    #[cfg(feature = "configUSE_TRACE_FACILITY")]
     ucQueueType: u8,
 
 }
@@ -65,13 +65,13 @@ impl <T>QueueDefinition<T>{
     ///
     /// # Return
     ///
-    #[cfg(configSUPPORT_DYNAMIC_ALLOCATION)]
+    #[cfg(feature = "configSUPPORT_DYNAMIC_ALLOCATION")]
     fn queue_generic_create<T>( uxQueueLength:UBaseType, uxItem:T, ucQueueType:u8) -> Queue<T> {
         let queue:Queue;
 
         queue.pcQueue =  VecDeque::with_capacity(uxQueueLength);
 
-        #[cfg(configSUPPORT_STATIC_ALLOCATION)]
+        #[cfg(feature = "configSUPPORT_STATIC_ALLOCATION")]
         queue.ucStaticallyAllocated = false;
         
         queue.initialise_new_queue(uxQueueLength,ucQueueType);
@@ -91,12 +91,12 @@ impl <T>QueueDefinition<T>{
         self.queue_generic_reset(true);
         
         {
-        #![cfg(configUSE_TRACE_FACILITY)]
+        #![cfg(feature = "configUSE_TRACE_FACILITY")]
         self.ucQueueType = ucQueueType;
         }
         
         {
-        #![cfg(configUSE_QUEUE_SETS)]
+        #![cfg(feature = "configUSE_QUEUE_SETS")]
         self.pxQueueSetContainer  = None;
         }
 
@@ -183,7 +183,7 @@ impl <T>QueueDefinition<T>{
 
                 if cTxLock == queueUNLOCKED{
 
-                    #[cfg(configUSE_QUEUE_SETS)]
+                    #[cfg(feature = "configUSE_QUEUE_SETS")]
                     match self.pxQueueSetContainer{
                         Some =>{
                             if prvNotifyQueueSetContainer(self, xCopyPosition ) != false{
@@ -207,8 +207,9 @@ impl <T>QueueDefinition<T>{
                             }
                         }
                     }
-
-                    if cfg!(not(configUSE_QUEUE_SETS)) {
+                    
+                    {
+                        #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
                         if list_is_empty!(self.xTasksWaitingToReceive) == false{
                             if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive) != false{
                                 pxHigherPriorityTaskWoken = true;
@@ -271,7 +272,7 @@ impl <T>QueueDefinition<T>{
             let cTxLock:i8 = self.cTxLock;
             while cTxLock > queueLOCKED_UNMODIFIED{
 
-                #[cfg(configUSE_QUEUE_SETS)]
+                #[cfg(feature = "configUSE_QUEUE_SETS")]
                 match self.pxQueueSetContainer{
                     Some =>{
                         if prvNotifyQueueSetContainer(self, queueSEND_TO_BACK) != false{
@@ -295,8 +296,8 @@ impl <T>QueueDefinition<T>{
                         }
                     }
                 }
-
-                if cfg!(not(configUSE_QUEUE_SETS)) {
+                {
+                    #![cfg(not(feature = "configUSE_QUEUE_SETS"))] 
                     if list_is_empty!(self.xTasksWaitingToReceive) == false{
                         if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive) != false{
                             vTaskMissedYield();
