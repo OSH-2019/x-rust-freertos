@@ -102,7 +102,7 @@ pub fn initialize_task_list () {
 	OVERFLOW_DELAY_TASK_LIST = &DELAY_TASK_LIST2;
 }
 
-pub fn add_task_to_ready_list (new_tcb: Option<&task_control_block>) {
+pub fn add_task_to_ready_list (new_tcb: Option<task_control_block>) {
     //* move_task_to_ready_state (new_tcb);
     record_ready_priority! (new_tcb.unwrap().task_priority);
     list_insert_end! (READY_TASK_LIST[new_tcb.unwrap().task_priority],new_tcb.state_list_item);
@@ -135,7 +135,7 @@ pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
         }
         }
         set_task_number!(get_task_number!() + 1);
-        add_task_to_ready_list(&new_tcb);
+        add_task_to_ready_list(new_tcb);
     }
     taskEXIT_CRITICAL!();
     if get_scheduler_running!() {
