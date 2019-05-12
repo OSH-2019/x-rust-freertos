@@ -2,6 +2,7 @@ use crate::port::*;
 use crate::list::*;
 use crate::kernel::*;
 use crate::*;
+use std::ffi::*;
 use std::mem::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -68,45 +69,6 @@ pub struct task_control_block{
 	notify_state  : u8,
 }
 
-
-impl task_control_block {
-    pub fn modify_name (&mut self, name:&str) -> &mut Self {
-        self.task_name = name.to_owned().to_string();
-        self
-    }
-
-    pub fn modify_stacksize (&mut self, stacksize: UBaseType) -> &mut Self {
-        self.task_stacksize = stacksize;
-        self
-    }
-
-    pub fn modify_priority (&mut self, priority: UBaseType) -> &mut Self {
-        self.task_priority = priority;
-        self
-    }
-
-    pub fn create_task (pccode: fn(), pcname: String, stack_depth: u16, priority: UBaseType) -> BaseType{
-        let mut return_status: BaseType;
-        let mut px_stack: *mut StackType;
-        //* Ignore the NULLs temporarily
-        px_stack = port::port_malloc(stack_depth * mem::size_of<StackType>());
-        let mut px_newtcb: task_control_block;
-        px_newtcb.stack_pos = px_stack;
-        //FIXME modifying return_status if malloc failed
-        //ready to insert into a list
-        px_newtcb.initialize_new_task (pccode, pcname, stack_depth, priority);
-        add_new_task_to_ready_list ();
-        return_status
-    }
-};
-
-
-pub fn get_tcb_from_handle (handle: Option<task_control_block>) -> task_control_block{
-    match (handle) {
-        Some (t) => t,
-        None => current_tcb
-    }
-}
 #[macro_export]
 macro_rules! record_ready_priority {
     ($priority:expr) => ({
@@ -116,7 +78,7 @@ macro_rules! record_ready_priority {
 }
 
 pub fn initialize_task_list () {
-	for priority in (0..configMAX_PRIORITIES-1)	{
+	for priority in (0..configMAX_PRIORITIES!()-1){
 		list_initialise! ( READY_TASK_LIST [priority] );
 	}
 
@@ -140,7 +102,7 @@ pub fn initialize_task_list () {
 	OVERFLOW_DELAY_TASK_LIST = &DELAY_TASK_LIST2;
 }
 
-pub fn add_task_to_ready_list (new_tcb: Option<&task_control_block>) {
+pub fn add_task_to_ready_list (new_tcb: Option<task_control_block>) {
     //* move_task_to_ready_state (new_tcb);
     record_ready_priority! (new_tcb.unwrap().task_priority);
     list_insert_end! (READY_TASK_LIST[new_tcb.unwrap().task_priority],new_tcb.state_list_item);
@@ -173,12 +135,12 @@ pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
         }
         }
         set_task_number!(get_task_number!() + 1);
-        add_task_to_ready_list(&new_tcb);
+        add_task_to_ready_list(new_tcb);
     }
     taskEXIT_CRITICAL!();
     if get_scheduler_running!() {
         if CURRENT_TCB.task_priority < new_tcb.unwrap().task_priority{
-            taskYIELD_IF_USING_PREEMPTION ();
+            taskYIELD_IF_USING_PREEMPTION! ();
         }
         else {
             mtCOVERAGE_TEST_MARKER! ();
@@ -188,3 +150,81 @@ pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
         mtCOVERAGE_TEST_MARKER! ();
     }
 }
+
+impl task_control_block {
+    pub fn modify_name (&mut self, name:&str) -> &mut Self {
+        self.task_name = name.to_owned().to_string();
+        self
+    }
+
+    pub fn modify_stacksize (&mut self, stacksize: UBaseType) -> &mut Self {
+        self.task_stacksize = stacksize;
+        self
+    }
+
+    pub fn modify_priority (&mut self, priority: UBaseType) -> &mut Self {
+        self.task_priority = priority;
+        self
+    }
+
+
+    pub fn initialize_new_task (&mut self, pccode: fn(), pcname: String, stack_depth: u16, priority: UBaseType){
+        let mut top_of_stack: *mut StackType;
+        let mut x: UBaseType;
+        top_of_stack = self.stack_pos + stack_depth - 1;
+        top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK;
+        //FIXME fix it later: pcname string
+        mtCOVERAGE_TEST_MARKER! ();
+
+        self.task_name = pcname;
+
+        if priority >= configMAX_PRIORITIES!() {
+            priority = configMAX_PRIORITIES!() - 1;
+        }else {
+            mtCOVERAGE_TEST_MARKER! ();
+        }
+
+        self.task_priority = priority;
+
+        #[cfg(configUSE_MUTEXES)]
+        {
+            self.mutexes_held = 0;
+            self.base_priority = priority;
+        }
+
+        //FIXME list_initialise_item usage?
+        list_initialise_item! (self.state_list_item);
+        list_initialise_item! (self.evnet_list_item);
+
+        #[cfg(portCRITICAL_NESTING_IN_TCB)]
+        {
+            self.critical_nesting = 0;
+        }
+
+        #[cfg(configGENERATE_RUN_TIME_STATUS)]
+        {
+            self.runtime_counter = 0;
+        }
+
+        #[cfg(config_USE_TASK_NOTIFICATIONS)]
+        {
+            self.notify_state = taskNOT_WAITING_NOTIFICATION;
+            self.notified_value = 0;
+        }
+    }
+
+    pub fn create_task (pccode: fn(), pcname: String, stack_depth: u16, priority: UBaseType) -> BaseType{
+        let mut return_status: BaseType;
+        let mut px_stack: *mut StackType;
+        //* Ignore the NULLs temporarily
+        px_stack = port::port_malloc(stack_depth * 8);
+        let mut px_newtcb: task_control_block;
+        px_newtcb.stack_pos = px_stack;
+        //FIXME modifying return_status if malloc failed
+        //ready to insert into a list
+        px_newtcb.initialize_new_task (pccode, pcname, stack_depth, priority);
+        let newtcb = Some(px_newtcb);
+        add_new_task_to_ready_list (newtcb);
+        return_status
+    }
+};
