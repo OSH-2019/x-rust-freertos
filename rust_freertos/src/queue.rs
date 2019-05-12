@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::cell::{RefCell, Ref, RefMut};
 use crate::*;
 use crate::queue_h::*;
+use crate::projdefs::*;
 //use volatile::Volatile;
 //
 
@@ -66,14 +67,16 @@ impl <T>QueueDefinition<T>{
     /// # Return
     ///
     #[cfg(feature = "configSUPPORT_DYNAMIC_ALLOCATION")]
-    fn queue_generic_create<T>( uxQueueLength:UBaseType, uxItem:T, ucQueueType:u8) -> Queue<T> {
-        let queue:Queue;
+    fn queue_generic_create ( uxQueueLength:UBaseType, uxItem:T, ucQueueType:u8) -> Queue<T> {
+        let queue:Queue<T>;
 
-        queue.pcQueue =  VecDeque::with_capacity(uxQueueLength);
+        queue.pcQueue =  VecDeque::with_capacity(uxQueueLength as usize);
 
-        #[cfg(feature = "configSUPPORT_STATIC_ALLOCATION")]
-        queue.ucStaticallyAllocated = false;
-        
+        {
+            #![cfg(feature = "configSUPPORT_STATIC_ALLOCATION")]
+            queue.ucStaticallyAllocated = false;
+        }
+
         queue.initialise_new_queue(uxQueueLength,ucQueueType);
         queue
     }
@@ -106,6 +109,7 @@ impl <T>QueueDefinition<T>{
     /// # Description
     /// * reset the queue
     /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.c 279-329
     /// # Argument
     /// * `xNewQueue` - whether the queue is a new queue
     /// # Return
@@ -161,6 +165,7 @@ impl <T>QueueDefinition<T>{
     /// # Description
     /// 
     /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.c 921-1069
     /// # Argument
     ///
     /// # Return
@@ -240,6 +245,7 @@ impl <T>QueueDefinition<T>{
     /// # Description
     /// * lock the queue
     /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.c 264-276
     /// # Argument
     /// * `&self` - queue
     /// # Return
@@ -261,6 +267,7 @@ impl <T>QueueDefinition<T>{
     /// # Description
     /// * unlock the queue
     /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.c 1794-1911
     /// # Argument
     /// * `&self` - queue
     /// # Return
@@ -340,5 +347,57 @@ impl <T>QueueDefinition<T>{
         taskEXIT_CRITICAL!();
     }
 
-}
+    /// # Description
+    /// * Post an item to the back of a queue.
+    /// * Implemented by:Ning Yuting
+    /// * C implementation: queue.h 355
+    /// # Argument
+    /// * `&self` - queue on which the item is to be posted.
+    /// * `pvItemToQueue` - the item that is to be placed on the queue.
+    /// * `xTicksToWait` - The maximum amount of time the task should block waiting for space to become available on the queue, should it already be full.
+    /// # Return
+    /// * true if the item was successfully posted, otherwise errQUEUE_FULL.
+    fn queue_send_to_front(&self,pvItemToQueue:T,xTicksToWait:TickType){
+        self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_FRONT)
+    }
+    
+    /// # Description
+    /// * Post an item to the back of a queue.
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.h 437
+    /// # Argument
+    /// * same to queue_send_to_front
+    /// # Return
+    /// * same to queue_send_to_front
+    fn queue_send_to_back(&self,pvItemToQueue:T,xTicksToWait:TickType){
+        self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_BACK)
+    }
+    
+    /// # Description
+    /// * equivalent to queue_send_to_back()
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.h 521
+    /// # Argument
+    /// * same to queue_send_to_back()
+    /// # Return
+    /// * same to queue_send_to_back()
+    fn queue_send(&self,pvItemToQueue:T,xTicksToWait:TickType){
+        self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_BACK)
+    }
 
+    /// # Description
+    /// * Only for use with queues that have a length of one - so the queue is either empty or full.
+    /// * Post an item on a queue.  If the queue is already full then overwrite the value held in the queue. 
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.h 604
+    /// # Argument
+    /// * `self` - queue
+    /// * `pvItemToQueue` - the item that is to be place on the queue.
+    /// # Return
+     /// * pdPASS is the only value that can be returned because queue_overwrite will write to the
+     /// queue even when the queue is already full.
+    fn queue_overwrite(&self,pvItemToQueue:T){
+        self.queue_generic_send(pvItemToQueue,0,queueOVERWRITE)
+    }
+
+}
