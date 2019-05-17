@@ -6,6 +6,8 @@ use std::ffi::*;
 use std::mem::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+
+// * Enumerate for Errors
 pub enum FreeRtosError {
     OutOfMemory,
     QueueSendTimeout,
@@ -19,7 +21,7 @@ pub enum FreeRtosError {
     ProcessorHasShutDown
 }
 
-//* task states
+// * Task states
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum task_state {
@@ -30,12 +32,13 @@ pub enum task_state {
     deleted   = 4
 }
 
+// * Top_priorities
 pub enum updated_top_priority{
     Updated,
     Notupdated
 }
 
-
+// * TCB control blok stuct
 pub struct task_control_block{
     //* basic information
 	state_list_item: ListItem,
@@ -69,6 +72,10 @@ pub struct task_control_block{
 	notify_state  : u8,
 }
 
+// * Record the Highest ready priority
+// * Usage:
+// * Input: num
+// * Output: None
 #[macro_export]
 macro_rules! record_ready_priority {
     ($priority:expr) => ({
@@ -77,6 +84,10 @@ macro_rules! record_ready_priority {
     })
 }
 
+// * Initialize lists, for rebooting
+// * Usage:
+// * Input: Nonw
+// * Output: None
 pub fn initialize_task_list () {
 	for priority in (0..configMAX_PRIORITIES!()-1){
 		list_initialise! ( READY_TASK_LIST [priority] );
@@ -102,6 +113,10 @@ pub fn initialize_task_list () {
 	OVERFLOW_DELAY_TASK_LIST = &DELAY_TASK_LIST2;
 }
 
+// * Add a task to ready list, the task is already transfer into a Option
+// * Usage:
+// * Input: new_tcb (Option<tcb>)
+// * Output: None
 pub fn add_task_to_ready_list (new_tcb: Option<task_control_block>) {
     //* move_task_to_ready_state (new_tcb);
     record_ready_priority! (new_tcb.unwrap().task_priority);
@@ -109,6 +124,10 @@ pub fn add_task_to_ready_list (new_tcb: Option<task_control_block>) {
     //* post for trace
 }
 
+// * Add a new task to ready list, coping with new priority
+// * Usage:
+// * Input: new_tcb (Option<tcb>)
+// * Output: None
 pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
     taskENTER_CRITICAL!();
     {
@@ -152,6 +171,10 @@ pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
 }
 
 impl task_control_block {
+    // * Modify basic information
+    // * Usage:
+    // * Input: new_tcb (Option<tcb>)
+    // * Output: None
     pub fn modify_name (&mut self, name:&str) -> &mut Self {
         self.task_name = name.to_owned().to_string();
         self
@@ -217,7 +240,7 @@ impl task_control_block {
         let mut return_status: BaseType;
         let mut px_stack: *mut StackType;
         //* Ignore the NULLs temporarily
-        px_stack = port::port_malloc(stack_depth * 8);
+        px_stack = port::port_malloc(stack_depth * INITIAL_CAPACITY);
         let mut px_newtcb: task_control_block;
         px_newtcb.stack_pos = px_stack;
         //FIXME modifying return_status if malloc failed
@@ -226,5 +249,123 @@ impl task_control_block {
         let newtcb = Some(px_newtcb);
         add_new_task_to_ready_list (newtcb);
         return_status
+    }
+
+    pub fn delete_task (task_to_delete: task_handle){
+        let mut px_tcb: *mut task_control_block;
+        taskENTER_CRITICAL!(){
+            px_tcb = get_tcb_from_handle (task_to_delete);
+            if list_remove!(&px_tcb.state_list_item) == 0 {
+                task_reset_ready_priority (&px_tcb.priority);
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER!();
+            }
+
+            if get_list_item_container(&px_tcb.evnet_list_item).is_some() {
+                list_remove!(&px_tcb.state_list_item);
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER! ();
+            }
+
+            set_task_number!(get_task_number!()+1);
+            if px_tcb == CURRENT_TCB {
+                list_insert_end!(task_waiting_termination,px_tcb.state_list_item);
+                deleted_tasks_waiting_clean_up += 1;
+                //!FIXME YeildPending
+                portPRE_TASK_DELETE_HOOK! (px_tcb,YeildPending);
+            }
+            else {
+                set_task_number!(get_task_number!()-1);
+                //!FIXME todo
+                prv_delete_task(pc_tcb);
+                prv_reset_next_task_unblock_time ();
+            }
+            //!FIXME todo
+            trace_task_delete();
+        }taskEXIT_CRITICAL!();
+
+        if get_scheduler_running!(){
+            config_assert (schedule_suspended == 0 ? 1 : 0);
+            portYIELD_WITHIN_API! ();
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER! ();
+        }
+    }
+
+    pub fn suspend_task (task_to_suspend: task_handle){
+        let mut px_tcb: *mut task_control_block;
+        taskENTER_CRITICAL!(){
+            px_tcb = get_tcb_from_handle (task_to_suspend);
+            traceTASK_SUSPEND(&px_tcb);
+            if list_remove!(px_tcb.unwrap().state_list_item) == 0 {
+                task_reset_ready_priority (&px_tcb.unwrap().priority);
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER! ();
+            }
+
+            if get_list_item_container!(px_tcb.unwrap().evnet_list_item).is_some() {
+                list_remove!(px_tcb.unwrap().state_list_item);
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER! ();
+            }
+            list_insert_end!(task_waiting_termination,px_tcb.unwrap().state_list_item);
+        }taskEXIT_CRITICAL!();
+
+        if get_scheduler_running!(){
+            taskENTER_CRITICAL!(){
+                prv_reset_next_task_unblock_time();
+            }taskEXIT_CRITICAL!();
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER! ();
+        }
+
+        if px_tcb == CURRENT_TCB {
+            if get_scheduler_running!(){
+                config_assert (schedule_suspended == 0 ? 1 : 0);
+                portYIELD_WITHIN_API! ();
+            }
+            else {
+                if current_list_length!(SUSPEND_TASK_LIST) == get_current_number_of_tasks!() {
+                    px_tcb = None;
+                }
+                else {
+                    task_switch_context();
+                }
+            }
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER!()
+        }
+    }
+
+    pub fn resume_task (task_to_resume: task_handle){
+        let mut px_tcb: *mut task_control_block;
+        config_assert (task_to_resume);
+        if px_tcb.is_some() && px_tcb!=CURRENT_TCB {
+            taskENTER_CRITICAL!(){
+                if get_task_is_tasksuspended(&px_tcb) {
+                    teace_task_RESUME (&px_tcb);
+                    list_remove! (px_tcb.unwrap().state_list_item);
+                    add_task_to_ready_list(px_tcb);
+                    if px_tcb.priority >= CURRENT_TCB.priority {
+                        taskYIELD_IF_USING_PREEMPTION();
+                    }else {
+                        mtCOVERAGE_TEST_MARKER! ();
+                    }
+                }
+                else {
+                    mtCOVERAGE_TEST_MARKER! ();
+                }
+            }taskEXIT_CRITICAL!();
+        }
+    }
+    else {
+        mtCOVERAGE_TEST_MARKER! ();
     }
 };
