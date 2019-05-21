@@ -170,6 +170,22 @@ pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
     }
 }
 
+/*
+   TODO : prvResetNextTaskUnblockTime list.c : 551
+   TODO : prvDeleteTCB list.c : 480
+*/
+pub prv_reset_next_task_unblock_time () {
+    if (list_is_empty!(pxDelayedTaskList))
+    {
+        xNextTaskUnblockTime = portMAX_DELAY;
+    }
+    else {
+        ( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
+		xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
+
+    }
+}
+
 impl task_control_block {
     // * Modify basic information
     // * Usage:
@@ -279,8 +295,8 @@ impl task_control_block {
             else {
                 set_task_number!(get_task_number!()-1);
                 //!FIXME todo
-                prv_delete_task(pc_tcb);
-                prv_reset_next_task_unblock_time ();
+                delete_tcb(pc_tcb);
+                reset_next_task_unblock_time ();
             }
             //!FIXME todo
             trace_task_delete();
