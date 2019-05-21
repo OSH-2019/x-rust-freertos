@@ -20,7 +20,9 @@ pub enum QueueUnion {
     uxRecuriveCallCount(UBaseType),
 }
 
-pub struct QueueDefinition<T>{
+#[derive(Default)]
+pub struct QueueDefinition<T> 
+    where T: Default {
     pcQueue: VecDeque<T>,
     
     pcHead: UBaseType,
@@ -55,9 +57,12 @@ pub struct QueueDefinition<T>{
 type xQueue<T> = QueueDefinition<T>;
 type Queue<T> = QueueDefinition<T>;
 
+impl Default for QueueUnion{
+    fn default() -> Self {QueueUnion::pcReadFrom(0)}
+}
 
-
-impl <T>QueueDefinition<T>{
+impl <T>QueueDefinition<T>
+    where T: Default{
     
     /// # Description
     /// * 
@@ -68,14 +73,9 @@ impl <T>QueueDefinition<T>{
     ///
     #[cfg(feature = "configSUPPORT_DYNAMIC_ALLOCATION")]
     fn queue_generic_create ( uxQueueLength:UBaseType, uxItem:T, ucQueueType:u8) -> Queue<T> {
-        let queue:Queue<T>;
+        let queue:Queue<T>=Default::default();
 
         queue.pcQueue =  VecDeque::with_capacity(uxQueueLength as usize);
-
-        {
-            #![cfg(feature = "configSUPPORT_STATIC_ALLOCATION")]
-            queue.ucStaticallyAllocated = false;
-        }
 
         queue.initialise_new_queue(uxQueueLength,ucQueueType);
         queue
@@ -89,8 +89,8 @@ impl <T>QueueDefinition<T>{
     /// # Return
     ///
     fn initialise_new_queue(&self, uxQueueLength: UBaseType, ucQueueType: u8)  {
-        self. pcHead = 0;
-        self.uxLength = uxQueueLength;
+        self.pcHead=0;
+        self.uxLength=uxQueueLength;
         self.queue_generic_reset(true);
         
         {
@@ -399,5 +399,43 @@ impl <T>QueueDefinition<T>{
     fn queue_overwrite(&self,pvItemToQueue:T){
         self.queue_generic_send(pvItemToQueue,0,queueOVERWRITE)
     }
+    
+    /// # Description
+    /// * Post an item to the front ofa queue.  It is safe to use this macro from within an interrupt service routine.
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.h 1129
+    /// # Argument
+    /// * `self` - queue
+    /// * `pvItemToQueue - the item taht is to be placed on the queue.
+    /// # Return
+    /// * `BaseType` -pdTRUE if the data was successfully sent to the queue, otherwise errQUEUE_FULL.
+    /// * `bool` - pxHigherPriorityTaskWoken is changed to be a return value. it is true if sending to the
+    /// queue caused a task to unblock,otherwise it is false.
+    fn queue_send_to_front_from_isr(&self,pvItemToQueue:T)->(BaseType, bool){
+        self.queue_generic_send_from_isr(pvItemToQueue,queueSEND_TO_FRONT)
+    }
 
+    /// # Description
+    /// * Post an item to the back of a queue. Others is same to queue_send_to_front_from_isr
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.h 1200
+    /// # Argument
+    ///
+    /// # Return
+    ///
+    fn queue_send_to_back_from_isr(&self,pvItemToQueue:T)->(BaseType, bool){
+        self.queue_generic_send_from_isr(pvItemToQueue,queueSEND_TO_BACK)
+    }
+
+    /// # Description
+    /// * A version of xQueueOverwrite() that can be used in an interrupt service routine (ISR).
+    /// * Implemented by:Ning Yuting
+    ///  * C implementation:queue.h 1287
+    ///  # Argument
+    ///
+    ///  # Return
+    ///
+    fn queue_overwrite_from_isr(&self,pvItemToQueue:T)->(BaseType, bool){
+        self.queue_generic_send_from_isr(pvItemToQueue,queueOVERWRITE)
+    }
 }
