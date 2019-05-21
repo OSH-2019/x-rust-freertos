@@ -12,41 +12,44 @@ lazy_static! {
 
     /* Lists for ready and blocked tasks. --------------------*/
     // Prioritised ready tasks.
-    pub static ref READY_TASK_LISTS: [LIST; configMAX_PRIORITIES!()] =
-        [LIST::new(), configMAX_PRIORITIES!()];
+    pub static ref READY_TASK_LISTS: [List; configMAX_PRIORITIES!()] =
+        [List_new(), configMAX_PRIORITIES!()];
+    
+    // change READY_TASK_LISTS to Arc<RwLock<List>>
+    pub static ref READY_TASK_LISTS: LIST = Arc::new(RwLock::newREADY_TASK_LISTS);
 
     /* Delayed tasks (two lists are used -
      * one for delays that have overflowed the current tick count.
      */
-    pub static ref DELAYED_TASK_LIST1: LIST = LIST::new();
-    pub static ref DELAYED_TASK_LIST2: LIST = LIST::new();
+    pub static ref DELAYED_TASK_LIST1: List = List_new!();
+    pub static ref DELAYED_TASK_LIST2: List = List_new!();
 
     // Points to the delayed task list currently being used.
-    pub static ref DELAYED_TASK_LIST: &'static LIST = &DELAYED_TASK_LIST1;
+    pub static ref DELAYED_TASK_LIST: &'static List = &DELAYED_TASK_LIST1;
 
     /* Points to the delayed task list currently being used 
      * to hold tasks that have overflowed the current tick count.
      */
-    pub static ref OVERFLOW_DELAYED_TASK_LIST: &'static LIST = &DELAYED_TASK_LIST2;
+    pub static ref OVERFLOW_DELAYED_TASK_LIST: &'static List = &DELAYED_TASK_LIST2;
 
     /* Tasks that have been readied while the scheduler was suspended.
      * They will be moved to the ready list when the scheduler is resumed. 
      */
-    pub static ref PENDING_READY_LIST: LIST = LIST::new();
+    pub static ref PENDING_READY_LIST: List = List_new!();
 }
 
 // Conditionally compiled global lists.
 #[cfg(feature = "INCLUDE_vTaskDelete")]
 lazy_static! {
     // Tasks that have been deleted - but their memory not yet freed.
-    pub static ref TASKS_WAITING_TERMINATION: LIST = LIST::new();
+    pub static ref TASKS_WAITING_TERMINATION: List = List_new!();
     pub static ref DELETED_TASKS_WAITING_CLEAN_UP: UBaseType = 0;
 }
 
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 lazy_static! {
     // Tasks that are currently suspended.
-    pub static ref SUSPENDED_TASK_LIST: LIST = LIST::new();
+    pub static ref SUSPENDED_TASK_LIST: List = List_new!();
 }
 
 /* ------------------ End global lists ------------------- */
@@ -244,4 +247,3 @@ macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
         // This macro does nothing.
     )
 }
-
