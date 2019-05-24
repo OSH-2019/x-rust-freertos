@@ -16,9 +16,9 @@ pub const portBYTE_ALIGNMENT_MASK: UBaseType = 8;
 #[cfg(not(target_arch = "x86_64"))]
 pub const portBYTE_ALIGNMENT_MASK: UBaseType = 4;
 
-#[cfg(configUSE_16_BIT_TICKS)]
+#[cfg(feature = "configUSE_16_BIT_TICKS")]
 pub const portMAX_DELAY: TickType = 0xffff;
-#[cfg(not(configUSE_16_BIT_TICKS))]
+#[cfg(not(feature = "configUSE_16_BIT_TICKS"))]
 pub const portMAX_DELAY: TickType = 0xffffffff;
 
 /* -------------------- Macros starting with "port_" ----------------- */

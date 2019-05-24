@@ -256,7 +256,7 @@ macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
 #[macro_export]
 macro_rules! get_current_task_handle {
     () => (
-        match CURRENT_TCB.try_read() {
+        match crate::task_global::CURRENT_TCB.try_read() {
             Ok(task_handle) => task_handle,
             Err(_) => panic!("Failed to get current task handle")
         }
@@ -266,6 +266,29 @@ macro_rules! get_current_task_handle {
 #[macro_export]
 macro_rules! set_current_task_handle {
     ($cloned_new_task: expr) => (
-        *CURRENT_TCB.write().unwrap() = $cloned_new_task
+        *(crate::task_global::CURRENT_TCB).write().unwrap() = $cloned_new_task
+    )
+}
+
+#[macro_export]
+macro_rules! get_current_task_priority {
+    () => (
+        get_current_task_handle!().get_priority()
+    )
+}
+
+#[macro_export]
+macro_rules! get_nth_ready_list {
+    ($n: expr) => (
+        
+    )
+}
+
+#[macro_export]
+macro_rules! switch_delayed_lists {
+    () => (
+        /* pxDelayedTaskList and pxOverflowDelayedTaskList are switched when the tick
+           count overflows. */
+        // TODO: tasks.c 239
     )
 }

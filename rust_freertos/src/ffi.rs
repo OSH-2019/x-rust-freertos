@@ -18,9 +18,15 @@ extern "C" fn xTaskGetCurrentTaskHandle() -> xTaskHandle {
 }
 
 #[no_mangle]
-extern "C" fn xTaskIncrementTick() -> i64{
+extern "C" fn xTaskIncrementTick() -> BaseType{
     trace!("xTaskIncrementTick() called from ffi!");
-    0
+    if kernel::task_increment_tick() {
+        info!("task_increment_tick() returned true");
+        pdTRUE
+    } else {
+        info!("task_increment_tick() returned false");
+        pdFALSE
+    }
 }
 
 #[no_mangle]
@@ -39,8 +45,10 @@ extern "C" fn vTaskSuspendAll() {
 extern "C" fn xTaskResumeAll() -> BaseType {
     trace!("xTaskResumeAll() called from ffi!");
     if kernel::task_resume_all() {
+        info!("task_resume_all() returned true");
         pdTRUE
     } else {
+        info!("task_resume_all() returned false");
         pdFALSE
     }
 }
