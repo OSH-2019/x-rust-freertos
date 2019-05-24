@@ -3,23 +3,24 @@
 use std::sync::{Arc, RwLock};
 use crate::*;
 use crate::port::{TickType, UBaseType};
+use crate::task_control::task_control_block;
 
 /// this should be defined is port.rs
 // type UBaseType = u16;    // unsighed short
-// type TickType = u16;  
+// type TickType = u16;
 // type TCB = TskTCB;   // not declared
 // type StackType = u16;
 
 // List is a list type, holding the items.
 // type List = Vec<Rc<RefCell<ListItem>>>;
-type List = Arc<RwLock<Vec<Arc<RwLock<ListItem>>>>>;
+pub type List = Arc<RwLock<Vec<Arc<RwLock<ListItem>>>>>;
 // LIST is a type that holds all the lists.
-type LIST = Arc<RwLock<Vec<List>>>;
+pub type LIST = Arc<RwLock<Vec<List>>>;
 
 /// thing now get better understood here!
 /// suppose we have a list vec, we call it `list`.
 /// now that we have two list, `lista` and `listb`.
-/// we could push the `lista` and `listb` in the `list` given above, meaning that 
+/// we could push the `lista` and `listb` in the `list` given above, meaning that
 /// lista == list[0]
 /// listb == list[1]
 /// we now have three list item named item1, item2, item3, which are created by the method `ListItem::new`
@@ -38,7 +39,7 @@ type LIST = Arc<RwLock<Vec<List>>>;
 ///         &mut list[i]
 ///     },
 ///     None => {
-///         panic!("no container found!");    
+///         panic!("no container found!");
 ///     }
 /// }
 /// `
@@ -57,10 +58,10 @@ struct TskTCB {
 
 #[derive(Debug)]
 pub struct ListItem {
-    item_value: TickType,
-    container: Option<ListName>,
+    pub item_value: TickType,
+    pub container: Option<ListName>,
     // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated, deprecateed
-    owner: Option<Arc<RwLock<TCB>>>,      // the TCB declaration is not defined
+    pub owner: Option<Arc<RwLock<task_control_block>>>,      // the TCB declaration is not defined
 }
 
 // impl ListItem {
@@ -86,7 +87,7 @@ impl ListItem {
             container: None,
             owner: None
         }))
-    }   
+    }
 }
 // initialization of List
 #[macro_export]
@@ -189,7 +190,7 @@ macro_rules! get_owner_of_next_entry {
                 }
             },
             None => None,
-        }  
+        }
     });
 }
 
@@ -206,7 +207,7 @@ macro_rules! get_owner_of_head_entry {
             None
         }else{
             Some(Arc::clone(&($list.read().unwrap())[0]))
-        }  
+        }
     });
 }
 
@@ -221,7 +222,7 @@ macro_rules! get_owner_of_head_entry {
 macro_rules! list_insert_end {
     ($list:expr, $item:expr) => ({
         {
-            
+
             ($list.write().unwrap()).push(Arc::clone(&$item));
         }
     })
@@ -251,7 +252,7 @@ macro_rules! get_item_index {
 }
 
 // /// # Description
-// /// * insert $item in $list in descending order 
+// /// * insert $item in $list in descending order
 // /// # Argument
 // /// * `$list` - List
 // /// * `$item` - Arc<RwLock<ListItem>>
@@ -331,7 +332,7 @@ macro_rules! list_remove_inner {
 #[macro_export]
 macro_rules!  get_list_container_mapped_index {
         ($item:expr) => ({
-            {   
+            {
                 match $item.read().unwrap().container {
                 ListName::LIST0 => 0,
                 ListName::LIST1 => 1,
@@ -359,7 +360,7 @@ macro_rules! list_remove {
     //         let list_mapped_index = get_list_container_mapped_index!($item);
     //         list_remove_inner!(LIST[list_mapped_index], $item);
     //         current_list_length!(list)
-    //     }  
+    //     }
     // });
     ($list:expr, $item:expr) => ({
         {
@@ -477,7 +478,7 @@ macro_rules! get_next {
                     Arc::clone(&($list.read().unwrap())[(index + 1) % current_list_length!($list)])
                 },
                 None => panic!("item not found"),
-            }    
+            }
         }
     })
 }
@@ -519,7 +520,7 @@ macro_rules! get_list_item_value {
 /// * `$list` - Arc<RwLock<List>>
 /// # Return
 /// * item_value: TickType
-#[macro_export] 
+#[macro_export]
 macro_rules! get_item_value_of_head_entry {
     ($list:expr) => ({
         {
@@ -539,7 +540,7 @@ mod test {
     fn test_rwlock() {
         let lock = ListItem::new(10);
         lock.write().unwrap().item_value = 11;
-        assert_eq!(lock.read().unwrap().item_value, 11); 
+        assert_eq!(lock.read().unwrap().item_value, 11);
     }
     #[test]
     fn test_basic() {

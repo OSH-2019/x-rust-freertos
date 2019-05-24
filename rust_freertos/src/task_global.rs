@@ -1,22 +1,27 @@
 use crate::*;
 use crate::port::{BaseType, UBaseType, TickType};
-use crate::task_control::TCB;
-use crate::list::LIST;
+use crate::list::{LIST, List};
+use crate::task_control::TaskHandle;
+use std::sync::{Arc, RwLock};
 
-// Define all the necessary global task lists.
+/* Current_TCB and global task lists. */
 lazy_static! {
-    /* NOTE! CURRENT_TCB isn't a pointer anymore,
-     * It's a MOVED value!
-     */
-    pub static ref CURRENT_TCB: TCB = kernel::create_idle_task();
 
-    /* Lists for ready and blocked tasks. --------------------*/
-    // Prioritised ready tasks.
-    pub static ref READY_TASK_LISTS: [List; configMAX_PRIORITIES!()] =
-        [List_new(), configMAX_PRIORITIES!()];
-    
-    // change READY_TASK_LISTS to Arc<RwLock<List>>
-    pub static ref READY_TASK_LISTS: LIST = Arc::new(RwLock::newREADY_TASK_LISTS);
+    /* Initialise CURRENT_TCB as early as it is declared rather than when the scheduler starts running.
+     * This isn't reasonable actually, but avoided the complexity of using an additional Option<>.
+     * Use RwLock to wrap TaskHandle because sometimes we need to change CURRENT_TCB.
+     * We use setter and getter to modify CURRENT_TCB, they are defined at the end of this file.
+     */
+    pub static ref CURRENT_TCB: RwLock<TaskHandle> = RwLock::new(kernel::create_idle_task());
+
+    /* change READY_TASK_LISTS to Arc<RwLock<List>>
+     * TODO: Change READT_TASK_LISTS back to `List` because it is too hard to use.
+     */
+    pub static ref READY_TASK_LISTS: LIST = Arc::new(RwLock::new(
+            (0..configMAX_PRIORITIES!())
+                .map(|_| List_new!())
+                .collect()
+                ));
 
     /* Delayed tasks (two lists are used -
      * one for delays that have overflowed the current tick count.
@@ -27,18 +32,18 @@ lazy_static! {
     // Points to the delayed task list currently being used.
     pub static ref DELAYED_TASK_LIST: &'static List = &DELAYED_TASK_LIST1;
 
-    /* Points to the delayed task list currently being used 
+    /* Points to the delayed task list currently being used
      * to hold tasks that have overflowed the current tick count.
      */
     pub static ref OVERFLOW_DELAYED_TASK_LIST: &'static List = &DELAYED_TASK_LIST2;
 
     /* Tasks that have been readied while the scheduler was suspended.
-     * They will be moved to the ready list when the scheduler is resumed. 
+     * They will be moved to the ready list when the scheduler is resumed.
      */
     pub static ref PENDING_READY_LIST: List = List_new!();
 }
 
-// Conditionally compiled global lists.
+/* Conditionally compiled global lists. */
 #[cfg(feature = "INCLUDE_vTaskDelete")]
 lazy_static! {
     // Tasks that have been deleted - but their memory not yet freed.
@@ -80,7 +85,7 @@ pub static mut SCHEDULER_SUSPENDED: UBaseType = 0;
 macro_rules! set_scheduler_suspended {
     ($next_val: expr) => (
         unsafe {
-            crate::task_global::SCHEDULER_SUSPENDED = $next_val
+            crate::task_global::SCHEDULER_SUSPENDED = $next_val;
         }
     )
 }
@@ -245,5 +250,22 @@ macro_rules! set_tick_count {
 macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
     () => (
         // This macro does nothing.
+    )
+}
+
+#[macro_export]
+macro_rules! get_current_task_handle {
+    () => (
+        match CURRENT_TCB.try_read() {
+            Ok(task_handle) => task_handle,
+            Err(_) => panic!("Failed to get current task handle")
+        }
+    )
+}
+
+#[macro_export]
+macro_rules! set_current_task_handle {
+    ($cloned_new_task: expr) => (
+        *CURRENT_TCB.write().unwrap() = $cloned_new_task
     )
 }

@@ -5,6 +5,10 @@
 use crate::*; // TODO: Is this line necessary?
 use crate::port::{TickType, UBaseType};
 use crate::projdefs::pdFALSE;
+use crate::task_control::{TaskHandle, TCB};
+use crate::task_global::*;
+use std::sync::{Arc, RwLock};
+// use crate::task_control::TCB;
 
 /*
  * Originally from task. h
@@ -22,8 +26,8 @@ macro_rules! taskYIELD {
 #[macro_export]
 macro_rules! taskYIELD_IF_USING_PREEMPTION {
     () => (
-        #[cfg(configUSE_PREEMPTION)]
-        portYIELD_WITHIN_API!()
+        #[cfg(feature = "configUSE_PREEMPTION")]
+        portYIELD_WITHIN_API!();
     )
 }
 /*
@@ -145,9 +149,6 @@ macro_rules! taskENABLE_INTERRUPTS {
 /// }
 /// ```
 pub fn task_start_scheduler() {
-    /* Add the idle task at the lowest priority. */
-    create_idle_task();
-
     #[cfg(configUSE_TIMERS)]
     create_timer_task();
 
@@ -166,9 +167,72 @@ pub fn task_start_scheduler() {
 /// # Return
 /// 
 /// Nothing
-fn create_idle_task() {
-    // TODO: Wait for task_create.
-    // On fail, panic!("Heap not enough to allocate idle task");
+pub fn create_idle_task() -> TaskHandle{
+    let idle_task_fn = | | {
+        loop {
+            /* THIS IS THE RTOS IDLE TASK - WHICH IS CREATED AUTOMATICALLY WHEN THE
+               SCHEDULER IS STARTED. */
+        
+            /* See if any tasks have deleted themselves - if so then the idle task
+               is responsible for freeing the deleted task's TCB and stack. */
+            check_tasks_waiting_termination();
+
+            /* If we are not using preemption we keep forcing a task switch to
+               see if any other task has become available.  If we are using
+               preemption we don't need to do this as any task becoming available
+               will automatically get the processor anyway. */
+            #[cfg(not(feature = "configUSE_PREEMPTION"))]
+            taskYIELD!();
+
+            {
+                #![cfg(all(feature = "configUSE_PREEMPTION", feature = "configIDLE_SHOULD_YIELD"))]
+                /* When using preemption tasks of equal priority will be
+                   timesliced.  If a task that is sharing the idle priority is ready
+                   to run then the idle task should yield before the end of the
+                   timeslice.
+
+                   A critical region is not required here as we are just reading from
+                   the list, and an occasional incorrect value will not matter.  If
+                   the ready list at the idle priority contains more than one task
+                   then a task other than the idle task is ready to execute. */
+                // TODO: Wait for LIST !
+                /*
+                if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ tskIDLE_PRIORITY ] ) ) > ( UBaseType_t ) 1 )
+                {
+                    taskYIELD!();
+                }
+                else
+                {
+                    mtCOVERAGE_TEST_MARKER!();
+                }
+                */
+            }
+
+            {
+                #![cfg(feature = "configUSE_IDLE_HOOK")]
+                // TODO: Use IdleHook
+                // extern void vApplicationIdleHook( void );
+
+                /* Call the user defined function from within the idle task.  This
+                   allows the application designer to add background functionality
+                   without the overhead of a separate task.
+                   NOTE: vApplicationIdleHook() MUST NOT, UNDER ANY CIRCUMSTANCES,
+                   CALL A FUNCTION THAT MIGHT BLOCK. */
+                // vApplicationIdleHook();
+                trace!("Idle Task running");
+            }
+        }
+    };
+
+    TCB::new()
+        .priority(0)
+        .name("Idle")
+        .initiailise(idle_task_fn)
+        .unwrap_or_else(|err| panic!("Idle task creation failed with error: {:?}", err))
+}
+
+fn check_tasks_waiting_termination() {
+    // TODO: Wait for task_delete.
 }
 
 /// # Description:
@@ -670,5 +734,6 @@ fn generate_context_switch_stats() {
 
 pub fn task_increment_tick() -> bool {
     // TODO: tasks.c 2500
+    portYIELD_WITHIN_API!();
     false
 }

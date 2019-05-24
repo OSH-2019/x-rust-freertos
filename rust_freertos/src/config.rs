@@ -13,7 +13,7 @@ macro_rules! configTICK_RATE_HZ {
 #[macro_export]
 macro_rules! configMINIMAL_STACK_SIZE {
     () => {
-        64 as u8
+        64 
     };
 }
 

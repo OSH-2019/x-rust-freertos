@@ -1,27 +1,14 @@
 use crate::port::*;
 use crate::list::*;
 use crate::kernel::*;
+use crate::task_global::*;
+use crate::projdefs::FreeRtosError;
 use crate::*;
-use std::ffi::*;
-use std::mem::*;
+use std::boxed::FnBox;
+use std::sync::{Arc, RwLock};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 
-// * Enumerate for Errors
-pub enum FreeRtosError {
-    OutOfMemory,
-    QueueSendTimeout,
-    QueueReceiveTimeout,
-    MutexTimeout,
-    Timeout,
-    QueueFull,
-    StringConversionError,
-    TaskNotFound,
-    InvalidQueueSize,
-    ProcessorHasShutDown
-}
-
-// * Task states
+//* task states
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum task_state {
@@ -32,21 +19,22 @@ pub enum task_state {
     deleted   = 4
 }
 
-// * Top_priorities
 pub enum updated_top_priority{
     Updated,
     Notupdated
 }
 
-// * TCB control blok stuct
+#[derive(Debug)]
 pub struct task_control_block{
     //* basic information
-	state_list_item: ListItem,
-	evnet_list_item: ListItem,
-	task_priority  : UBaseType,
-	task_stacksize : UBaseType,
-	task_name      : String,
-	stack_pos      : *mut StackType,
+    state_list_item: Arc<RwLock<ListItem>>,
+    evnet_list_item: Arc<RwLock<ListItem>>,
+    task_priority  : UBaseType,
+    task_stacksize : UBaseType,
+    task_name      : String,
+    // NOTE! This field is added for use with the `code()` method.
+    // `stack_pos` is StackType because raw pointer can't be sent between threads safely.
+    stack_pos      : StackType,
 
     //* end of stack
     // #[cfg(portStack_GROWTH)]{}
@@ -58,182 +46,125 @@ pub struct task_control_block{
 
     //* reverse priority
     #[cfg(configUSE_MUTEXES)]
-	base_priority  : UBaseType,
-	#[cfg(configUSE_MUTEXES)]
-	mutexes_held   : UBaseType,
+    base_priority  : UBaseType,
+    #[cfg(configUSE_MUTEXES)]
+    mutexes_held   : UBaseType,
 
     #[cfg(configGENERATE_RUN_TIME_STATUS)]
-	runtime_counter: TickType,
+    runtime_counter: TickType,
 
     //* notify information
     #[cfg(config_USE_TASK_NOTIFICATIONS)]
-	notified_value: u32,
-	#[cfg(config_USE_TASK_NOTIFICATIONS)]
-	notify_state  : u8,
+    notified_value: u32,
+    #[cfg(config_USE_TASK_NOTIFICATIONS)]
+    notify_state  : u8,
 }
 
-// * Record the Highest ready priority
-// * Usage:
-// * Input: num
-// * Output: None
-#[macro_export]
-macro_rules! record_ready_priority {
-    ($priority:expr) => ({
-        if $priority > get_top_ready_priority!()
-        {set_top_ready_priority!($priority);}
-    })
-}
-
-// * Initialize lists, for rebooting
-// * Usage:
-// * Input: Nonw
-// * Output: None
-pub fn initialize_task_list () {
-	for priority in (0..configMAX_PRIORITIES!()-1){
-		list_initialise! ( READY_TASK_LIST [priority] );
-	}
-
-	list_initialise!( DELAY_TASK_LIST1 );
-	list_initialise!( DELAY_TASK_LIST2 );
-	list_initialise!( PENDING_READY_LIST );
-
-	{
-        #![cfg( INCLUDE_vTaskDelete)]
-		list_initialise!( TASK_WATCHING_TERMINATION );
-	}
-
-	{
-        #![cfg( INCLUDE_vTaskSuspend)]
-		list_initialise!( SUSPEND_TASK_LIST );
-	}
-
-	/* Start with pxDelayedTaskList using list1 and the pxOverflowDelayedTaskList
-	using list2. */
-	DELAY_TASK_LIST = &DELAY_TASK_LIST1;
-	OVERFLOW_DELAY_TASK_LIST = &DELAY_TASK_LIST2;
-}
-
-// * Add a task to ready list, the task is already transfer into a Option
-// * Usage:
-// * Input: new_tcb (Option<tcb>)
-// * Output: None
-pub fn add_task_to_ready_list (new_tcb: Option<task_control_block>) {
-    //* move_task_to_ready_state (new_tcb);
-    record_ready_priority! (new_tcb.unwrap().task_priority);
-    list_insert_end! (READY_TASK_LIST[new_tcb.unwrap().task_priority],new_tcb.state_list_item);
-    //* post for trace
-}
-
-// * Add a new task to ready list, coping with new priority
-// * Usage:
-// * Input: new_tcb (Option<tcb>)
-// * Output: None
-pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
-    taskENTER_CRITICAL!();
-    {
-        set_current_number_of_tasks!(get_current_number_of_tasks!() + 1);
-        match CURRENT_TCB {
-            None => {
-                CURRENT_TCB = new_tcb;
-                if get_current_number_of_tasks!() == 1 {
-                    initialize_task_list ();
-                }
-                else {
-                    mtCOVERAGE_TEST_MARKER!();
-                }
-            }
-            Some (a) => {
-            if !get_scheduler_running!() {
-                if a.task_priority <= new_tcb.unwrap().task_priority {
-                    CURRENT_TCB = new_tcb;
-                }
-                else {
-                    mtCOVERAGE_TEST_MARKER! ();
-                }
-            }
-        }
-        }
-        set_task_number!(get_task_number!() + 1);
-        add_task_to_ready_list(new_tcb);
-    }
-    taskEXIT_CRITICAL!();
-    if get_scheduler_running!() {
-        if CURRENT_TCB.task_priority < new_tcb.unwrap().task_priority{
-            taskYIELD_IF_USING_PREEMPTION! ();
-        }
-        else {
-            mtCOVERAGE_TEST_MARKER! ();
-        }
-    }
-    else {
-        mtCOVERAGE_TEST_MARKER! ();
-    }
-}
-
-/*
-   TODO : prvResetNextTaskUnblockTime list.c : 551
-   TODO : prvDeleteTCB list.c : 480
-*/
-pub prv_reset_next_task_unblock_time () {
-    if (list_is_empty!(pxDelayedTaskList))
-    {
-        xNextTaskUnblockTime = portMAX_DELAY;
-    }
-    else {
-        ( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
-		xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
-
-    }
-}
-
+pub type TCB = task_control_block;
+pub type Task = task_control_block;
 impl task_control_block {
-    // * Modify basic information
-    // * Usage:
-    // * Input: new_tcb (Option<tcb>)
-    // * Output: None
-    pub fn modify_name (&mut self, name:&str) -> &mut Self {
+    pub fn new() -> Self {
+        task_control_block {
+            // TODO: What is state_list_item?!
+            state_list_item: ListItem::new(0),
+            evnet_list_item: ListItem::new(0),
+            task_priority  : 1,
+            task_stacksize : configMINIMAL_STACK_SIZE!(), 
+            task_name      : String::from("Unnamed"),
+            stack_pos      : 0,
+
+            //* nesting
+            #[cfg(portCRITICAL_NESTING_IN_TCB)]
+            critical_nesting: 0,
+
+            //* reverse priority
+            #[cfg(configUSE_MUTEXES)]
+            base_priority  : 0,
+            #[cfg(configUSE_MUTEXES)]
+            mutexes_held   : 0,
+
+            #[cfg(configGENERATE_RUN_TIME_STATUS)]
+            runtime_counter: 0,
+
+            //* notify information
+            #[cfg(config_USE_TASK_NOTIFICATIONS)]
+            notified_value: 0,
+            #[cfg(config_USE_TASK_NOTIFICATIONS)]
+            notify_state  : 0,
+        }
+    }
+
+    pub fn name (mut self, name:&str) -> Self {
         self.task_name = name.to_owned().to_string();
         self
     }
 
-    pub fn modify_stacksize (&mut self, stacksize: UBaseType) -> &mut Self {
+    pub fn stacksize (mut self, stacksize: UBaseType) -> Self {
         self.task_stacksize = stacksize;
         self
     }
 
-    pub fn modify_priority (&mut self, priority: UBaseType) -> &mut Self {
-        self.task_priority = priority;
+    pub fn priority (mut self, priority: UBaseType) -> Self {
+        if priority >= configMAX_PRIORITIES!() {
+            warn!("Specified priority larger than system maximum priority, will be reduced.");
+            info!("MAX_PRIORITY is {}, but got {}", configMAX_PRIORITIES!() - 1, priority);
+            self.task_priority = configMAX_PRIORITIES!() - 1;
+        } else {
+            self.task_priority = priority;
+        }
         self
     }
 
+    pub fn initiailise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError> 
+        where F: FnOnce() -> ()
+    {
+        let size_of_stacktype = std::mem::size_of::<StackType>();
+        let stacksize_as_bytes = size_of_stacktype * self.task_stacksize as usize;
+        trace!("Initialising Task: {}, stack size: {} bytes", self.task_name, stacksize_as_bytes);
+        
+        // Return `Err` if malloc fails.
+        let px_stack = port::port_malloc(stacksize_as_bytes)?;
 
-    pub fn initialize_new_task (&mut self, pccode: fn(), pcname: String, stack_depth: u16, priority: UBaseType){
-        let mut top_of_stack: *mut StackType;
-        let mut x: UBaseType;
-        top_of_stack = self.stack_pos + stack_depth - 1;
-        top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK;
-        //FIXME fix it later: pcname string
-        mtCOVERAGE_TEST_MARKER! ();
+        // A trick here. By changing raw pointer `px_stack` to StackType,
+        // avoid using unsafe `*mut` as a struct field.
+        // We don't lost any information here because raw pointers are actually addresses,
+        // which can be stored as plain numbers.
+        self.stack_pos = px_stack as StackType;
+        trace!("stack_pos for task {} is {}", self.task_name, self.stack_pos);
 
-        self.task_name = pcname;
+        let mut top_of_stack = self.stack_pos + self.task_stacksize as StackType - 1;
+        top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as StackType;
 
-        if priority >= configMAX_PRIORITIES!() {
-            priority = configMAX_PRIORITIES!() - 1;
-        }else {
-            mtCOVERAGE_TEST_MARKER! ();
-        }
+        let param_ptr = Box::new(Box::new(func)); // Pass task function as a parameter.
+        let param_ptr = &*param_ptr as *const _ as *mut _; // Convert to raw pointer.
 
-        self.task_priority = priority;
+        /* We use a wrapper function to call the task closure,
+         * this is how freertos.rs approaches this problem, and is explained here:
+         * https://stackoverflow.com/questions/32270030/how-do-i-convert-a-rust-closure-to-a-c-style-callback
+         */
+        port::port_initialise_stack(top_of_stack as *mut _,
+                                    Some(run_wrapper),
+                                    param_ptr
+                                    )?;
 
+        /* Do a bunch of conditional initialisations. */
         #[cfg(configUSE_MUTEXES)]
         {
             self.mutexes_held = 0;
             self.base_priority = priority;
         }
 
-        //FIXME list_initialise_item usage?
+        /* These list items were already initialised when `self` was created.
         list_initialise_item! (self.state_list_item);
         list_initialise_item! (self.evnet_list_item);
+        */
+
+        // Create task handle.
+        let handle = Arc::new(RwLock::new(self));
+        // TODO: Change type of list_items.
+        set_list_item_owner!(handle.read().unwrap().state_list_item,  &handle);
+        set_list_item_owner!(handle.read().unwrap().evnet_list_item, &handle);
+        let handle = TaskHandle(handle);
 
         #[cfg(portCRITICAL_NESTING_IN_TCB)]
         {
@@ -250,22 +181,175 @@ impl task_control_block {
             self.notify_state = taskNOT_WAITING_NOTIFICATION;
             self.notified_value = 0;
         }
+
+        handle.add_new_task_to_ready_list()?;
+
+        Ok(handle)
+    }
+}
+
+/* Task call wrapper function. */
+extern "C" fn run_wrapper(func_to_run: CVoidPointer)
+{
+    println!("{:X}", func_to_run as u64);
+    unsafe {
+        let func_to_run = Box::from_raw(func_to_run as *mut Box<FnBox() + 'static>);
+        func_to_run();
+        // TODO: Delete this wrapper task.
+    }
+}
+
+// * Record the Highest ready priority
+// * Usage:
+// * Input: num
+// * Output: None
+#[macro_export]
+macro_rules! record_ready_priority {
+    ($priority:expr) => ({
+        if $priority > get_top_ready_priority!()
+        {set_top_ready_priority!($priority);}
+    })
+}
+
+/*
+pub fn initialize_task_list () {
+    for priority in (0..configMAX_PRIORITIES-1)	{
+        list_initialise! ( READY_TASK_LIST [priority] );
     }
 
-    pub fn create_task (pccode: fn(), pcname: String, stack_depth: u16, priority: UBaseType) -> BaseType{
-        let mut return_status: BaseType;
-        let mut px_stack: *mut StackType;
-        //* Ignore the NULLs temporarily
-        px_stack = port::port_malloc(stack_depth * INITIAL_CAPACITY);
-        let mut px_newtcb: task_control_block;
-        px_newtcb.stack_pos = px_stack;
-        //FIXME modifying return_status if malloc failed
-        //ready to insert into a list
-        px_newtcb.initialize_new_task (pccode, pcname, stack_depth, priority);
-        let newtcb = Some(px_newtcb);
-        add_new_task_to_ready_list (newtcb);
-        return_status
+    list_initialise!( DELAY_TASK_LIST1 );
+    list_initialise!( DELAY_TASK_LIST2 );
+    list_initialise!( PENDING_READY_LIST );
+
+    {
+        #![cfg( INCLUDE_vTaskDelete)]
+        list_initialise!( TASK_WATCHING_TERMINATION );
     }
+
+    {
+        #![cfg( INCLUDE_vTaskSuspend)]
+        list_initialise!( SUSPEND_TASK_LIST );
+    }
+
+    /* Start with pxDelayedTaskList using list1 and the pxOverflowDelayedTaskList
+       using list2. */
+    DELAY_TASK_LIST = &DELAY_TASK_LIST1;
+    OVERFLOW_DELAY_TASK_LIST = &DELAY_TASK_LIST2;
+}
+*/
+
+/* Since multiple `TaskHandle`s may refer to and own a same TCB at a time,
+ * we wrapped TCB within a `tuple struct` using `Arc<RwLock<_>>`
+ */
+#[derive(Clone)]
+pub struct TaskHandle(Arc<RwLock<TCB>>);
+
+impl TaskHandle {
+    pub fn from(tcb: TCB) -> Self {
+        /* Construct a TaskHandle with a TCB. */
+        TaskHandle(Arc::new(RwLock::new(tcb)))
+    }
+
+    pub fn get_priority(&self) -> UBaseType{
+        /* Get the priority of a task.
+         * Since this method is so frequently used, I used a funtion to do it.
+         */
+        self.0.read().unwrap().task_priority
+    }
+
+    pub fn add_task_to_ready_list (&self) -> Result<(), FreeRtosError>{
+        let unwrapped_tcb = get_tcb_from_handle!(self);
+        let priority = self.get_priority();
+
+        traceMOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
+        record_ready_priority! (priority);
+
+        let list_to_insert = (*READY_TASK_LISTS).write().unwrap();
+        /* let list_to_insert = match list_to_insert {
+            Ok(lists) => lists[unwrapped_tcb.task_priority as usize],
+            Err(_) => {
+                warn!("List was locked, read failed");
+                return Err(FreeRtosError::DeadLocked);
+            }
+        };
+        */
+        list_insert_end! (&list_to_insert[priority as usize], unwrapped_tcb.state_list_item);
+        tracePOST_MOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
+        Ok(())
+    }
+
+    fn add_new_task_to_ready_list (&self) -> Result<(), FreeRtosError>{
+        let unwrapped_tcb = get_tcb_from_handle!(self);
+
+        taskENTER_CRITICAL!();
+        {
+            // We don't need to initialise task lists any more.
+
+            set_current_number_of_tasks!(get_current_number_of_tasks!() + 1);
+            /* CURRENT_TCB won't be None. See task_global.rs. */
+            let unwrapped_cur = get_current_task_handle!();
+            if !get_scheduler_running!() {
+                if unwrapped_cur.get_priority() <= unwrapped_tcb.task_priority {
+                    /* If the scheduler is not already running, make this task the
+                       current task if it is the highest priority task to be created
+                       so far. */
+                    set_current_task_handle!(self.clone());
+                }
+                else {
+                    mtCOVERAGE_TEST_MARKER! ();
+                }
+            }
+            set_task_number!(get_task_number!() + 1);
+            traceTASK_CREATE!(self.clone());
+            self.add_task_to_ready_list()?;
+        }
+        taskEXIT_CRITICAL!();
+        if get_scheduler_running!() {
+            let current_task_priority = get_current_task_handle!().get_priority();
+            if current_task_priority < unwrapped_tcb.task_priority{
+                taskYIELD_IF_USING_PREEMPTION!();
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER! ();
+            }
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER! ();
+        }
+
+        Ok(())
+    }
+}
+
+#[macro_export]
+macro_rules! get_tcb_from_handle {
+    ($handle: expr) => (
+        match $handle.0.try_read() {
+            Ok(a) => a,
+            Err(_) => {
+                warn!("TCB was locked, read failed");
+                return Err(FreeRtosError::DeadLocked);
+            }
+        }
+    )
+}
+
+
+/*
+   TODO : prvResetNextTaskUnblockTime list.c : 551
+   TODO : prvDeleteTCB list.c : 480
+*/
+pub prv_reset_next_task_unblock_time () {
+    if (list_is_empty!(pxDelayedTaskList))
+    {
+        xNextTaskUnblockTime = portMAX_DELAY;
+    }
+    else {
+        ( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
+		xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
+
+    }
+}
 
     pub fn delete_task (task_to_delete: task_handle){
         let mut px_tcb: *mut task_control_block;

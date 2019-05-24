@@ -12,7 +12,7 @@ into which trace is to be written. */
 #[macro_export]
 macro_rules! traceSTART {
     () => {
-        println!("traceSTART!() called!");
+        trace!("Trace starts");
     };
 }
 
@@ -20,7 +20,9 @@ macro_rules! traceSTART {
 written. */
 #[macro_export]
 macro_rules! traceEND {
-    () => {};
+    () => {
+        trace!("Trace ends");
+    };
 }
 
 /* Called after a task has been selected to run.  pxCurrentTCB holds a pointer
@@ -215,20 +217,24 @@ macro_rules! traceQUEUE_DELETE {
     ($pxQueue: expr) => {};
 }
 
+/* This macro is defined in port.rs
 #[macro_export]
 macro_rules! traceTASK_CREATE {
     ($pxNewTCB: expr) => {};
 }
+*/
 
 #[macro_export]
 macro_rules! traceTASK_CREATE_FAILED {
     () => {};
 }
 
+/* This macro is defined in port.rs
 #[macro_export]
 macro_rules! traceTASK_DELETE {
     ($pxTaskToDelete: expr) => {};
 }
+*/
 
 #[macro_export]
 macro_rules! traceTASK_DELAY_UNTIL {
