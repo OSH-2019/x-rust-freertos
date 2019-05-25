@@ -46,31 +46,32 @@ pub struct task_control_block{
 	task_priority  : UBaseType,
 	task_stacksize : UBaseType,
 	task_name      : String,
-	stack_pos      : *mut StackType,
+	stack_pos      : StackType,
 
     //* end of stack
     // #[cfg(portStack_GROWTH)]{}
     // end_of_stack: *mut StackType,
 
     //* nesting
-    #[cfg(portCRITICAL_NESTING_IN_TCB)]
+    #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
     critical_nesting: UBaseType,
 
     //* reverse priority
-    #[cfg(configUSE_MUTEXES)]
+    #[cfg(feature = "configUSE_MUTEXES")]
 	base_priority  : UBaseType,
-	#[cfg(configUSE_MUTEXES)]
+	#[cfg(feature = "configUSE_MUTEXES")]
 	mutexes_held   : UBaseType,
 
-    #[cfg(configGENERATE_RUN_TIME_STATUS)]
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATUS")]
 	runtime_counter: TickType,
 
     //* notify information
-    #[cfg(config_USE_TASK_NOTIFICATIONS)]
+    #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
 	notified_value: u32,
-	#[cfg(config_USE_TASK_NOTIFICATIONS)]
+	#[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
 	notify_state  : u8,
 }
+
 
 // * Record the Highest ready priority
 // * Usage:
@@ -98,12 +99,12 @@ pub fn initialize_task_list () {
 	list_initialise!( PENDING_READY_LIST );
 
 	{
-        #![cfg( INCLUDE_vTaskDelete)]
+        #![cfg(feature = "INCLUDE_vTaskDelete")]
 		list_initialise!( TASK_WATCHING_TERMINATION );
 	}
 
 	{
-        #![cfg( INCLUDE_vTaskSuspend)]
+        #![cfg(feature = "INCLUDE_vTaskSuspend")]
 		list_initialise!( SUSPEND_TASK_LIST );
 	}
 
@@ -174,17 +175,8 @@ pub fn add_new_task_to_ready_list (new_tcb: Option<task_control_block>) {
    TODO : prvResetNextTaskUnblockTime list.c : 551
    TODO : prvDeleteTCB list.c : 480
 */
-pub prv_reset_next_task_unblock_time () {
-    if (list_is_empty!(pxDelayedTaskList))
-    {
-        xNextTaskUnblockTime = portMAX_DELAY;
-    }
-    else {
-        ( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
-		xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
 
-    }
-}
+type task_handle = task_control_block;
 
 impl task_control_block {
     // * Modify basic information
@@ -206,11 +198,10 @@ impl task_control_block {
         self
     }
 
-
     pub fn initialize_new_task (&mut self, pccode: fn(), pcname: String, stack_depth: u16, priority: UBaseType){
-        let mut top_of_stack: *mut StackType;
+        let mut top_of_stack: StackType;
         let mut x: UBaseType;
-        top_of_stack = self.stack_pos + stack_depth - 1;
+        top_of_stack = self.stack_pos + (stack_depth as usize) - 1;
         top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK;
         //FIXME fix it later: pcname string
         mtCOVERAGE_TEST_MARKER! ();
@@ -225,8 +216,8 @@ impl task_control_block {
 
         self.task_priority = priority;
 
-        #[cfg(configUSE_MUTEXES)]
         {
+            #![cfg(feature = "configUSE_MUTEXES")]
             self.mutexes_held = 0;
             self.base_priority = priority;
         }
@@ -235,18 +226,18 @@ impl task_control_block {
         list_initialise_item! (self.state_list_item);
         list_initialise_item! (self.evnet_list_item);
 
-        #[cfg(portCRITICAL_NESTING_IN_TCB)]
         {
+            #![cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
             self.critical_nesting = 0;
         }
 
-        #[cfg(configGENERATE_RUN_TIME_STATUS)]
         {
+            #![cfg(feature = "configGENERATE_RUN_TIME_STATUS")]
             self.runtime_counter = 0;
         }
 
-        #[cfg(config_USE_TASK_NOTIFICATIONS)]
         {
+            #![cfg(feature = "config_USE_TASK_NOTIFICATIONS")]
             self.notify_state = taskNOT_WAITING_NOTIFICATION;
             self.notified_value = 0;
         }
@@ -254,7 +245,7 @@ impl task_control_block {
 
     pub fn create_task (pccode: fn(), pcname: String, stack_depth: u16, priority: UBaseType) -> BaseType{
         let mut return_status: BaseType;
-        let mut px_stack: *mut StackType;
+        let mut px_stack: StackType;
         //* Ignore the NULLs temporarily
         px_stack = port::port_malloc(stack_depth * INITIAL_CAPACITY);
         let mut px_newtcb: task_control_block;
@@ -313,7 +304,8 @@ impl task_control_block {
 
     pub fn suspend_task (task_to_suspend: task_handle){
         let mut px_tcb: *mut task_control_block;
-        taskENTER_CRITICAL!(){
+        taskENTER_CRITICAL!();
+        {
             px_tcb = get_tcb_from_handle (task_to_suspend);
             traceTASK_SUSPEND(&px_tcb);
             if list_remove!(px_tcb.unwrap().state_list_item) == 0 {
@@ -356,12 +348,12 @@ impl task_control_block {
             }
         }
         else {
-            mtCOVERAGE_TEST_MARKER!()
+            mtCOVERAGE_TEST_MARKER!();
         }
     }
 
     pub fn resume_task (task_to_resume: task_handle){
-        let mut px_tcb: *mut task_control_block;
+        let mut px_tcb: Option<task_control_block>;
         config_assert (task_to_resume);
         if px_tcb.is_some() && px_tcb!=CURRENT_TCB {
             taskENTER_CRITICAL!(){
@@ -380,7 +372,6 @@ impl task_control_block {
                 }
             }taskEXIT_CRITICAL!();
         }
-    }
     else {
         mtCOVERAGE_TEST_MARKER! ();
     }
