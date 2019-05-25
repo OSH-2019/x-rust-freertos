@@ -14,7 +14,7 @@ pub type xTaskHandle = *mut ::std::os::raw::c_void;
 #[no_mangle]
 extern "C" fn xTaskGetCurrentTaskHandle() -> xTaskHandle {
     trace!("xTaskGetCurrentTaskHandle() called from ffi!");
-    std::sync::Arc::into_raw(get_current_task_handle!().0) as *mut _
+    get_current_task_handle!().as_raw()
 }
 
 #[no_mangle]

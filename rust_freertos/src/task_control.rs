@@ -32,7 +32,6 @@ pub struct task_control_block{
     task_priority  : UBaseType,
     task_stacksize : UBaseType,
     task_name      : String,
-    // NOTE! This field is added for use with the `code()` method.
     // `stack_pos` is StackType because raw pointer can't be sent between threads safely.
     stack_pos      : StackType,
 
@@ -41,22 +40,22 @@ pub struct task_control_block{
     // end_of_stack: *mut StackType,
 
     //* nesting
-    #[cfg(portCRITICAL_NESTING_IN_TCB)]
+    #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
     critical_nesting: UBaseType,
 
     //* reverse priority
-    #[cfg(configUSE_MUTEXES)]
+    #[cfg(feature = "configUSE_MUTEXES")]
     base_priority  : UBaseType,
-    #[cfg(configUSE_MUTEXES)]
+    #[cfg(feature = "configUSE_MUTEXES")]
     mutexes_held   : UBaseType,
 
-    #[cfg(configGENERATE_RUN_TIME_STATUS)]
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     runtime_counter: TickType,
 
     //* notify information
-    #[cfg(config_USE_TASK_NOTIFICATIONS)]
+    #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notified_value: u32,
-    #[cfg(config_USE_TASK_NOTIFICATIONS)]
+    #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notify_state  : u8,
 }
 
@@ -74,22 +73,22 @@ impl task_control_block {
             stack_pos      : 0,
 
             //* nesting
-            #[cfg(portCRITICAL_NESTING_IN_TCB)]
+            #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
             critical_nesting: 0,
 
             //* reverse priority
-            #[cfg(configUSE_MUTEXES)]
+            #[cfg(feature = "configUSE_MUTEXES")]
             base_priority  : 0,
-            #[cfg(configUSE_MUTEXES)]
+            #[cfg(feature = "configUSE_MUTEXES")]
             mutexes_held   : 0,
 
-            #[cfg(configGENERATE_RUN_TIME_STATUS)]
+            #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
             runtime_counter: 0,
 
             //* notify information
-            #[cfg(config_USE_TASK_NOTIFICATIONS)]
+            #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
             notified_value: 0,
-            #[cfg(config_USE_TASK_NOTIFICATIONS)]
+            #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
             notify_state  : 0,
         }
     }
@@ -135,7 +134,7 @@ impl task_control_block {
         let mut top_of_stack = self.stack_pos + self.task_stacksize as StackType - 1;
         top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as StackType;
 
-        let param_ptr = Box::new(Box::new(func)); // Pass task function as a parameter.
+        let param_ptr = Box::new(Box::new(func) as Box<FnBox()>); // Pass task function as a parameter.
         let param_ptr = &*param_ptr as *const _ as *mut _; // Convert to raw pointer.
 
         /* We use a wrapper function to call the task closure,
@@ -148,10 +147,10 @@ impl task_control_block {
                                     )?;
 
         /* Do a bunch of conditional initialisations. */
-        #[cfg(configUSE_MUTEXES)]
+        #[cfg(feature = "configUSE_MUTEXES")]
         {
             self.mutexes_held = 0;
-            self.base_priority = priority;
+            self.base_priority = self.task_priority;
         }
 
         /* These list items were already initialised when `self` was created.
@@ -160,23 +159,26 @@ impl task_control_block {
         */
 
         // Create task handle.
-        let handle = Arc::new(RwLock::new(self));
+        let handle = TaskHandle(Arc::new(RwLock::new(self)));
         // TODO: Change type of list_items.
-        set_list_item_owner!(handle.read().unwrap().state_list_item,  &handle);
-        set_list_item_owner!(handle.read().unwrap().evnet_list_item, &handle);
-        let handle = TaskHandle(handle);
+        let state_list_item = handle.get_state_list_item();
+        let event_list_item = handle.get_event_list_item();
+        set_list_item_owner!(state_list_item, &handle.0);
+        set_list_item_owner!(event_list_item, &handle.0);
+        let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
+        set_list_item_value!(state_list_item, item_value);
 
-        #[cfg(portCRITICAL_NESTING_IN_TCB)]
+        #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
         {
             self.critical_nesting = 0;
         }
 
-        #[cfg(configGENERATE_RUN_TIME_STATUS)]
+        #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
         {
             self.runtime_counter = 0;
         }
 
-        #[cfg(config_USE_TASK_NOTIFICATIONS)]
+        #[cfg(feature = "config_USE_TASK_NOTIFICATIONS")]
         {
             self.notify_state = taskNOT_WAITING_NOTIFICATION;
             self.notified_value = 0;
@@ -186,12 +188,38 @@ impl task_control_block {
 
         Ok(handle)
     }
+
+    pub fn get_state_list_item(&self) -> Arc<RwLock<ListItem>> {
+        Arc::clone(&self.state_list_item)
+    }
+
+    pub fn get_event_list_item(&self) -> Arc<RwLock<ListItem>> {
+        Arc::clone(&self.evnet_list_item)
+    }
+
+    pub fn get_priority(&self) -> UBaseType {
+        self.task_priority
+    }
+
+    pub fn get_name(&self) -> &String {
+        &self.task_name
+    }
+
+    pub fn get_run_time(&self) -> TickType {
+        self.runtime_counter
+    }
+
+    pub fn set_run_time(&mut self, next_val: TickType) -> TickType {
+        let prev_val = self.runtime_counter;
+        self.runtime_counter = next_val;
+        prev_val
+    }
 }
 
 /* Task call wrapper function. */
 extern "C" fn run_wrapper(func_to_run: CVoidPointer)
 {
-    println!("{:X}", func_to_run as u64);
+    info!("Run_wrapper: The function is at position: {:X}", func_to_run as u64);
     unsafe {
         let func_to_run = Box::from_raw(func_to_run as *mut Box<FnBox() + 'static>);
         func_to_run();
@@ -222,12 +250,12 @@ pub fn initialize_task_list () {
     list_initialise!( PENDING_READY_LIST );
 
     {
-        #![cfg( INCLUDE_vTaskDelete)]
+        #![cfg(INCLUDE_vTaskDelete)]
         list_initialise!( TASK_WATCHING_TERMINATION );
     }
 
     {
-        #![cfg( INCLUDE_vTaskSuspend)]
+        #![cfg(INCLUDE_vTaskSuspend)]
         list_initialise!( SUSPEND_TASK_LIST );
     }
 
@@ -245,16 +273,25 @@ pub fn initialize_task_list () {
 pub struct TaskHandle(Arc<RwLock<TCB>>);
 
 impl TaskHandle {
+    pub fn from_arc(arc: Arc<RwLock<TCB>>) -> Self {
+        TaskHandle(arc)
+    }
+
     pub fn from(tcb: TCB) -> Self {
         /* Construct a TaskHandle with a TCB. */
         TaskHandle(Arc::new(RwLock::new(tcb)))
+    }
+
+    /* This function is for use in FFI. */
+    pub fn as_raw(self) -> ffi::xTaskHandle {
+        Arc::into_raw(self.0) as *mut _
     }
 
     pub fn get_priority(&self) -> UBaseType{
         /* Get the priority of a task.
          * Since this method is so frequently used, I used a funtion to do it.
          */
-        self.0.read().unwrap().task_priority
+        self.0.read().unwrap().get_priority()
     }
 
     pub fn add_task_to_ready_list (&self) -> Result<(), FreeRtosError>{
@@ -264,7 +301,7 @@ impl TaskHandle {
         traceMOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
         record_ready_priority! (priority);
 
-        let list_to_insert = (*READY_TASK_LISTS).write().unwrap();
+        // let list_to_insert = (*READY_TASK_LISTS).write().unwrap();
         /* let list_to_insert = match list_to_insert {
             Ok(lists) => lists[unwrapped_tcb.task_priority as usize],
             Err(_) => {
@@ -273,7 +310,7 @@ impl TaskHandle {
             }
         };
         */
-        list_insert_end! (&list_to_insert[priority as usize], unwrapped_tcb.state_list_item);
+        list_insert_end! (nth_ready_list_mut!(priority), unwrapped_tcb.state_list_item);
         tracePOST_MOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
         Ok(())
     }
@@ -319,6 +356,28 @@ impl TaskHandle {
 
         Ok(())
     }
+
+    pub fn get_event_list_item(&self) -> Arc<RwLock<ListItem>> {
+        get_tcb_from_handle!(self).get_event_list_item()
+    }
+
+    pub fn get_state_list_item(&self) -> Arc<RwLock<ListItem>> {
+        get_tcb_from_handle!(self).get_state_list_item()
+    }
+
+    pub fn get_name(&self) -> &String {
+        get_tcb_from_handle!(self).get_name()
+    }
+
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+    pub fn get_run_time(&self) -> TickType{
+        get_tcb_from_handle!(self).get_run_time()
+    }
+
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+    pub fn set_run_time(&self, next_val: TickType) -> TickType{
+        get_tcb_from_handle_mut!(self).set_run_time(next_val)
+    }
 }
 
 #[macro_export]
@@ -328,12 +387,25 @@ macro_rules! get_tcb_from_handle {
             Ok(a) => a,
             Err(_) => {
                 warn!("TCB was locked, read failed");
-                return Err(FreeRtosError::DeadLocked);
+                panic!("Task handle locked!");
             }
         }
     )
 }
 
+#[macro_export]
+macro_rules! get_tcb_from_handle_mut {
+    ($handle: expr) => (
+        match $handle.0.try_write() {
+            Ok(a) => a,
+            Err(_) => {
+                warn!("TCB was locked, write failed");
+                panic!("Task handle locked!");
+            }
+        }
+    )
+}
+/*
 
 /*
    TODO : prvResetNextTaskUnblockTime list.c : 551
@@ -464,8 +536,8 @@ pub prv_reset_next_task_unblock_time () {
                 }
             }taskEXIT_CRITICAL!();
         }
+        else {
+            mtCOVERAGE_TEST_MARKER! ();
+        }
     }
-    else {
-        mtCOVERAGE_TEST_MARKER! ();
-    }
-};
+*/

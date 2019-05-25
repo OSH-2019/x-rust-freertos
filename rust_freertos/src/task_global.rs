@@ -80,6 +80,14 @@ when the scheduler is unsuspended.  The pending ready list itself can only be
 accessed from a critical section. */
 pub static mut SCHEDULER_SUSPENDED: UBaseType = 0;
 
+/*< Holds the value of a timer/counter the last time a task was switched in. */
+#[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+pub static mut TASK_SWITCHED_IN_TIME: u32 = 0;
+
+/*< Holds the total amount of execution time as defined by the run time counter clock. */
+#[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+pub static mut TOTAL_RUN_TIME: u32 = 0;
+
 /* Setters and getters of the above global variables to avoid redundancy of unsafe blocks. */
 #[macro_export]
 macro_rules! set_scheduler_suspended {
@@ -244,12 +252,43 @@ macro_rules! set_tick_count {
     )
 }
 
-/* ---------- End of global variable setters and getters -----------*/
+#[macro_export]
+#[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+macro_rules! set_total_run_time {
+    ($next_val: expr) => (
+        unsafe {
+            TOTAL_RUN_TIME = $next_val
+        }
+    )
+}
 
 #[macro_export]
-macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
+#[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+macro_rules! set_task_switch_in_time {
+    ($next_val: expr) => (
+        unsafe {
+            TASK_SWITCHED_IN_TIME = $next_val
+        }
+    )
+}
+
+#[macro_export]
+#[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+macro_rules! get_total_run_time {
     () => (
-        // This macro does nothing.
+        unsafe {
+            TOTAL_RUN_TIME
+        }
+    )
+}
+
+#[macro_export]
+#[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+macro_rules! get_task_switch_in_time {
+    () => (
+        unsafe {
+            TASK_SWITCHED_IN_TIME
+        }
     )
 }
 
@@ -276,11 +315,26 @@ macro_rules! get_current_task_priority {
         get_current_task_handle!().get_priority()
     )
 }
+/* ---------- End of global variable setters and getters -----------*/
 
 #[macro_export]
-macro_rules! get_nth_ready_list {
+macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
+    () => (
+        // This macro does nothing.
+    )
+}
+
+#[macro_export]
+macro_rules! nth_ready_list {
     ($n: expr) => (
-        
+        (*crate::task_global::READY_TASK_LISTS).read().unwrap()[$n as usize]
+    )
+}
+
+#[macro_export]
+macro_rules! nth_ready_list_mut {
+    ($n: expr) => (
+        (*crate::task_global::READY_TASK_LISTS).write().unwrap()[$n as usize]
     )
 }
 

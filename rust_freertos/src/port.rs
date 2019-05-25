@@ -9,7 +9,7 @@ pub type StackType = usize;
 pub type BaseType = i64;
 pub type UBaseType = u64;
 pub type TickType = u32;
-pub type CVoidPointer = *mut ::std::os::raw::c_void;
+pub type CVoidPointer = *mut std::os::raw::c_void;
 
 #[cfg(target_arch = "x86_64")]
 pub const portBYTE_ALIGNMENT_MASK: UBaseType = 8;
@@ -136,7 +136,7 @@ macro_rules! traceTASK_CREATE {
     ($pxTaskHandle: expr) => {
         unsafe {
             trace!("Task creation accomplished.");
-            bindings::vPortAddTaskHandle(std::sync::Arc::into_raw($pxTaskHandle.0) as *mut _)
+            bindings::vPortAddTaskHandle($pxTaskHandle.as_raw())
         }
     };
 }
