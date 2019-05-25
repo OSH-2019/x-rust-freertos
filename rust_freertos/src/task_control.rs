@@ -372,7 +372,8 @@ impl task_control_block {
                 }
             }taskEXIT_CRITICAL!();
         }
-    else {
+        else {
         mtCOVERAGE_TEST_MARKER! ();
+        }
     }
 }
