@@ -42,7 +42,7 @@ pub enum updated_top_priority{
 pub struct task_control_block{
     //* basic information
 	state_list_item: ListItem,
-	evnet_list_item: ListItem,
+	event_list_item: ListItem,
 	task_priority  : UBaseType,
 	task_stacksize : UBaseType,
 	task_name      : String,
@@ -224,7 +224,7 @@ impl task_control_block {
 
         //FIXME list_initialise_item usage?
         list_initialise_item! (self.state_list_item);
-        list_initialise_item! (self.evnet_list_item);
+        list_initialise_item! (self.event_list_item);
 
         {
             #![cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
@@ -269,7 +269,7 @@ impl task_control_block {
                 mtCOVERAGE_TEST_MARKER!();
             }
 
-            if get_list_item_container(&px_tcb.evnet_list_item).is_some() {
+            if get_list_item_container(&px_tcb.event_list_item).is_some() {
                 list_remove!(&px_tcb.state_list_item);
             }
             else {
@@ -315,7 +315,7 @@ impl task_control_block {
                 mtCOVERAGE_TEST_MARKER! ();
             }
 
-            if get_list_item_container!(px_tcb.unwrap().evnet_list_item).is_some() {
+            if get_list_item_container!(px_tcb.unwrap().event_list_item).is_some() {
                 list_remove!(px_tcb.unwrap().state_list_item);
             }
             else {
