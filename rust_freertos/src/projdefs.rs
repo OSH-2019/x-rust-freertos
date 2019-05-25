@@ -7,6 +7,22 @@ pub const pdFALSE: BaseType = 0;
 pub const pdPASS: BaseType = pdTRUE;
 pub const pdFAIL: BaseType = pdFALSE;
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum FreeRtosError {
+    OutOfMemory,
+    QueueSendTimeout,
+    QueueReceiveTimeout,
+    MutexTimeout,
+    Timeout,
+    QueueFull,
+    StringConversionError,
+    TaskNotFound,
+    InvalidQueueSize,
+    ProcessorHasShutDown,
+    DeadLocked,
+    PortError
+}
+
 #[macro_export]
 macro_rules! pdMS_TO_TICKS {
     ($xTimeInMs:expr) => {

@@ -375,4 +375,4 @@ impl task_control_block {
     else {
         mtCOVERAGE_TEST_MARKER! ();
     }
-};
+}

@@ -1,6 +1,7 @@
 // port.c - The wrapper of portable functions written in C.
 // This file is created by Fan Jinhao.
 use crate::bindings::*;
+use crate::projdefs::FreeRtosError;
 
 // NOTE! These type aliases may vary across different platforms.
 // TODO: Find a better way to define these types.
@@ -8,13 +9,16 @@ pub type StackType = usize;
 pub type BaseType = i64;
 pub type UBaseType = u64;
 pub type TickType = u32;
+pub type CVoidPointer = *mut std::os::raw::c_void;
 
-// Keep the same definition with bindgen.
-pub type TaskFunction = Box<extern "C" fn(arg1: *mut ::std::os::raw::c_void)>;
+#[cfg(target_arch = "x86_64")]
+pub const portBYTE_ALIGNMENT_MASK: UBaseType = 8;
+#[cfg(not(target_arch = "x86_64"))]
+pub const portBYTE_ALIGNMENT_MASK: UBaseType = 4;
 
-#[cfg(configUSE_16_BIT_TICKS)]
+#[cfg(feature = "configUSE_16_BIT_TICKS")]
 pub const portMAX_DELAY: TickType = 0xffff;
-#[cfg(not(configUSE_16_BIT_TICKS))]
+#[cfg(not(feature = "configUSE_16_BIT_TICKS"))]
 pub const portMAX_DELAY: TickType = 0xffffffff;
 
 /* -------------------- Macros starting with "port_" ----------------- */
@@ -29,7 +33,7 @@ macro_rules! portYIELD {
 #[macro_export]
 macro_rules! portYIELD_WITHIN_API {
     () => {
-        unsafe { portYIELD() }
+        portYIELD!()
     };
 }
 
@@ -117,8 +121,25 @@ macro_rules! portNOP {
     };
 }
 
-// TODO: traceTASK_DELETE() and traceTASK_CREATE()
-// These functions were not wrapped because they require a void* pointer.
+#[macro_export]
+macro_rules! traceTASK_DELETE {
+    ($pxTaskToDelete: expr) => {
+        unsafe {
+            // TODO: Add a trace!()
+            bindings::vPortForciblyEndThread(std::sync::Arc::into_raw($pxTaskToDelete) as *mut _)
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! traceTASK_CREATE {
+    ($pxTaskHandle: expr) => {
+        unsafe {
+            trace!("Task creation accomplished.");
+            bindings::vPortAddTaskHandle($pxTaskHandle.as_raw())
+        }
+    };
+}
 
 #[macro_export]
 macro_rules! portCONFIGURE_TIMER_FOR_RUN_TIME_STATS {
@@ -208,8 +229,16 @@ macro_rules! portRESET_READY_PRIORITY {
 /*
  * Map to the memory management routines required for the port.
  */
-pub fn port_malloc(size: usize) -> *mut ::std::os::raw::c_void {
-    unsafe { pvPortMalloc(size) }
+pub fn port_malloc(size: usize) -> Result<CVoidPointer, FreeRtosError> {
+    unsafe { 
+        let ret_ptr = pvPortMalloc(size);
+        if ret_ptr.is_null() {
+            error!("Malloc returned null.");
+            Err(FreeRtosError::OutOfMemory)
+        } else {
+            Ok(ret_ptr)
+        }
+    }
 }
 
 pub fn port_free(pv: *mut ::std::os::raw::c_void) {
@@ -271,8 +300,14 @@ pub fn port_end_scheduler() {
  */
 pub fn port_initialise_stack(
     pxTopOfStack: *mut StackType,
-    pxCode: TaskFunction,
+    pxCode: TaskFunction_t,
     pvParameters: *mut ::std::os::raw::c_void,
-) -> *mut StackType {
-    unsafe { pxPortInitialiseStack(pxTopOfStack, Some(*pxCode), pvParameters) }
+) -> Result<*mut StackType, FreeRtosError> {
+    let ret_val = unsafe { pxPortInitialiseStack(pxTopOfStack, pxCode, pvParameters) };
+    if ret_val.is_null() {
+        error!("Port failed to initialise task stack!");
+        Err(FreeRtosError::PortError)
+    } else {
+        Ok(ret_val)
+    }
 }

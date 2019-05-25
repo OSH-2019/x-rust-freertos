@@ -5,6 +5,10 @@
 use crate::*; // TODO: Is this line necessary?
 use crate::port::{TickType, UBaseType};
 use crate::projdefs::pdFALSE;
+use crate::task_control::{TaskHandle, TCB};
+use crate::task_global::*;
+use std::sync::{Arc, RwLock};
+// use crate::task_control::TCB;
 
 /*
  * Originally from task. h
@@ -22,8 +26,8 @@ macro_rules! taskYIELD {
 #[macro_export]
 macro_rules! taskYIELD_IF_USING_PREEMPTION {
     () => (
-        #[cfg(configUSE_PREEMPTION)]
-        portYIELD_WITHIN_API!()
+        #[cfg(feature = "configUSE_PREEMPTION")]
+        portYIELD_WITHIN_API!();
     )
 }
 /*
@@ -131,24 +135,19 @@ macro_rules! taskENABLE_INTERRUPTS {
 /// Nothing
 ///
 /// # Example
-/// TODO: Finish the example.
 /// ```
-///  void vAFunction( void )
-///  {
-///	 // Create at least one task before starting the kernel.
-///	 xTaskCreate( vTaskCode, "NAME", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
+/// task_control::TCB::new()
+///                   .name("NAME")
+///                   .priority(1)
+///                   .initialise(|| println!("Hello world!"))
 ///
-///	 // Start the real time kernel with preemption.
-///	 vTaskStartScheduler ();
+/// // Start the real time kernel with preemption.
+/// task_start_scheduler();
 ///
-///	 // Will not get here unless a task calls vTaskEndScheduler ()
-/// }
+/// // Will not get here unless a task calls vTaskEndScheduler ()
 /// ```
 pub fn task_start_scheduler() {
-    /* Add the idle task at the lowest priority. */
-    create_idle_task();
-
-    #[cfg(configUSE_TIMERS)]
+    #[cfg(feature = "configUSE_TIMERS")]
     create_timer_task();
 
     initialize_scheduler();
@@ -166,9 +165,69 @@ pub fn task_start_scheduler() {
 /// # Return
 /// 
 /// Nothing
-fn create_idle_task() {
-    // TODO: Wait for task_create.
-    // On fail, panic!("Heap not enough to allocate idle task");
+pub fn create_idle_task() -> TaskHandle{
+    let idle_task_fn = | | {
+        loop {
+            /* THIS IS THE RTOS IDLE TASK - WHICH IS CREATED AUTOMATICALLY WHEN THE
+               SCHEDULER IS STARTED. */
+        
+            /* See if any tasks have deleted themselves - if so then the idle task
+               is responsible for freeing the deleted task's TCB and stack. */
+            check_tasks_waiting_termination();
+
+            /* If we are not using preemption we keep forcing a task switch to
+               see if any other task has become available.  If we are using
+               preemption we don't need to do this as any task becoming available
+               will automatically get the processor anyway. */
+            #[cfg(not(feature = "configUSE_PREEMPTION"))]
+            taskYIELD!();
+
+            {
+                #![cfg(all(feature = "configUSE_PREEMPTION", feature = "configIDLE_SHOULD_YIELD"))]
+                /* When using preemption tasks of equal priority will be
+                   timesliced.  If a task that is sharing the idle priority is ready
+                   to run then the idle task should yield before the end of the
+                   timeslice.
+
+                   A critical region is not required here as we are just reading from
+                   the list, and an occasional incorrect value will not matter.  If
+                   the ready list at the idle priority contains more than one task
+                   then a task other than the idle task is ready to execute. */
+                if current_list_length!(nth_ready_list!(0)) > 1
+                {
+                    taskYIELD!();
+                }
+                else
+                {
+                    mtCOVERAGE_TEST_MARKER!();
+                }
+            }
+
+            {
+                #![cfg(feature = "configUSE_IDLE_HOOK")]
+                // TODO: Use IdleHook
+                // extern void vApplicationIdleHook( void );
+
+                /* Call the user defined function from within the idle task.  This
+                   allows the application designer to add background functionality
+                   without the overhead of a separate task.
+                   NOTE: vApplicationIdleHook() MUST NOT, UNDER ANY CIRCUMSTANCES,
+                   CALL A FUNCTION THAT MIGHT BLOCK. */
+                // vApplicationIdleHook();
+                trace!("Idle Task running");
+            }
+        }
+    };
+
+    TCB::new()
+        .priority(0)
+        .name("Idle")
+        .initiailise(idle_task_fn)
+        .unwrap_or_else(|err| panic!("Idle task creation failed with error: {:?}", err))
+}
+
+fn check_tasks_waiting_termination() {
+    // TODO: Wait for task_delete.
 }
 
 /// # Description:
@@ -184,7 +243,7 @@ fn create_idle_task() {
 /// 
 /// Nothing
 fn create_timer_task() {
-    // TODO: Wait for task_create.
+    // TODO: This function relies on the software timer, which we may not implement.
     // timer::create_timer_task()
     // On fail, panic!("No enough heap space to allocate timer task.");
 }
@@ -269,27 +328,23 @@ fn initialize_scheduler() {
 /// TODO: Finish the doctest.
 /// ```
 ///
-/// void vTaskCode( void * pvParameters )
-/// {
-/// for( ;; )
-/// {
-/// // Task code goes here.
-/// // At some point we want to end the real time kernel processing
-/// // so call ...
-/// println!("Task Code called successfully!");
-/// vTaskEndScheduler ();
-/// }
-/// }
-/// void vAFunction( void )
-/// {
-///     // Create at least one task before starting the kernel.
-///     xTaskCreate( vTaskCode, "NAME", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
-///     // Start the real time kernel with preemption.
-///     vTaskStartScheduler ();
-///     // Will only get here when the vTaskCode () task has called
-///     // vTaskEndScheduler ().  When we get here we are back to single task
-///     // execution.
-/// }
+/// task_control::TCB::new()
+///                   .name("NAME")
+///                   .priority(1)
+///                   .initialise(|| { loop {
+///                         println!("Task Code called successfully!");
+///                         // Task code goes here.
+///                         // At some point we want to end the real time kernel processing
+///                         // so call ...
+///                         task_end_scheduler();
+///                     });
+///
+/// // Start the real time kernel with preemption.
+/// task_start_scheduler();
+/// // Will only get here when the vTaskCode () task has called
+/// // vTaskEndScheduler ().  When we get here we are back to single task
+/// // execution.
+///
 /// ```
 
 pub fn task_end_scheduler() {
@@ -408,9 +463,6 @@ pub fn task_suspend_all() {
 		 }
 	 }
  }
-   </pre>
- * \defgroup xTaskResumeAll xTaskResumeAll
- * \ingroup SchedulerControl
  */
 pub fn task_resume_all() -> bool {
     let already_yielded = false;
@@ -453,7 +505,7 @@ pub fn task_resume_all() -> bool {
                 if get_yield_pending!() {
 
                     {
-                        #![cfg(configUSE_PREEMPTION)]
+                        #![cfg(feature = "configUSE_PREEMPTION")]
                         already_yielded = true;
                     }
 
@@ -473,43 +525,51 @@ pub fn task_resume_all() -> bool {
 }
 
 fn move_tasks_to_ready_list() -> bool {
-    /*
-     * TODO: Wait until list and TCB is defined.
-    while( listLIST_IS_EMPTY( &xPendingReadyList ) == pdFALSE )
-    {
-        pxTCB = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( ( &xPendingReadyList ) );
-        ( void ) uxListRemove( &( pxTCB->xEventListItem ) );
-        ( void ) uxListRemove( &( pxTCB->xStateListItem ) );
-        prvAddTaskToReadyList( pxTCB );
+    let has_unblocked_task = false;
+    while !list_is_empty!(PENDING_READY_LIST) {
+        let task_handle = TaskHandle::from_arc(
+            get_owner_of_head_entry!(PENDING_READY_LIST).unwrap());
+        let event_list_item = task_handle.get_event_list_item();
+        let state_list_item = task_handle.get_state_list_item();
+
+        if let Some(list) = get_list_item_container!(event_list_item) {
+            list_remove!(list, state_list_item);
+        } else {
+            warn!("State_list_item of task {} should have container", 
+                  task_handle.get_name());
+        }
+
+        if let Some(list) = get_list_item_container!(event_list_item) {
+            list_remove!(list, state_list_item);
+        } else {
+            warn!("State_list_item of task {} should have container", 
+                  task_handle.get_name());
+        }
+
+        task_handle.add_task_to_ready_list();
 
         /* If the moved task has a priority higher than the current
            task then a yield must be performed. */
-        if( pxTCB->uxPriority >= pxCurrentTCB->uxPriority )
+        if task_handle.get_priority() >= get_current_task_priority!()
         {
-            xYieldPending = pdTRUE;
+            set_yield_pending!(true);
         }
         else
         {
-            mtCOVERAGE_TEST_MARKER();
+            mtCOVERAGE_TEST_MARKER!();
         }
     }
-    */
     false
 }
 
 fn reset_next_task_unblock_time() {
-    /*
-     * TODO: Wait for list and task.
-
-    TCB_t *pxTCB;
-
-    if( listLIST_IS_EMPTY( pxDelayedTaskList ) != pdFALSE )
+    if list_is_empty!( DELAYED_TASK_LIST )
     {
         /* The new current delayed list is empty.  Set xNextTaskUnblockTime to
            the maximum possible value so it is	extremely unlikely that the
            if( xTickCount >= xNextTaskUnblockTime ) test will pass until
            there is an item in the delayed list. */
-        xNextTaskUnblockTime = portMAX_DELAY;
+        set_next_task_unblock_time!(port::portMAX_DELAY);
     }
     else
     {
@@ -517,11 +577,13 @@ fn reset_next_task_unblock_time() {
            the item at the head of the delayed list.  This is the time at
            which the task at the head of the delayed list should be removed
            from the Blocked state. */
-        ( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
-        xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
+        let task_handle = TaskHandle::from_arc(
+            get_owner_of_head_entry!(DELAYED_TASK_LIST).unwrap()
+            );
+        set_next_task_unblock_time!(
+            get_list_item_value!(task_handle.get_state_list_item())
+            );
     }
-
-    */
 }
 
 fn process_pended_ticks() {
@@ -565,7 +627,7 @@ fn process_pended_ticks() {
 /// # Return
 /// 
 /// Nothing
-#[cfg(configUSE_TICKLESS_IDLE)]
+#[cfg(feature = "configUSE_TICKLESS_IDLE")]
 pub fn task_step_tick(ticks_to_jump: TickType) {
     /* Correct the tick count value after a period during which the tick
        was suppressed.  Note this does *not* call the tick hook function for
@@ -605,7 +667,7 @@ pub fn task_switch_context() {
         set_yield_pending!(false);
         traceTASK_SWITCHED_OUT!();
 
-        #[cfg(configGENERATE_RUN_TIME_STATS)]
+        #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
         generate_context_switch_stats();
 
         /* Check for stack overflow, if configured. */
@@ -622,33 +684,41 @@ pub fn task_switch_context() {
 
 fn task_select_highest_priority_task() {
     let top_priority: UBaseType = get_top_ready_priority!();
-    /*
-     * TODO: Wait until these functions and variables are defined.
 
     /* Find the highest priority queue that contains ready tasks. */
-    while( listLIST_IS_EMPTY( &( pxReadyTasksLists[ uxTopPriority ] ) ) )
+    while list_is_empty!(nth_ready_list!(top_priority))
     {
-        assert!(top_prioity > 0, "No task found with a non-zero priority");
+        assert!(top_priority > 0, "No task found with a non-zero priority");
         top_priority -= 1;
     }
+
     /* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of
        the same priority get an equal share of the processor time. */
-    listGET_OWNER_OF_NEXT_ENTRY( pxCurrentTCB, &( pxReadyTasksLists[ uxTopPriority ] ) );
+    let next_task = TaskHandle::from_arc(
+        get_owner_of_next_entry!(
+            nth_ready_list!(top_priority),
+            get_current_task_handle!().get_state_list_item()
+            ).unwrap()
+        );
 
-    */
+    set_current_task_handle!(next_task);
+
     set_top_ready_priority!(top_priority);
 }
 
-#[cfg(configGENERATE_RUN_TIME_STATS)]
+#[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
 fn generate_context_switch_stats() {
-    // TODO: Wait until CurrentTCB is defined.
     /*
     #ifdef portALT_GET_RUN_TIME_COUNTER_VALUE
     portALT_GET_RUN_TIME_COUNTER_VALUE( ulTotalRunTime );
     #else
     ulTotalRunTime = portGET_RUN_TIME_COUNTER_VALUE();
     #endif
-
+    */
+    let total_run_time = portGET_RUN_TIME_COUNTER_VALUE!() as u32;
+    trace!("Total runtime: {}", total_run_time);
+    set_total_run_time!(total_run_time);
+    
     /* Add the amount of time the task has been running to the
        accumulated time so far.  The time the task started running was
        stored in ulTaskSwitchedInTime.  Note that there is no overflow
@@ -656,19 +726,157 @@ fn generate_context_switch_stats() {
        overflows.  The guard against negative values is to protect
        against suspect run time stat counter implementations - which
        are provided by the application, not the kernel. */
-    if( ulTotalRunTime > ulTaskSwitchedInTime )
+    let task_switched_in_time = get_task_switch_in_time!();
+    if total_run_time > task_switched_in_time
     {
-        pxCurrentTCB->ulRunTimeCounter += ( ulTotalRunTime - ulTaskSwitchedInTime );
+        let current_task = get_current_task_handle!();
+        let old_run_time = current_task.get_run_time();
+        current_task.set_run_time(old_run_time + total_run_time - task_switched_in_time);
     }
     else
     {
-        mtCOVERAGE_TEST_MARKER();
+        mtCOVERAGE_TEST_MARKER!();
     }
-    ulTaskSwitchedInTime = ulTotalRunTime;
-    */
+    set_task_switch_in_time!(total_run_time);
 }
 
 pub fn task_increment_tick() -> bool {
     // TODO: tasks.c 2500
-    false
+    let mut switch_required = false;
+
+    /* Called by the portable layer each time a tick interrupt occurs.
+       Increments the tick then checks to see if the new tick value will cause any
+       tasks to be unblocked. */
+    traceTASK_INCREMENT_TICK!( get_tick_count!() );
+
+    if get_scheduler_suspended!() != pdFALSE as UBaseType {
+        /* Minor optimisation.  The tick count cannot change in this
+           block. */
+        let const_tick_count = get_tick_count!() + 1;
+
+        /* Increment the RTOS tick, switching the delayed and overflowed
+           delayed lists if it wraps to 0. */
+        set_tick_count!(const_tick_count);
+
+        if const_tick_count == 0 {
+            // NOTE: This macro has yet been implemented.
+            switch_delayed_lists!();
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER!();
+        }
+
+        /* See if this tick has made a timeout expire.  Tasks are stored in
+           the	queue in the order of their wake time - meaning once one task
+           has been found whose block time has not expired there is no need to
+           look any further down the list. */
+        if const_tick_count >= get_next_task_unblock_time!()
+        {
+            loop {
+                if list_is_empty!( DELAYED_TASK_LIST ) {
+                    /* The delayed list is empty.  Set xNextTaskUnblockTime
+                       to the maximum possible value so it is extremely
+                       unlikely that the
+                       if( xTickCount >= xNextTaskUnblockTime ) test will pass
+                       next time through. */
+                    set_next_task_unblock_time!(port::portMAX_DELAY);
+                    break;
+                }
+                else {
+                    /* The delayed list is not empty, get the value of the
+                       item at the head of the delayed list.  This is the time
+                       at which the task at the head of the delayed list must
+                       be removed from the Blocked state. */
+                    let delay_head_entry_owner = get_owner_of_head_entry!(DELAYED_TASK_LIST).unwrap();
+                    // TODO: This is probably an error of `list`
+                    let task_handle = TaskHandle::from_arc(delay_head_entry_owner);
+                    let state_list_item = task_handle.get_state_list_item();
+                    let event_list_item = task_handle.get_event_list_item();
+                    let item_value = get_list_item_value!(state_list_item);
+
+                    if const_tick_count < item_value
+                    {
+                        /* It is not time to unblock this item yet, but the
+                           item value is the time at which the task at the head
+                           of the blocked list must be removed from the Blocked
+                           state -	so record the item value in
+                           xNextTaskUnblockTime. */
+                        set_next_task_unblock_time!(item_value);
+                        break;
+                    }
+                    else
+                    {
+                        mtCOVERAGE_TEST_MARKER!();
+                    }
+
+                    /* It is time to remove the item from the Blocked state. */
+                    if let Some(list) = get_list_item_container!(state_list_item) {
+                        list_remove!(list, state_list_item);
+                    } else {
+                        warn!("State_list_item of task {} doesn't have container", 
+                              task_handle.get_name());
+                    }
+
+                    /* Is the task waiting on an event also?  If so remove
+                       it from the event list. */
+                    if let Some(list) = get_list_item_container!(event_list_item) {
+                        list_remove!(list, event_list_item);
+                    }
+                    else {
+                        trace!("Task {} isn't waiting on an event list", task_handle.get_name());
+                    }
+
+                    /* Place the unblocked task into the appropriate ready
+                       list. */
+                    task_handle.add_task_to_ready_list();
+
+                    /* A task being unblocked cannot cause an immediate
+                       context switch if preemption is turned off. */
+                    {
+                        #![cfg(feature = "configUSE_PREEMPTION")]
+                        /* Preemption is on, but a context switch should
+                           only be performed if the unblocked task has a
+                           priority that is equal to or higher than the
+                           currently executing task. */
+                        if task_handle.get_priority() >= get_current_task_priority!()
+                        {
+                            switch_required = true;
+                        }
+                        else
+                        {
+                            mtCOVERAGE_TEST_MARKER!();
+                        }
+                    }
+                }
+            }
+        }
+
+        /* Tasks of equal priority to the currently running task will share
+           processing time (time slice) if preemption is on, and the application
+           writer has not explicitly turned time slicing off. */
+        {
+            #![cfg(all(feature = "configUSE_PREEMPTION", feature = "configUSE_TIME_SLICING"))]
+            if current_list_length!(nth_ready_list!(get_current_task_priority!())) > 1 {
+                switch_required = true;
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER!();
+            }
+        }
+
+        {
+            #![cfg(feature = "configUSE_TICK_HOOK")]
+            /* Guard against the tick hook being called when the pended tick
+               count is being unwound (when the scheduler is being unlocked). */
+            if get_pended_ticks!() == 0
+            {
+                // vApplicationTickHook();
+            }
+            else
+            {
+                mtCOVERAGE_TEST_MARKER!();
+            }
+        }
+    }
+    switch_required
 }
