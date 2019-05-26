@@ -4,6 +4,8 @@ use std::sync::{Arc, RwLock};
 use crate::*;
 use crate::port::{TickType, UBaseType};
 use crate::task_control::task_control_block;
+use crate::task_global::global_lists;
+
 
 /// this should be defined is port.rs
 // type UBaseType = u16;    // unsighed short
@@ -26,8 +28,8 @@ pub type LIST = Arc<RwLock<Vec<List>>>;
 /// we now have three list item named item1, item2, item3, which are created by the method `ListItem::new`
 /// every thim we want insert an item to a list, we should first call `set_list_item_container!` macro, for example:
 /// `
-/// //insert item1 to the lista, since the lista is the first value in list, the index should be 0 --> ListName::LIST0
-/// set_list_item_container!(item1, ListName::LIST0);
+/// //insert item1 to the lista, since the lista is the first value in list, the index should be 0 --> ListName::READY_TASK_LISTS_0
+/// set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
 /// insert_end!(lista, item1);
 /// `
 /// and in this way, we could easily find the **actural** container.
@@ -43,13 +45,28 @@ pub type LIST = Arc<RwLock<Vec<List>>>;
 ///     }
 /// }
 /// `
+/// 
+/// 
+
+
+/// this is the all lists' mapping index
 #[derive(Debug, Copy, Clone)]
 pub enum ListName {
-    LIST0,
-    LIST1,
-    LIST2,
-    LIST3,
-    LIST4,
+    READY_TASK_LISTS_0,
+    READY_TASK_LISTS_1,
+    READY_TASK_LISTS_2,
+    READY_TASK_LISTS_3,
+    READY_TASK_LISTS_4,
+    READY_TASK_LISTS_5,
+    READY_TASK_LISTS_6,
+    READY_TASK_LISTS_7,
+    READY_TASK_LISTS_8,
+    READY_TASK_LISTS_9,
+    DELAYED_TASK_LIST,
+    OVERFLOW_DELAYED_TASK_LIST,
+    PENDING_READY_LIST,
+    TASKS_WAITING_TERMINATION,
+    SUSPENDED_TASK_LIST,
 }
 #[derive(Debug)]
 struct TskTCB {
@@ -184,8 +201,8 @@ macro_rules! get_owner_of_next_entry {
         let index = get_item_index!($list, $item, eq);
         match index {
             Some(index) => {
-                match ($list.read().unwrap())[(index + 1) % current_list_length!($list)].read().unwrap().owner {
-                    Some(owner) => Some(Arc::clone(&owner)),
+                match ($list.read().unwrap())[(index + 1) % current_list_length!($list)].read().unwrap().owner.as_ref() {
+                    Some(owner) => Some(Arc::clone(owner)),
                     None => None,
                 }
             },
@@ -206,7 +223,15 @@ macro_rules! get_owner_of_head_entry {
         if current_list_length!($list) == 0 {
             None
         }else{
-            Some(Arc::clone(&($list.read().unwrap())[0]))
+            // Some(Arc::clone(&($list.read().unwrap())[0].read().unwrap().owner.unwrap()))
+            match ($list.read().unwrap())[0].read().unwrap().owner.as_ref() {
+                Some(owner) => {
+                    Some(Arc::clone(owner))
+                },
+                None => {
+                    None
+                }
+            }
         }
     });
 }
@@ -329,39 +354,40 @@ macro_rules! list_remove_inner {
 /// $item: ListItem
 /// #Return
 /// Nothing
-#[macro_export]
-macro_rules!  get_list_container_mapped_index {
-        ($item:expr) => ({
-            {
-                match $item.read().unwrap().container {
-                ListName::LIST0 => 0,
-                ListName::LIST1 => 1,
-                ListName::LIST2 => 2;
-                ListName::LIST3 => 3;
-                ListName::LIST4 => 4;
-                _               => 0;
-                }
-            }
-    });
-}
+// #[macro_export]
+// macro_rules!  get_list_container_mapped_index {
+//         ($item:expr) => ({
+//             {
+//                 match $item.read().unwrap().container {
+//                 ListName::LIST0 => 0,
+//                 ListName::LIST1 => 1,
+//                 ListName::LIST2 => 2;
+//                 ListName::LIST3 => 3;
+//                 ListName::LIST4 => 4;
+//                 _               => 0;
+//                 }
+//             }
+//     });
+// }
 
 
 /// # Description
 /// remove one item and return the current list length
 /// # Arguments
 /// $item: Arc<RwLock<ListItem>>
+/// $list: List
 /// #Return
 /// current list item
 #[macro_export]
 macro_rules! list_remove {
-    // bugs here!!!
-    // ($item:expr) => ({
-    //     {
-    //         let list_mapped_index = get_list_container_mapped_index!($item);
-    //         list_remove_inner!(LIST[list_mapped_index], $item);
-    //         current_list_length!(list)
-    //     }
-    // });
+    // not know the container
+    ($item:expr) => ({
+        {
+            let index = get_list_item_container!($item).unwrap() as usize;
+            list_remove!((global_lists.write().unwrap())[index], $item);
+        }
+    });
+    // konw the container 
     ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, eq);
@@ -564,7 +590,7 @@ mod test {
 
         assert_eq!(list_is_empty!(list1), true);
 
-        set_list_item_container!(item1, ListName::LIST0);
+        set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
         assert_eq!(0, item1.read().unwrap().container.unwrap() as i32);
 
         list_insert_end!(list1, item1);
@@ -572,11 +598,11 @@ mod test {
         list_insert!(list1, item2);
         list_insert!(list1, item4);
         assert_eq!((list1.read().unwrap())[0].read().unwrap().item_value, 100);
-        set_list_item_container!(item1, ListName::LIST0);
+        set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
         assert_eq!((list1.read().unwrap())[1].read().unwrap().item_value, 200);
-        set_list_item_container!(item1, ListName::LIST0);
+        set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
         assert_eq!((list1.read().unwrap())[2].read().unwrap().item_value, 300);
-        set_list_item_container!(item1, ListName::LIST0);
+        set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
         assert_eq!((list1.read().unwrap())[3].read().unwrap().item_value, 400);
 
         list_remove!(list1, item3);

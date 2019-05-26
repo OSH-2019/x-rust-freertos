@@ -12,7 +12,7 @@ fn main() {
     // The solution is to comment out the following line after the first time you've generated the bindings.
     // run_bindgen();
 
-    // run_cc();
+    run_cc();
 }
 
 // Run bindgen to genernate C bindings in portable.h to Rust.

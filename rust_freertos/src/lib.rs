@@ -19,11 +19,11 @@ mod trace;
 mod ffi;
 mod list;
 mod task_global;
-mod task_control;
+pub mod task_control;
 // mod task_api;
-mod kernel;
-mod queue;
-mod queue_h;
+pub mod kernel;
+// mod queue;
+// mod queue_h;
 
 #[cfg(test)]
 mod tests {
@@ -67,12 +67,13 @@ mod tests {
 
     }
 
+    /*
     use std::collections::VecDeque;
     use std::sync::Arc;
     #[test]
     fn test_basics() {
         let m = Arc::new(String::from("Wow, We made it!"));
-        let main_task = Task::new()
+        let main_task = TCB::new()
                             .name("main")
                             .priority(1)
                             .code(move || {
@@ -82,4 +83,5 @@ mod tests {
                             .initialise_new_task();
         kernel::task_start_scheduler();
     }
+    */
 }

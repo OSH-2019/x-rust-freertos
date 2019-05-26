@@ -114,7 +114,7 @@ impl task_control_block {
         self
     }
 
-    pub fn initiailise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError> 
+    pub fn initialise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError> 
         where F: FnOnce() -> ()
     {
         let size_of_stacktype = std::mem::size_of::<StackType>();
@@ -201,8 +201,8 @@ impl task_control_block {
         self.task_priority
     }
 
-    pub fn get_name(&self) -> &String {
-        &self.task_name
+    pub fn get_name(&self) -> String {
+        self.task_name.clone()
     }
 
     pub fn get_run_time(&self) -> TickType {
@@ -365,7 +365,7 @@ impl TaskHandle {
         get_tcb_from_handle!(self).get_state_list_item()
     }
 
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> String {
         get_tcb_from_handle!(self).get_name()
     }
 

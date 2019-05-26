@@ -7,54 +7,43 @@ use std::sync::{Arc, RwLock};
 /* Current_TCB and global task lists. */
 lazy_static! {
 
+    pub static ref READY_TASK_LISTS: [UBaseType; configMAX_PRIORITIES!()] = 
+        [ add_list_count!() ; configMAX_PRIORITIES!() ];
+
+    /* Delayed tasks (two lists are used -
+     * one for delays that have overflowed the current tick count.
+     */
+    // Points to the delayed task list currently being used.
+    pub static ref DELAYED_TASK_LIST: UBaseType = add_list_count!();
+    /* Points to the delayed task list currently being used
+     * to hold tasks that have overflowed the current tick count.
+     */
+    pub static ref OVERFLOW_DELAYED_TASK_LIST: UBaseType = add_list_count!();
+
+    /* Tasks that have been readied while the scheduler was suspended.
+     * They will be moved to the ready list when the scheduler is resumed.
+     */
+    pub static ref PENDING_READY_LIST: UBaseType = add_list_count!();
+
+    // Tasks that have been deleted - but their memory not yet freed.
+    #[cfg(feature = "INCLUDE_vTaskDelete")]
+    pub static ref TASKS_WAITING_TERMINATION: UBaseType = add_list_count!();
+    #[cfg(feature = "INCLUDE_vTaskDelete")]
+    pub static ref DELETED_TASKS_WAITING_CLEAN_UP: UBaseType = 0;
+
+    // Tasks that are currently suspended.
+    #[cfg(feature = "INCLUDE_vTaskSuspend")]
+    pub static ref SUSPENDED_TASK_LIST: UBaseType = add_list_count!();
+
     /* Initialise CURRENT_TCB as early as it is declared rather than when the scheduler starts running.
      * This isn't reasonable actually, but avoided the complexity of using an additional Option<>.
      * Use RwLock to wrap TaskHandle because sometimes we need to change CURRENT_TCB.
      * We use setter and getter to modify CURRENT_TCB, they are defined at the end of this file.
      */
     pub static ref CURRENT_TCB: RwLock<TaskHandle> = RwLock::new(kernel::create_idle_task());
-
-    /* change READY_TASK_LISTS to Arc<RwLock<List>>
-     * TODO: Change READT_TASK_LISTS back to `List` because it is too hard to use.
-     */
-    pub static ref READY_TASK_LISTS: LIST = Arc::new(RwLock::new(
-            (0..configMAX_PRIORITIES!())
-                .map(|_| List_new!())
-                .collect()
-                ));
-
-    /* Delayed tasks (two lists are used -
-     * one for delays that have overflowed the current tick count.
-     */
-    pub static ref DELAYED_TASK_LIST1: List = List_new!();
-    pub static ref DELAYED_TASK_LIST2: List = List_new!();
-
-    // Points to the delayed task list currently being used.
-    pub static ref DELAYED_TASK_LIST: &'static List = &DELAYED_TASK_LIST1;
-
-    /* Points to the delayed task list currently being used
-     * to hold tasks that have overflowed the current tick count.
-     */
-    pub static ref OVERFLOW_DELAYED_TASK_LIST: &'static List = &DELAYED_TASK_LIST2;
-
-    /* Tasks that have been readied while the scheduler was suspended.
-     * They will be moved to the ready list when the scheduler is resumed.
-     */
-    pub static ref PENDING_READY_LIST: List = List_new!();
-}
-
-/* Conditionally compiled global lists. */
-#[cfg(feature = "INCLUDE_vTaskDelete")]
-lazy_static! {
-    // Tasks that have been deleted - but their memory not yet freed.
-    pub static ref TASKS_WAITING_TERMINATION: List = List_new!();
-    pub static ref DELETED_TASKS_WAITING_CLEAN_UP: UBaseType = 0;
-}
-
-#[cfg(feature = "INCLUDE_vTaskSuspend")]
-lazy_static! {
-    // Tasks that are currently suspended.
-    pub static ref SUSPENDED_TASK_LIST: List = List_new!();
+    pub static ref global_lists: Arc<RwLock<Vec<List>>> = Arc::new(RwLock::new(
+            (0..get_list_count!()).map(|n| List_new!()).collect()
+    ));
 }
 
 /* ------------------ End global lists ------------------- */
@@ -69,6 +58,42 @@ pub static mut YIELD_PENDING: bool = false;
 pub static mut NUM_OF_OVERFLOWS: BaseType = 0;
 pub static mut TASK_NUMBER: UBaseType = 0;
 pub static mut NEXT_TASK_UNBLOCK_TIME: TickType = 0;
+
+static mut LIST_COUNT: UBaseType = 0;
+
+#[macro_export]
+macro_rules! add_list_count {
+    () => (
+        unsafe {
+            let old_list_count = LIST_COUNT;
+            LIST_COUNT += 1;
+            old_list_count
+        }
+    )
+}
+
+#[macro_export]
+macro_rules! get_list_count {
+    () => (
+        unsafe {
+            LIST_COUNT
+        }
+    )
+}
+
+#[macro_export]
+macro_rules! get_list {
+    ($list_name: expr) => (
+        global_lists.read().unwrap()[*$list_name as usize]
+    )
+}
+
+#[macro_export]
+macro_rules! get_list_mut {
+    ($list_name: expr) => (
+        global_lists.write().unwrap()[*$list_name as usize]
+    )
+}
 
 /* Context switches are held pending while the scheduler is suspended.  Also,
 interrupts must not manipulate the xStateListItem of a TCB, or any of the
@@ -295,10 +320,7 @@ macro_rules! get_task_switch_in_time {
 #[macro_export]
 macro_rules! get_current_task_handle {
     () => (
-        match crate::task_global::CURRENT_TCB.try_read() {
-            Ok(task_handle) => task_handle,
-            Err(_) => panic!("Failed to get current task handle")
-        }
+        crate::task_global::CURRENT_TCB.read().unwrap().clone()
     )
 }
 
@@ -327,14 +349,14 @@ macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
 #[macro_export]
 macro_rules! nth_ready_list {
     ($n: expr) => (
-        (*crate::task_global::READY_TASK_LISTS).read().unwrap()[$n as usize]
+        get_list!(&crate::task_global::READY_TASK_LISTS[$n as usize])
     )
 }
 
 #[macro_export]
 macro_rules! nth_ready_list_mut {
     ($n: expr) => (
-        (*crate::task_global::READY_TASK_LISTS).write().unwrap()[$n as usize]
+        get_list_mut!(&crate::task_global::READY_TASK_LISTS[$n as usize])
     )
 }
 

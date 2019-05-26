@@ -136,13 +136,19 @@ macro_rules! taskENABLE_INTERRUPTS {
 ///
 /// # Example
 /// ```
-/// task_control::TCB::new()
+/// extern crate rust_freertos;
+/// use simplelog::*;
+/// use std::fs::File;
+/// rust_freertos::task_control::TCB::new()
 ///                   .name("NAME")
 ///                   .priority(1)
-///                   .initialise(|| println!("Hello world!"))
+///                   .initialise(|| {
+///                   println!("Hello world!");
+///                   rust_freertos::kernel::task_end_scheduler();
+///                   });
 ///
 /// // Start the real time kernel with preemption.
-/// task_start_scheduler();
+/// rust_freertos::kernel::task_start_scheduler();
 ///
 /// // Will not get here unless a task calls vTaskEndScheduler ()
 /// ```
@@ -222,7 +228,7 @@ pub fn create_idle_task() -> TaskHandle{
     TCB::new()
         .priority(0)
         .name("Idle")
-        .initiailise(idle_task_fn)
+        .initialise(idle_task_fn)
         .unwrap_or_else(|err| panic!("Idle task creation failed with error: {:?}", err))
 }
 
@@ -327,8 +333,8 @@ fn initialize_scheduler() {
 /// # Example
 /// TODO: Finish the doctest.
 /// ```
-///
-/// task_control::TCB::new()
+/// extern crate rust_freertos;
+/// rust_freertos::task_control::TCB::new()
 ///                   .name("NAME")
 ///                   .priority(1)
 ///                   .initialise(|| { loop {
@@ -336,11 +342,12 @@ fn initialize_scheduler() {
 ///                         // Task code goes here.
 ///                         // At some point we want to end the real time kernel processing
 ///                         // so call ...
-///                         task_end_scheduler();
+///                         rust_freertos::kernel::task_end_scheduler();
+///                         }
 ///                     });
 ///
 /// // Start the real time kernel with preemption.
-/// task_start_scheduler();
+/// rust_freertos::kernel::task_start_scheduler();
 /// // Will only get here when the vTaskCode () task has called
 /// // vTaskEndScheduler ().  When we get here we are back to single task
 /// // execution.
@@ -465,7 +472,8 @@ pub fn task_suspend_all() {
  }
  */
 pub fn task_resume_all() -> bool {
-    let already_yielded = false;
+    info!("task_resume_all");
+    let mut already_yielded = false;
 
     // TODO: This is a recoverable error, use Result<> instead.
     assert!(get_scheduler_suspended!() > pdFALSE as UBaseType,
@@ -484,6 +492,7 @@ pub fn task_resume_all() -> bool {
         set_scheduler_suspended!(get_scheduler_suspended!() - 1);
         if get_scheduler_suspended!() == pdFALSE as UBaseType {
             if get_current_number_of_tasks!() > 0 {
+                trace!("Current number of tasks is: {}, move tasks to ready list.", get_current_number_of_tasks!());
                 /* Move any readied tasks from the pending list into the
                    appropriate ready list. */
                 if move_tasks_to_ready_list() {
@@ -513,9 +522,7 @@ pub fn task_resume_all() -> bool {
                 } else {
                     mtCOVERAGE_TEST_MARKER!();
                 }
-
             }
-
         } else {
             mtCOVERAGE_TEST_MARKER!();
         }
@@ -525,28 +532,19 @@ pub fn task_resume_all() -> bool {
 }
 
 fn move_tasks_to_ready_list() -> bool {
-    let has_unblocked_task = false;
-    while !list_is_empty!(PENDING_READY_LIST) {
+    let mut has_unblocked_task = false;
+    while !list_is_empty!(get_list!(PENDING_READY_LIST)) {
+        has_unblocked_task = true;
         let task_handle = TaskHandle::from_arc(
-            get_owner_of_head_entry!(PENDING_READY_LIST).unwrap());
+            get_owner_of_head_entry!(get_list!(PENDING_READY_LIST)).unwrap());
         let event_list_item = task_handle.get_event_list_item();
         let state_list_item = task_handle.get_state_list_item();
 
-        if let Some(list) = get_list_item_container!(event_list_item) {
-            list_remove!(list, state_list_item);
-        } else {
-            warn!("State_list_item of task {} should have container", 
-                  task_handle.get_name());
-        }
+        list_remove!(state_list_item);
 
-        if let Some(list) = get_list_item_container!(event_list_item) {
-            list_remove!(list, state_list_item);
-        } else {
-            warn!("State_list_item of task {} should have container", 
-                  task_handle.get_name());
-        }
+        list_remove!(event_list_item);
 
-        task_handle.add_task_to_ready_list();
+        task_handle.add_task_to_ready_list().unwrap();
 
         /* If the moved task has a priority higher than the current
            task then a yield must be performed. */
@@ -559,11 +557,11 @@ fn move_tasks_to_ready_list() -> bool {
             mtCOVERAGE_TEST_MARKER!();
         }
     }
-    false
+    has_unblocked_task
 }
 
 fn reset_next_task_unblock_time() {
-    if list_is_empty!( DELAYED_TASK_LIST )
+    if list_is_empty!( get_list!(DELAYED_TASK_LIST) )
     {
         /* The new current delayed list is empty.  Set xNextTaskUnblockTime to
            the maximum possible value so it is	extremely unlikely that the
@@ -578,7 +576,7 @@ fn reset_next_task_unblock_time() {
            which the task at the head of the delayed list should be removed
            from the Blocked state. */
         let task_handle = TaskHandle::from_arc(
-            get_owner_of_head_entry!(DELAYED_TASK_LIST).unwrap()
+            get_owner_of_head_entry!(get_list!(DELAYED_TASK_LIST)).unwrap()
             );
         set_next_task_unblock_time!(
             get_list_item_value!(task_handle.get_state_list_item())
@@ -683,7 +681,7 @@ pub fn task_switch_context() {
 }
 
 fn task_select_highest_priority_task() {
-    let top_priority: UBaseType = get_top_ready_priority!();
+    let mut top_priority: UBaseType = get_top_ready_priority!();
 
     /* Find the highest priority queue that contains ready tasks. */
     while list_is_empty!(nth_ready_list!(top_priority))
@@ -773,7 +771,7 @@ pub fn task_increment_tick() -> bool {
         if const_tick_count >= get_next_task_unblock_time!()
         {
             loop {
-                if list_is_empty!( DELAYED_TASK_LIST ) {
+                if list_is_empty!( get_list!(DELAYED_TASK_LIST) ) {
                     /* The delayed list is empty.  Set xNextTaskUnblockTime
                        to the maximum possible value so it is extremely
                        unlikely that the
@@ -787,7 +785,7 @@ pub fn task_increment_tick() -> bool {
                        item at the head of the delayed list.  This is the time
                        at which the task at the head of the delayed list must
                        be removed from the Blocked state. */
-                    let delay_head_entry_owner = get_owner_of_head_entry!(DELAYED_TASK_LIST).unwrap();
+                    let delay_head_entry_owner = get_owner_of_head_entry!(get_list!(DELAYED_TASK_LIST)).unwrap();
                     // TODO: This is probably an error of `list`
                     let task_handle = TaskHandle::from_arc(delay_head_entry_owner);
                     let state_list_item = task_handle.get_state_list_item();
@@ -810,21 +808,11 @@ pub fn task_increment_tick() -> bool {
                     }
 
                     /* It is time to remove the item from the Blocked state. */
-                    if let Some(list) = get_list_item_container!(state_list_item) {
-                        list_remove!(list, state_list_item);
-                    } else {
-                        warn!("State_list_item of task {} doesn't have container", 
-                              task_handle.get_name());
-                    }
+                    list_remove!(state_list_item);
 
                     /* Is the task waiting on an event also?  If so remove
                        it from the event list. */
-                    if let Some(list) = get_list_item_container!(event_list_item) {
-                        list_remove!(list, event_list_item);
-                    }
-                    else {
-                        trace!("Task {} isn't waiting on an event list", task_handle.get_name());
-                    }
+                    list_remove!(event_list_item);
 
                     /* Place the unblocked task into the appropriate ready
                        list. */
