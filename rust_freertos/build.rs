@@ -10,7 +10,7 @@ use std::path::PathBuf;
 fn main() {
     // NOTE: Running bindgen in every build is quite time-consuming.
     // The solution is to comment out the following line after the first time you've generated the bindings.
-    // run_bindgen();
+    run_bindgen();
 
     // run_cc();
 }

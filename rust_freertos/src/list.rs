@@ -375,7 +375,7 @@ macro_rules! list_remove {
     // not know the container
     ($item:expr) => ({
         {
-            let index = get_list_item_owner!($item) as UBaseType;
+            let index = get_list_item_owner!($item) as usize;
             list_remove!((global_list.write().unwrap())[index], $item);
         }
     });
