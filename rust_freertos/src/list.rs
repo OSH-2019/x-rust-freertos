@@ -1,26 +1,25 @@
 // #![crate_name = "doc"]
 
-use std::sync::{Arc, RwLock};
+use std::rc::Rc;
+use std::cell::{RefCell, Ref, RefMut};
 use crate::*;
-use crate::port::{TickType, UBaseType};
-use crate::task_control::task_control_block;
+use crate::port::{TickType};
 
 /// this should be defined is port.rs
-// type UBaseType = u16;    // unsighed short
-// type TickType = u16;
-// type TCB = TskTCB;   // not declared
+// type BaseType = u16;    // unsighed short
+// type TickType = u16;  
+type TCB = TskTCB;   // not declared
 // type StackType = u16;
 
 // List is a list type, holding the items.
-// type List = Vec<Rc<RefCell<ListItem>>>;
-pub type List = Arc<RwLock<Vec<Arc<RwLock<ListItem>>>>>;
+type List = Vec<Rc<RefCell<ListItem>>>;
 // LIST is a type that holds all the lists.
-pub type LIST = Arc<RwLock<Vec<List>>>;
+type LIST = Vec<List>;
 
 /// thing now get better understood here!
 /// suppose we have a list vec, we call it `list`.
 /// now that we have two list, `lista` and `listb`.
-/// we could push the `lista` and `listb` in the `list` given above, meaning that
+/// we could push the `lista` and `listb` in the `list` given above, meaning that 
 /// lista == list[0]
 /// listb == list[1]
 /// we now have three list item named item1, item2, item3, which are created by the method `ListItem::new`
@@ -39,7 +38,7 @@ pub type LIST = Arc<RwLock<Vec<List>>>;
 ///         &mut list[i]
 ///     },
 ///     None => {
-///         panic!("no container found!");
+///         panic!("no container found!");    
 ///     }
 /// }
 /// `
@@ -58,96 +57,38 @@ struct TskTCB {
 
 #[derive(Debug)]
 pub struct ListItem {
-    pub item_value: TickType,
-    pub container: Option<ListName>,
+    item_value: TickType,
+    container: Option<ListName>,
     // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated, deprecateed
-    pub owner: Option<Arc<RwLock<task_control_block>>>,      // the TCB declaration is not defined
+    owner: Option<Rc<RefCell<TCB>>>,      // the TCB declaration is not defined
 }
 
-// impl ListItem {
-//     /// # Description
-//     /// * constructor
-//     /// # Argument
-//     /// * `item_value` - item_value
-//     /// # Return
-//     /// * Rc<RefCell<Self>>
-//     pub fn new(item_value: TickType) -> Rc<RefCell<Self>> {
-//         Rc::new(RefCell::new(ListItem {
-//             item_value: item_value,
-//             container: None,
-//             owner: None
-//         }))
-//     }
-// }
-
 impl ListItem {
-    pub fn new(item_value: TickType) -> Arc<RwLock<ListItem>> {
-        Arc::new(RwLock::new(ListItem {
+    /// # Description
+    /// * constructor
+    /// # Argument
+    /// * `item_value` - item_value
+    /// # Return
+    /// * Rc<RefCell<Self>>
+    pub fn new(item_value: TickType) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(ListItem {
             item_value: item_value,
             container: None,
             owner: None
         }))
     }
 }
-// initialization of List
-#[macro_export]
-macro_rules! List_new {
-    () => ({
-        Arc::new(RwLock::new(vec![]))
-    })
-}
-
-// // initialization of List
-#[macro_export]
-macro_rules! LIST_new {
-    () => ({
-        Arc::new(RwLock::new(vec![]))
-    })
-}
-// /// # Description
-// /// set list item's owner
-// /// # Arguments
-// /// $item: Rc<RefCell<ListItem>>
-// /// $owner: Rc<RefCell<TCB>>
-// /// #Return
-// /// Nothing
-// #[macro_export]
-// macro_rules! set_list_item_owner {
-//     ($item:expr, $owner:expr) => ({
-//         $item.borrow_mut().owner = Some(Rc::clone(&$owner));
-//     });
-// }
 /// # Description
 /// set list item's owner
 /// # Arguments
-/// $item: Arc<RwLock<ListItem>>
-/// $owner: Arc<RwLock<TCB>>
+/// $item: Rc<RefCell<ListItem>>
+/// $owner: Rc<RefCell<TCB>>
 /// #Return
 /// Nothing
 #[macro_export]
 macro_rules! set_list_item_owner {
     ($item:expr, $owner:expr) => ({
-        $item.write().unwrap().owner = Some(Arc::clone(&$owner));
-    });
-}
-
-/// # Description
-/// get list item's owner
-/// # Arguments
-/// $ietm: Arc<RwLock<ListItem>>
-/// #Return
-/// Option<Arc<RwLock<TCB>>>
-#[macro_export]
-macro_rules! get_list_item_owner {
-    ($item:expr) => ({
-        match $item.read().unwrap().owner {
-            Some(owner) => {
-                Some(Arc::clone(&owner))
-            },
-            None => {
-                None
-            }
-        }
+        $item.borrow_mut().owner = Some(Rc::clone(&$owner));
     });
 }
 
@@ -157,25 +98,25 @@ macro_rules! get_list_item_owner {
 /// $ietm: Rc<Refcell<ListItem>>
 /// #Return
 /// Option<Rc<RefCell<TCB>>>
-// #[macro_export]
-// macro_rules! get_list_item_owner {
-//     ($item:expr) => ({
-//         match $item.read().unwrap().owner {
-//             Some(owner) => {
-//                 Arc::clone(&owner)
-//             },
-//             None => {
-//                 None
-//             }
-//         }
-//     });
-// }
+#[macro_export]
+macro_rules! get_list_item_owner {
+    ($item:expr) => ({
+        match $item.borrow().owner {
+            Some(owner) => {
+                Rc::clone(&owner)
+            },
+            None => {
+                None
+            }
+        }
+    });
+}
 
 /// # Description
 /// get owner of next entry
 /// # Arguments
-/// $list: Arc<RwLock<List>>
-/// $item: Arc<RwLock<ListItem>>
+/// $list: List
+/// $item: Rc<RefCell<ListItem>>
 /// #Return
 /// Option<Rc<RefCell<TCB>>>
 #[macro_export]
@@ -184,138 +125,138 @@ macro_rules! get_owner_of_next_entry {
         let index = get_item_index!($list, $item, eq);
         match index {
             Some(index) => {
-                match ($list.read().unwrap())[(index + 1) % current_list_length!($list)].read().unwrap().owner {
-                    Some(owner) => Some(Arc::clone(&owner)),
+                match $list[(index + 1) % current_list_length!($list)].borrow().owner {
+                    Some(owner) => Rc::clone(&owner),
                     None => None,
                 }
             },
             None => None,
-        }
+        }  
     });
 }
 
-// /// # Description
-// /// get owner of head entry
-// /// # Arguments
-// /// $list: List
-// /// #Return
-// /// Option<Rc<RefCell<TCB>>>
+/// # Description
+/// get owner of head entry
+/// # Arguments
+/// $list: List
+/// #Return
+/// Option<Rc<RefCell<TCB>>>
 #[macro_export]
 macro_rules! get_owner_of_head_entry {
     ($list:expr) => ({
         if current_list_length!($list) == 0 {
             None
         }else{
-            Some(Arc::clone(&($list.read().unwrap())[0]))
-        }
+            Some(Rc::clone(&$list[0]))
+        }  
     });
 }
 
-// /// # Description
-// /// * append $item to the $list
-// /// # Argument
-// /// * `$list` - list
-// /// * `$item` - list item
-// /// # Return
-// /// * Nothing
+/// # Description
+/// * append $item to the $list
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * Nothing
 #[macro_export]
 macro_rules! list_insert_end {
     ($list:expr, $item:expr) => ({
         {
-
-            ($list.write().unwrap()).push(Arc::clone(&$item));
+            
+            $list.push(Rc::clone(&$item));
         }
     })
 }
 
-// /// # Description
-// /// * get $item's index in $list, based on the given oprator
-// /// # Argument
-// /// * `$list` - Arc<RwLock<List>>
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// # Return
-// /// * Option<u32>
+/// # Description
+/// * get $item's index in $list, based on the given oprator
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * Option<u32>
 #[macro_export]
 macro_rules! get_item_index {
     ($list:expr, $item:expr, eq) => ({
         {
-            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value == $item.read().unwrap().item_value);
+            let index = $list.iter().position(|x| x.borrow().item_value == $item.borrow().item_value);
             index
         }
     });
     ($list:expr, $item:expr, gt) => ({
         {
-            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value > $item.read().unwrap().item_value);
+            let index = $list.iter().position(|x| x.borrow().item_value > $item.borrow().item_value);
             index
         }
     });
 }
 
-// /// # Description
-// /// * insert $item in $list in descending order
-// /// # Argument
-// /// * `$list` - List
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// # Return
-// /// * Nothing
+/// # Description
+/// * insert $item in $list in descending order 
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * Nothing
 #[macro_export]
 macro_rules! list_insert {
     ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, gt);
             match index {
-                Some(index) => $list.write().unwrap().insert(index, Arc::clone(&$item)),
+                Some(index) => $list.insert(index, Rc::clone(&$item)),
                 None => list_insert_end!($list, $item),
             }
         }
     })
 }
 
-// /// # Description
-// /// * set list item container
-// /// # Argument
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// * `$name` - ListName
-// /// # Return
-// /// * Nothing
+/// # Description
+/// * set list item container
+/// # Argument
+/// * `$item` - list item
+/// * `$Name::$name` - ListName
+/// # Return
+/// * Nothing
 #[macro_export]
 macro_rules! set_list_item_container {
     ($item:expr, $name:expr) => ({
         {
-            $item.write().unwrap().container = Some($name);
+            $item.borrow_mut().container = Some($name);
         }
     })
 }
 
-// /// # Description
-// /// * get list item container
-// /// # Argument
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// # Return
-// /// * Option<ListName>
+/// # Description
+/// * get list item container
+/// # Argument
+/// * `$item` - list item
+/// # Return
+/// * Option<ListName>
 #[macro_export]
 macro_rules! get_list_item_container {
     ($item:expr) => ({
         {
-            $item.read().unwrap().container
+            $item.borrow().container
         }
     })
 }
 
-// /// # Description
-// /// * remove the $item in $list, panic if the $item not in $list
-// /// # Argument
-// /// * `$list` - list
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// # Return
-// /// * Nothing
+/// # Description
+/// * remove the $item in $list, panic if the $item not in $list
+/// # Argument
+/// * `$list` - list
+/// * `$item` - list item
+/// # Return
+/// * Nothing
 #[macro_export]
 macro_rules! list_remove_inner {
     ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, eq);
             match index {
-                Some(index) => $list.write().unwrap().remove(index),
+                Some(index) => $list.remove(index),
                 None => panic!("attemp to remove an item that actually not exsited"),
             }
         }
@@ -332,8 +273,8 @@ macro_rules! list_remove_inner {
 #[macro_export]
 macro_rules!  get_list_container_mapped_index {
         ($item:expr) => ({
-            {
-                match $item.read().unwrap().container {
+            {   
+                match $item.container {
                 ListName::LIST0 => 0,
                 ListName::LIST1 => 1,
                 ListName::LIST2 => 2;
@@ -349,27 +290,23 @@ macro_rules!  get_list_container_mapped_index {
 /// # Description
 /// remove one item and return the current list length
 /// # Arguments
-/// $item: Arc<RwLock<ListItem>>
+/// $item: ListItem
 /// #Return
 /// current list item
 #[macro_export]
 macro_rules! list_remove {
-    // bugs here!!!
-    // ($item:expr) => ({
-    //     {
-    //         let list_mapped_index = get_list_container_mapped_index!($item);
-    //         list_remove_inner!(LIST[list_mapped_index], $item);
-    //         current_list_length!(list)
-    //     }
-    // });
+    ($item:expr) => ({
+        {
+            let list_mapped_index = get_list_container_mapped_index!($item);
+            list_remove_inner!(LIST[list_mapped_index], $item);
+            current_list_length!(list)
+        }  
+    });
     ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, eq);
             match index {
-                Some(index) => {
-                    $list.write().unwrap().remove(index);
-                    current_list_length!($list)
-                },
+                Some(index) => $list.remove(index),
                 None => panic!("item not in list, check your code!"),
             }
         }
@@ -386,7 +323,7 @@ macro_rules! list_remove {
 macro_rules! list_initialise_item {
     ($item:expr) => ({
         {
-            $item.write().unwrap().container = None;
+            $item.borrow_mut().container = None;
         }
     })
 }
@@ -401,7 +338,7 @@ macro_rules! list_initialise_item {
 macro_rules! list_initialise {
     ($list:expr) => ({
         {
-            $list.write().unwrap().clear();
+            $list.clear();
         }
     })
 }
@@ -419,12 +356,8 @@ macro_rules! is_contained_within {
         {
             let index = get_item_index!($list, $item, eq);
             match index {
-                Some(index) => {
-                    true
-                },
-                None => {
-                    false
-                }
+                Some(index) => true,
+                None => false,
             }
 
         }
@@ -441,7 +374,7 @@ macro_rules! is_contained_within {
 macro_rules! list_is_empty {
     ($list:expr) => ({
         {
-            $list.read().unwrap().is_empty()
+            $list.is_empty()
         }
     })
 }
@@ -456,7 +389,7 @@ macro_rules! list_is_empty {
 macro_rules! current_list_length {
     ($list:expr) => ({
         {
-            $list.read().unwrap().len()
+            $list.len()
         }
     })
 }
@@ -464,21 +397,19 @@ macro_rules! current_list_length {
 /// # Description
 /// * get the next item of $list, and the current item is $item. If $item is not in $list, panic!.
 /// # Argument
-/// * `$list` - Arc<RwLock<List>>
+/// * `$list` - list
 /// * `$item` - list item
 /// # Return
-/// * item: Arc<RwLock<ListItem>>
+/// * item: &Rc<RefCell<ListItem>>
 #[macro_export]
 macro_rules! get_next {
     ($list:expr, $item:expr) => ({
         {
             let index = get_item_index!($list, $item, eq);
             match index {
-                Some(index) => {
-                    Arc::clone(&($list.read().unwrap())[(index + 1) % current_list_length!($list)])
-                },
+                Some(index) => &$list[(index + 1) % current_list_length!($list)],
                 None => panic!("item not found"),
-            }
+            }    
         }
     })
 }
@@ -494,7 +425,7 @@ macro_rules! get_next {
 macro_rules! set_list_item_value {
     ($item:expr, $value:expr) => ({
         {
-            $item.write().unwrap().item_value = $value;
+            $item.borrow_mut().item_value = $value;
         }
     })
 }
@@ -509,7 +440,7 @@ macro_rules! set_list_item_value {
 macro_rules! get_list_item_value {
     ($item:expr) => ({
         {
-            $item.read().unwrap().item_value
+            $item.borrow().item_value
         }
     })
 }
@@ -517,15 +448,15 @@ macro_rules! get_list_item_value {
 /// # Description
 /// * get item_value of the head_entry of the list. If the list is empty, panic!
 /// # Argument
-/// * `$list` - Arc<RwLock<List>>
+/// * `$list` - list
 /// # Return
 /// * item_value: TickType
-#[macro_export]
+#[macro_export] 
 macro_rules! get_item_value_of_head_entry {
     ($list:expr) => ({
         {
             if !list_is_empty!($list) {
-                ($list.read().unwrap())[0].read().unwrap().item_value
+                $list[0].borrow().item_value
             } else {
                 panic!("no head entry");
             }
@@ -537,19 +468,13 @@ macro_rules! get_item_value_of_head_entry {
 mod test {
     use super::*;
     #[test]
-    fn test_rwlock() {
-        let lock = ListItem::new(10);
-        lock.write().unwrap().item_value = 11;
-        assert_eq!(lock.read().unwrap().item_value, 11);
-    }
-    #[test]
     fn test_basic() {
         let mut item = ListItem::new(100);
-        let mut list1: List = List_new!();
+        let mut list1: Vec<Rc<RefCell<ListItem>>> = vec![];
         let mut list = vec![list1];
         let mut list1 = &mut list[0];
         list_insert_end!(list1, item);
-        assert_eq!((list1.read().unwrap())[0].read().unwrap().item_value, 100);
+        assert_eq!(list1[0].borrow().item_value, 100);
     }
     #[test]
     fn test_some_macros() {
@@ -557,32 +482,31 @@ mod test {
         let mut item2 = ListItem::new(200);
         let mut item3 = ListItem::new(300);
         let mut item4 = ListItem::new(400);
-        let mut list1: List = List_new!();
-
+        let mut list1: Vec<Rc<RefCell<ListItem>>> = vec![];
         let mut list = vec![list1];
         let mut list1 = &mut list[0];
 
         assert_eq!(list_is_empty!(list1), true);
 
         set_list_item_container!(item1, ListName::LIST0);
-        assert_eq!(0, item1.read().unwrap().container.unwrap() as i32);
+        assert_eq!(0, item1.borrow().container.unwrap() as i32);
 
         list_insert_end!(list1, item1);
         list_insert_end!(list1, item3);
         list_insert!(list1, item2);
         list_insert!(list1, item4);
-        assert_eq!((list1.read().unwrap())[0].read().unwrap().item_value, 100);
+        assert_eq!(list1[0].borrow().item_value, 100);
         set_list_item_container!(item1, ListName::LIST0);
-        assert_eq!((list1.read().unwrap())[1].read().unwrap().item_value, 200);
+        assert_eq!(list1[1].borrow().item_value, 200);
         set_list_item_container!(item1, ListName::LIST0);
-        assert_eq!((list1.read().unwrap())[2].read().unwrap().item_value, 300);
+        assert_eq!(list1[2].borrow().item_value, 300);
         set_list_item_container!(item1, ListName::LIST0);
-        assert_eq!((list1.read().unwrap())[3].read().unwrap().item_value, 400);
+        assert_eq!(list1[3].borrow().item_value, 400);
 
         list_remove!(list1, item3);
-        assert_eq!((list1.read().unwrap())[0].read().unwrap().item_value, 100);
-        assert_eq!((list1.read().unwrap())[1].read().unwrap().item_value, 200);
-        assert_eq!((list1.read().unwrap())[2].read().unwrap().item_value, 400);
+        assert_eq!(list1[0].borrow().item_value, 100);
+        assert_eq!(list1[1].borrow().item_value, 200);
+        assert_eq!(list1[2].borrow().item_value, 400);
 
         assert_eq!(get_item_value_of_head_entry!(list1), 100);
         assert_eq!(get_list_item_value!(item2), 200);
