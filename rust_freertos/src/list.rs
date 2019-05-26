@@ -4,11 +4,7 @@ use std::sync::{Arc, RwLock};
 use crate::*;
 use crate::port::{TickType, UBaseType};
 use crate::task_control::task_control_block;
-<<<<<<< HEAD
 use crate::task_global::global_lists;
-=======
-use crate::task_control::global_task;
->>>>>>> refs/remotes/origin/task
 
 
 /// this should be defined is port.rs
@@ -227,7 +223,6 @@ macro_rules! get_owner_of_head_entry {
         if current_list_length!($list) == 0 {
             None
         }else{
-<<<<<<< HEAD
             // Some(Arc::clone(&($list.read().unwrap())[0].read().unwrap().owner.unwrap()))
             match ($list.read().unwrap())[0].read().unwrap().owner.as_ref() {
                 Some(owner) => {
@@ -237,9 +232,6 @@ macro_rules! get_owner_of_head_entry {
                     None
                 }
             }
-=======
-            Some(Arc::clone(&($list.read().unwrap())[0].read().unwrap().owner.unwrap()))
->>>>>>> refs/remotes/origin/task
         }
     });
 }
@@ -391,13 +383,8 @@ macro_rules! list_remove {
     // not know the container
     ($item:expr) => ({
         {
-<<<<<<< HEAD
             let index = get_list_item_container!($item).unwrap() as usize;
             list_remove!((global_lists.write().unwrap())[index], $item);
-=======
-            let index = get_list_item_owner!($item) as usize;
-            list_remove!((global_list.write().unwrap())[index], $item);
->>>>>>> refs/remotes/origin/task
         }
     });
     // konw the container 
