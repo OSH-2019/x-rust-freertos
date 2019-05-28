@@ -58,10 +58,45 @@ pub fn task_remove_from_event_list (event_list: List) -> bool {
 // TODO : vTaskMissedYield
 // * task.c 3076
 
+fn vTaskMissedYield() {
+	set_yield_pending! (false);
 
 // TODO : timeout struct
 // * task.h 135
+
+#[derive(Debug)]
+struct time_out {
+	overflow_count: BaseType;
+	time_on_entering: TickType;
+};
+
+
 // TODO : vTaskSetTimeOutState
 // * task.c 3007
+
+fn vTaskSetTimeOutState( pxtimeout: time_out ) {
+	assert! ( pxtimeout );
+	pxtimeout.overflow_count = NUM_OF_OVERFLOWS;
+	pxtimeout.time_on_entering = TICK_COUNT;
+}
+
 // TODO : xTaskCheckForTimeOut
 // * task.c 3015
+
+fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> BaseType {
+	let mut xreturn: BaseType = false;
+	assert! (pxtimeout);
+	assert! (ticks_to_wait);
+
+	taskENTER_CRITICAL! ();
+	{
+		const const_tick_count: TickType = TICK_COUNT;
+
+		#[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+		{
+			let unwrapped_cur = get_current_task_handle!();
+			if ()
+		}
+	}
+	taskEXIT_CRITICAL! ();
+}
