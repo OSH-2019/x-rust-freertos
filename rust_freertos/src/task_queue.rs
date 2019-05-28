@@ -13,7 +13,6 @@ pub fn task_remove_from_event_list (event_list: List) -> bool {
     let mut unblocked_tcb = get_owner_of_head_entry! (event_list);
     configASSERT( unblocked_tcb );
 
-    // FIXME  list remove parameters?
     list_remove! ( unblocked_tcb.event_list_item );
 
     if get_scheduler_suspended!() {
