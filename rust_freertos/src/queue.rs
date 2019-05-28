@@ -7,6 +7,7 @@ use std::cell::{RefCell, Ref, RefMut};
 use crate::*;
 use crate::queue_h::*;
 use crate::projdefs::*;
+use crate::task_queue::*;
 //use volatile::Volatile;
 //
 
@@ -31,8 +32,8 @@ pub struct QueueDefinition<T>
 
     u: QueueUnion,
 
-    xTasksWaitingToSend:Vec<Rc<RefCell<ListItem>>>,
-    xTasksWaitingToReceive:Vec<Rc<RefCell<ListItem>>> ,
+    xTasksWaitingToSend:List,
+    xTasksWaitingToReceive:List,
 
     uxMessagesWaiting: UBaseType,
     uxLength: UBaseType,
@@ -129,7 +130,7 @@ impl <T>QueueDefinition<T>
             self.pcQueue.clear();//初始化空队列
             if xNewQueue == false {
                 if list_is_empty!(self.xTasksWaitingToSend) == false {
-                    if xTaskRemoveFromEventList( &(self.xTasksWaitingToSend)) != false{
+                    if task_remove_from_event_list(self.xTasksWaitingToSend) != false{
                         queueYIELD_IF_USING_PREEMPTION();
                     }
                     else{
@@ -345,6 +346,151 @@ impl <T>QueueDefinition<T>
             self.cRxLock = queueUNLOCKED;
         }
         taskEXIT_CRITICAL!();
+    }
+
+    /// # Description
+    /// * 原第二个参数pvBuffer是读取到的数据，作为返回值的第二个. 
+    /// * Implemented by:Ning Yuting
+    /// * C implementation: queue.c 1237
+    /// # Argument
+    /// * 
+    /// # Return
+    /// * 
+    fn queue_generic_receive(&self,xTicksToWait:TickType,xJustPeeking:BaseType){
+        let xEntryTimeSet:BaseType = pdFALSE;
+        #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
+        assert!(!((xTaskGetSchedulerState() == taskSCHEDULER_SUSPENDED) && (xTicksToWait != 0)));
+        loop {
+            taskENTER_CRITICAL!();
+            {
+                let uxMessagesWaiting:UBaseType = self.uxMessagesWaiting;
+                if uxMessagesWaiting > 0 as UBaseType{
+                    let pcOriginalReadPosition:BaseType = self.u.pcReadFrom;
+                     self.copy_data_from_queue();//
+                    if xJustPeeking == pdFALSE{
+                        traceQUEUE_RECEIVE!(self);
+                        
+                        /* actually removing data, not just peeking. */
+                        self.uxMessagesWaiting = uxMessagesWaiting - 1;
+                        {
+                            #![cfg(feature = "configUSE_MUTEXES")]
+                            if self.uxQueueType == queueQUEUE_IS_MUTEX{
+                                self.pxMutexHolder = pvTaskIncrementMutexHeldCount(); 
+                            }
+                            else {
+                                mtCOVERAGE_TEST_MARKER!();
+                            }
+                        }
+
+                        if list_is_empty!(self.xTasksWaitingToSend) == false {
+                            if task_remove_from_event_list(self.xTasksWaitingToSend) != false {
+                                queueYIELD_IF_USING_PREEMPTION();
+                            }
+                            else {
+                                mtCOVERAGE_TEST_MARKER!();
+                            }
+                        }
+                        else {
+                            mtCOVERAGE_TEST_MARKER!();
+                        }
+                    }
+                    else {
+                        traceQUEUE_PEEK!(self);
+                        self.u.pcReadFrom = pcOriginalReadPosition;
+                        if list_is_empty!(self.xTasksWaitingToReceive) != false {
+                            if task_remove_from_event_list(self.xTasksWaitingToReceive) != false{
+                                queueYIELD_IF_USING_PREEMPTION();
+                            }
+                            else {
+                                mtCOVERAGE_TEST_MARKER!();
+                            }
+                        }
+                        else {
+                            mtCOVERAGE_TEST_MARKER!();
+                        }
+                    }
+                    taskEXIT_CRITICAL!();
+                    return pdPASS;
+                }
+                else {
+                    if xTicksToWait == 0 as TickType {
+                        taskEXIT_CRITICAL!();
+                        traceQUEUE_RECEIVE_FAILED!(self);
+                        return errQUEUE_EMPTY;
+                    }
+                    else if xEntryTimeSet == pdFALSE {
+                        task_set_time_out_state(xTimeOut);
+                    }
+                    else {
+                        mtCOVERAGE_TEST_MARKER!();
+                    }
+                }
+            }
+            taskEXIT_CRITICAL!();
+
+            task_suspend_all();
+            self.lock_queue();
+
+            if xTaskCheckForTimeOut(xTimeOut,xTicksToWait) == false {
+                if self.prvIsQueueEmpty != false{
+                    traceBLOCKING_ON_QUEUE_RECEIVE!(self);
+                    {
+                        #![cfg(feature = "configUSE_MUTEXES")]
+                        if self.uxQueueType == queueQUEUE_IS_MUTEX {
+                            taskENTER_CRITICAL!();
+                            {
+                                vTaskPriorityInherit(self.pxMutexHolder);
+                            }
+                            taskEXIT_CRITICAL!();
+                        }
+                        else{
+                            mtCOVERAGE_TEST_MARKER!();
+                        }
+                    }
+                    vTaskPlaceOnEventList(self.xTasksWaitingToReceive,xTicksToWait);
+                    self.unlock_queue();
+                    if xTaskResumeAll() == false {
+                        portYIELD_WITHIN_API();
+                    }
+                    else {
+                        mtCOVERAGE_TEST_MARKER!();
+                    }
+                }
+                else {
+                    self.unlock_queue();
+                    xTaskResumeAll();
+                }
+            }
+            else {
+                self.unlock_queue();
+                xTaskResumeALl();
+                if self.is_queue_empty() != false{
+                    traceQUEUE_RECEIVE_FAILED!(self);
+                    return errQUEUE_EMPTY;
+                }
+                else {
+                    mtCOVERAGE_TEST_MARKER!();
+                }
+            }           
+        }
+    }
+
+    /// 原先是将队列中pcReadFrom处的内容拷贝到第二个参数pvBuffer中，现改为返回值
+    fn copy_data_from_queue(self) -> (T){
+        if self.uxItemSize != 0 as UBaseType{
+            self.u = match self.u {
+                QueueUnion::pcReadFrom(prev) => QueueUnion::pcReadFrom(prev + 1);
+                QueueUnion::
+            }
+            self.u.pcReadFrom = self.u::pcReadFrom + 1;
+            if self.u.pcReadFrom >= self.pcTail{
+                self.u.pcReadFrom = self.pcHead;
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER!();
+            }
+            self.pcQueue.get(self.u.pcReadFrom)
+        }
     }
 
     /// # Description

@@ -22,8 +22,9 @@ mod task_global;
 pub mod task_control;
 // mod task_api;
 pub mod kernel;
-// mod queue;
-// mod queue_h;
+mod queue;
+mod queue_h;
+mod task_queue;
 
 #[cfg(test)]
 mod tests {
