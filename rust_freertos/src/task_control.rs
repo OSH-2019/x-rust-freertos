@@ -57,6 +57,8 @@ pub struct task_control_block{
     notified_value: u32,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notify_state  : u8,
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    delay_aborted : 0,
 }
 
 pub type TCB = task_control_block;
@@ -68,7 +70,7 @@ impl task_control_block {
             state_list_item: ListItem::new(0),
             evnet_list_item: ListItem::new(0),
             task_priority  : 1,
-            task_stacksize : configMINIMAL_STACK_SIZE!(), 
+            task_stacksize : configMINIMAL_STACK_SIZE!(),
             task_name      : String::from("Unnamed"),
             stack_pos      : 0,
 
@@ -90,6 +92,8 @@ impl task_control_block {
             notified_value: 0,
             #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
             notify_state  : 0,
+            #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+            delay_aborted : 0,
         }
     }
 
@@ -114,13 +118,13 @@ impl task_control_block {
         self
     }
 
-    pub fn initialise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError> 
+    pub fn initialise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
         where F: FnOnce() -> ()
     {
         let size_of_stacktype = std::mem::size_of::<StackType>();
         let stacksize_as_bytes = size_of_stacktype * self.task_stacksize as usize;
         trace!("Initialising Task: {}, stack size: {} bytes", self.task_name, stacksize_as_bytes);
-        
+
         // Return `Err` if malloc fails.
         let px_stack = port::port_malloc(stacksize_as_bytes)?;
 
