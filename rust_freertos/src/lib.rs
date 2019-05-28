@@ -47,41 +47,26 @@ mod tests {
         port::port_start_scheduler();
     }
     */
-
-    #[test]
-    fn test_trace() {
-        traceQUEUE_CREATE!(1);
-    }
-
-    #[test]
-    fn test_pdMS_TO_TICKS() {
-        assert_eq!(1000, pdMS_TO_TICKS!(1000));
-    }
-
-    #[test]
-    fn test_cfg() {
-        #[cfg(INCLUDE_vTaskPrioritySet)]
-        println!("Included!");
-        #[cfg(not(INCLUDE_vTaskPrioritySet))]
-        println!("Not Included!");
-
-    }
-
-    /*
-    use std::collections::VecDeque;
     use std::sync::Arc;
     #[test]
     fn test_basics() {
+        task_global::init();
+
+        /* The following code can't run correctly yet.
         let m = Arc::new(String::from("Wow, We made it!"));
-        let main_task = TCB::new()
+        let main = || {
+            let v = Arc::clone(&m);
+            loop {
+                trace!("{}", v);
+            }
+        };
+        let main_task = task_control::TCB::new()
                             .name("main")
                             .priority(1)
-                            .code(move || {
-                                let v = Arc::clone(&m);
-                                println!("{}", v);
-                            })
-                            .initialise_new_task();
+                            .initialise(main);
+        */
+
         kernel::task_start_scheduler();
+        kernel::task_end_scheduler();
     }
-    */
 }

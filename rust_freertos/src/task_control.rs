@@ -136,6 +136,7 @@ impl task_control_block {
 
         let param_ptr = Box::new(Box::new(func) as Box<FnBox()>); // Pass task function as a parameter.
         let param_ptr = &*param_ptr as *const _ as *mut _; // Convert to raw pointer.
+        trace!("Function ptr of {} is at {:X}", self.get_name(), param_ptr as u64);
 
         /* We use a wrapper function to call the task closure,
          * this is how freertos.rs approaches this problem, and is explained here:
@@ -145,6 +146,7 @@ impl task_control_block {
                                     Some(run_wrapper),
                                     param_ptr
                                     )?;
+        trace!("Stack initialisation succeeded");
 
         /* Do a bunch of conditional initialisations. */
         #[cfg(feature = "configUSE_MUTEXES")]
@@ -157,16 +159,6 @@ impl task_control_block {
         list_initialise_item! (self.state_list_item);
         list_initialise_item! (self.evnet_list_item);
         */
-
-        // Create task handle.
-        let handle = TaskHandle(Arc::new(RwLock::new(self)));
-        // TODO: Change type of list_items.
-        let state_list_item = handle.get_state_list_item();
-        let event_list_item = handle.get_event_list_item();
-        set_list_item_owner!(state_list_item, &handle.0);
-        set_list_item_owner!(event_list_item, &handle.0);
-        let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
-        set_list_item_value!(state_list_item, item_value);
 
         #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
         {
@@ -184,6 +176,16 @@ impl task_control_block {
             self.notified_value = 0;
         }
 
+
+        // Create task handle.
+        let handle = TaskHandle(Arc::new(RwLock::new(self)));
+        // TODO: Change type of list_items.
+        let state_list_item = handle.get_state_list_item();
+        let event_list_item = handle.get_event_list_item();
+        set_list_item_owner!(state_list_item, &handle.0);
+        set_list_item_owner!(event_list_item, &handle.0);
+        let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
+        set_list_item_value!(state_list_item, item_value);
         handle.add_new_task_to_ready_list()?;
 
         Ok(handle)
@@ -321,19 +323,26 @@ impl TaskHandle {
         taskENTER_CRITICAL!();
         {
             // We don't need to initialise task lists any more.
-
-            set_current_number_of_tasks!(get_current_number_of_tasks!() + 1);
+            let n_o_t = get_current_number_of_tasks!() + 1;
+            set_current_number_of_tasks!(n_o_t);
             /* CURRENT_TCB won't be None. See task_global.rs. */
-            let unwrapped_cur = get_current_task_handle!();
-            if !get_scheduler_running!() {
-                if unwrapped_cur.get_priority() <= unwrapped_tcb.task_priority {
-                    /* If the scheduler is not already running, make this task the
-                       current task if it is the highest priority task to be created
-                       so far. */
-                    set_current_task_handle!(self.clone());
+            if task_global::CURRENT_TCB.read().unwrap().is_none() {
+                set_current_task_handle!(self.clone());
+                if get_current_number_of_tasks!() != 1 {
+                    mtCOVERAGE_TEST_MARKER!(); // What happened?
                 }
-                else {
-                    mtCOVERAGE_TEST_MARKER! ();
+            } else {
+                let unwrapped_cur = get_current_task_handle!();
+                if !get_scheduler_running!() {
+                    if unwrapped_cur.get_priority() <= unwrapped_tcb.task_priority {
+                        /* If the scheduler is not already running, make this task the
+                           current task if it is the highest priority task to be created
+                           so far. */
+                        set_current_task_handle!(self.clone());
+                    }
+                    else {
+                        mtCOVERAGE_TEST_MARKER! ();
+                    }
                 }
             }
             set_task_number!(get_task_number!() + 1);

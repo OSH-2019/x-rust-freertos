@@ -559,6 +559,7 @@ macro_rules! get_item_value_of_head_entry {
     })
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -619,3 +620,4 @@ mod test {
 
     }
 }
+*/

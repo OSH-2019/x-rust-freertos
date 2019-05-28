@@ -1,7 +1,6 @@
 // kernel.rs, FreeRTOS scheduler control APIs.
 // This file is created by Fan Jinhao.
-// Functions defined in this file are explained in Chapter 9 and 10.
-
+// Functions defined in this file are explained in Chapter 9 and 10.  
 use crate::*; // TODO: Is this line necessary?
 use crate::port::{TickType, UBaseType};
 use crate::projdefs::pdFALSE;
@@ -134,25 +133,9 @@ macro_rules! taskENABLE_INTERRUPTS {
 /// 
 /// Nothing
 ///
-/// # Example
-/// ```
-/// extern crate rust_freertos;
-/// use simplelog::*;
-/// use std::fs::File;
-/// rust_freertos::task_control::TCB::new()
-///                   .name("NAME")
-///                   .priority(1)
-///                   .initialise(|| {
-///                   println!("Hello world!");
-///                   rust_freertos::kernel::task_end_scheduler();
-///                   });
-///
-/// // Start the real time kernel with preemption.
-/// rust_freertos::kernel::task_start_scheduler();
-///
-/// // Will not get here unless a task calls vTaskEndScheduler ()
-/// ```
 pub fn task_start_scheduler() {
+    create_idle_task();
+
     #[cfg(feature = "configUSE_TIMERS")]
     create_timer_task();
 
@@ -172,8 +155,10 @@ pub fn task_start_scheduler() {
 /// 
 /// Nothing
 pub fn create_idle_task() -> TaskHandle{
+    println!("number: {}", get_current_number_of_tasks!());
     let idle_task_fn = | | {
         loop {
+            trace!("Idle Task running");
             /* THIS IS THE RTOS IDLE TASK - WHICH IS CREATED AUTOMATICALLY WHEN THE
                SCHEDULER IS STARTED. */
         
@@ -472,7 +457,7 @@ pub fn task_suspend_all() {
  }
  */
 pub fn task_resume_all() -> bool {
-    info!("task_resume_all");
+    println!("resume_all called!");
     let mut already_yielded = false;
 
     // TODO: This is a recoverable error, use Result<> instead.
@@ -490,6 +475,7 @@ pub fn task_resume_all() -> bool {
     {
         // Decrement SCHEDULER_SUSPENDED.
         set_scheduler_suspended!(get_scheduler_suspended!() - 1);
+        println!("get_current_number_of_tasks: {}", get_current_number_of_tasks!());
         if get_scheduler_suspended!() == pdFALSE as UBaseType {
             if get_current_number_of_tasks!() > 0 {
                 trace!("Current number of tasks is: {}, move tasks to ready list.", get_current_number_of_tasks!());
