@@ -29,14 +29,22 @@ macro_rules! traceEND {
 to the task control block of the selected task. */
 #[macro_export]
 macro_rules! traceTASK_SWITCHED_IN {
-    () => {};
+    () => {
+        if let Some(current_task) = get_current_task_handle_wrapped!() {
+            trace!("Task {} switched in", current_task.get_name());
+        } else {
+            warn!("No task switched in");
+        }
+    };
 }
 
 /* Called before stepping the tick count after waking from tickless idle
 sleep. */
 #[macro_export]
 macro_rules! traceINCREASE_TICK_COUNT {
-    ($x: expr) => {};
+    ($x: expr) => {
+        trace!("Tick count increased from {}", $x);
+    };
 }
 
 /* Called immediately before entering tickless idle. */
@@ -55,7 +63,11 @@ macro_rules! traceLOW_POWER_IDLE_END {
 to the task control block of the task being switched out. */
 #[macro_export]
 macro_rules! traceTASK_SWITCHED_OUT {
-    () => {};
+    () => {
+        if let Some(current_task) = get_current_task_handle_wrapped!() {
+            trace!("Task {} will be switched out", current_task.get_name());
+        }
+    };
 }
 
 /* Called when a task attempts to take a mutex that is already held by a

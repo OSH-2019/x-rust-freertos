@@ -362,6 +362,14 @@ macro_rules! get_task_switch_in_time {
 }
 
 #[macro_export]
+macro_rules! get_current_task_handle_wrapped {
+    () => (
+        // NOTE: This macro WILL be deprecated. So please avoid using this macro.
+        crate::task_global::CURRENT_TCB.read().unwrap().as_ref()
+    )
+}
+
+#[macro_export]
 macro_rules! get_current_task_handle {
     () => (
         crate::task_global::CURRENT_TCB.read().unwrap().as_ref().unwrap().clone()
