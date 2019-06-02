@@ -59,10 +59,7 @@ lazy_static! {
 
 /* ------------------ End global lists ------------------- */
 
-use simplelog::*;
-use std::fs::*;
 pub fn init() {
-    WriteLogger::init(LevelFilter::Trace, Config::default(), File::create("my_rust_bin.log").unwrap()).unwrap();
     unsafe {
         for i in 0..configMAX_PRIORITIES!() {
             READY_TASK_LISTS[i] = add_list_count!();
@@ -419,5 +416,10 @@ macro_rules! switch_delayed_lists {
         /* pxDelayedTaskList and pxOverflowDelayedTaskList are switched when the tick
            count overflows. */
         // TODO: tasks.c 239
+        unsafe {
+            let tmp = DELAYED_TASK_LIST;
+            DELAYED_TASK_LIST = OVERFLOW_DELAYED_TASK_LIST;
+            OVERFLOW_DELAYED_TASK_LIST = tmp;
+        }
     )
 }

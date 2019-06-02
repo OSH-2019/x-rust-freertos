@@ -204,6 +204,7 @@ impl task_control_block {
         }
 
         // Create task handle.
+        let sp = self.stack_pos;
         let handle = TaskHandle(Arc::new(RwLock::new(self)));
         // TODO: Change type of list_items.
         let state_list_item = handle.get_state_list_item();
@@ -212,6 +213,11 @@ impl task_control_block {
         set_list_item_owner!(event_list_item, &handle.0);
         let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
         set_list_item_value!(state_list_item, item_value);
+
+        // `stack_pos` is a unique number for each task, so it is prefect to be a hash code.
+        set_list_item_hash!(state_list_item, sp);
+        set_list_item_hash!(event_list_item, sp);
+
         handle.add_new_task_to_ready_list()?;
 
         Ok(handle)

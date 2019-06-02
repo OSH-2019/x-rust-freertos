@@ -9,6 +9,15 @@ use crate::*; // TODO: Is this line necessary?
 use std::sync::{Arc, RwLock};
 // use crate::task_control::TCB;
 
+/* Definitions returned by xTaskGetSchedulerState(). 
+ * The originial definitons are C constants, we changed them to enums.
+ */
+pub enum SchedulerState {
+    NotStarted,
+    Suspended,
+    Running
+}
+
 /*
  * Originally from task. h
  *
@@ -674,6 +683,7 @@ fn task_select_highest_priority_task() {
         .unwrap(),
     );
 
+    trace!("Next task is {}", next_task.get_name());
     set_current_task_handle!(next_task);
 
     set_top_ready_priority!(top_priority);
@@ -729,7 +739,6 @@ pub fn task_increment_tick() -> bool {
         set_tick_count!(const_tick_count);
 
         if const_tick_count == 0 {
-            // NOTE: This macro has yet been implemented.
             switch_delayed_lists!();
         } else {
             mtCOVERAGE_TEST_MARKER!();
@@ -808,7 +817,6 @@ pub fn task_increment_tick() -> bool {
         writer has not explicitly turned time slicing off. */
         {
             #![cfg(all(feature = "configUSE_PREEMPTION", feature = "configUSE_TIME_SLICING"))]
-            trace!("Reached this block");
             if current_list_length!(nth_ready_list!(get_current_task_priority!())) > 1 {
                 switch_required = true;
             } else {
@@ -844,4 +852,19 @@ pub fn task_increment_tick() -> bool {
         }
     }
     switch_required
+}
+
+#[cfg(any(feature = "INCLUDE_xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
+pub fn task_get_scheduler_state() -> SchedulerState {
+    if !get_scheduler_running!() {
+        SchedulerState::NotStarted
+    }
+    else {
+        if get_scheduler_suspended!() == pdFALSE as UBaseType {
+            SchedulerState::Running
+        }
+        else {
+            SchedulerState::Suspended
+        }
+    }
 }

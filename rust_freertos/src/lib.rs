@@ -48,25 +48,36 @@ mod tests {
     }
     */
     use std::sync::Arc;
+    use simplelog::*;
+    use std::fs::*;
     #[test]
     fn test_basics() {
+        // The logger may cause mutex deadlocks on the log file.
+        WriteLogger::init(LevelFilter::Trace, Config::default(), File::create("debug.log").unwrap()).unwrap();
         task_global::init();
 
-        /* The following code can't run correctly yet.
         let m = Arc::new(String::from("Wow, We made it!"));
-        let main = || {
-            let v = Arc::clone(&m);
-            loop {
-                trace!("{}", v);
-            }
-        };
-        let main_task = task_control::TCB::new()
+        let _main_task = task_control::TCB::new()
                             .name("main")
                             .priority(1)
-                            .initialise(main);
-        */
+                            .initialise(move || {
+                                // let v = Arc::clone(&m);
+                                loop {
+                                    // println!("Main task running.");
+                                    // kernel::task_end_scheduler();
+                                }
+                            });
 
+        let _other_task = task_control::TCB::new()
+                            .name("other")
+                            .priority(1)
+                            .initialise(move || {
+                                // let v = Arc::clone(&m);
+                                loop {
+                                    // println!("other task running.");
+                                }
+                            });
         kernel::task_start_scheduler();
-        kernel::task_end_scheduler();
+        println!("Exit");
     }
 }
