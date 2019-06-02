@@ -10,14 +10,8 @@ pub const pdFAIL: BaseType = pdFALSE;
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum FreeRtosError {
     OutOfMemory,
-    QueueSendTimeout,
-    QueueReceiveTimeout,
-    MutexTimeout,
     Timeout,
-    QueueFull,
-    StringConversionError,
     TaskNotFound,
-    InvalidQueueSize,
     ProcessorHasShutDown,
     DeadLocked,
     PortError

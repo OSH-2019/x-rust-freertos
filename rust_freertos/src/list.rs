@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, RwLock};
 use crate::*;
-use crate::port::{TickType, UBaseType};
+use crate::port::{TickType, UBaseType, StackType};
 use crate::task_control::task_control_block;
 use crate::task_global::global_lists;
 
@@ -76,6 +76,8 @@ struct TskTCB {
 #[derive(Debug)]
 pub struct ListItem {
     pub item_value: TickType,
+    //new hash value: to identify which TCB is chosed
+    pub hash: StackType,
     pub container: Option<ListName>,
     // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated, deprecateed
     pub owner: Option<Arc<RwLock<task_control_block>>>,      // the TCB declaration is not defined
@@ -102,7 +104,8 @@ impl ListItem {
         Arc::new(RwLock::new(ListItem {
             item_value: item_value,
             container: None,
-            owner: None
+            owner: None,
+            hash: 0
         }))
     }
 }
@@ -147,6 +150,16 @@ macro_rules! set_list_item_owner {
         $item.write().unwrap().owner = Some(Arc::clone(&$owner));
     });
 }
+
+
+#[macro_export]
+macro_rules! set_list_item_hash {
+    ($item:expr, $value:expr) => ({
+        $item.write().unwrap().hash = $value;       
+    })
+}
+
+
 
 /// # Description
 /// get list item's owner
@@ -264,13 +277,15 @@ macro_rules! list_insert_end {
 macro_rules! get_item_index {
     ($list:expr, $item:expr, eq) => ({
         {
-            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value == $item.read().unwrap().item_value);
+            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value == $item.read().unwrap().item_value 
+                                                            &&    x.read().unwrap().hash == $item.read().unwrap().hash);
             index
         }
     });
     ($list:expr, $item:expr, gt) => ({
         {
-            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value > $item.read().unwrap().item_value);
+            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value > $item.read().unwrap().item_value
+                                                            &&    x.read().unwrap().hash == $item.read().unwrap().hash);
             index
         }
     });
@@ -559,7 +574,6 @@ macro_rules! get_item_value_of_head_entry {
     })
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -620,4 +634,3 @@ mod test {
 
     }
 }
-*/
