@@ -10,6 +10,15 @@ use crate::task_global::*;
 use std::sync::{Arc, RwLock};
 // use crate::task_control::TCB;
 
+/* Definitions returned by xTaskGetSchedulerState().
+   * The originial definitons are C constants, we changed them to enums.
+   */
+  pub enum SchedulerState {
+      NotStarted,
+      Suspended,
+      Running
+  }
+
 /*
  * Originally from task. h
  *
@@ -868,3 +877,19 @@ pub fn task_increment_tick() -> bool {
     }
     switch_required
 }
+
+#[cfg(any(feature = "INCLUDE_xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
+  pub fn task_get_scheduler_state() -> SchedulerState {
+      // These enums are defined at the top of this file.
+      if !get_scheduler_running!() {
+          SchedulerState::NotStarted
+      }
+      else {
+          if get_scheduler_suspended!() == pdFALSE as UBaseType {
+              SchedulerState::Running
+          }
+          else {
+              SchedulerState::Suspended
+          }
+      }
+  }
