@@ -7,7 +7,6 @@ use crate::*;
 use std::boxed::FnBox;
 use std::sync::{Arc, RwLock};
 
-
 //* task states
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
@@ -58,7 +57,7 @@ pub struct task_control_block{
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notify_state  : u8,
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    delay_aborted : 0,
+    delay_aborted : u8,
 }
 
 pub type TCB = task_control_block;
@@ -66,7 +65,6 @@ pub type Task = task_control_block;
 impl task_control_block {
     pub fn new() -> Self {
         task_control_block {
-            // TODO: What is state_list_item?!
             state_list_item: ListItem::new(0),
             evnet_list_item: ListItem::new(0),
             task_priority  : 1,
@@ -209,13 +207,25 @@ impl task_control_block {
         self.task_name.clone()
     }
 
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     pub fn get_run_time(&self) -> TickType {
         self.runtime_counter
     }
 
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     pub fn set_run_time(&mut self, next_val: TickType) -> TickType {
-        let prev_val = self.runtime_counter;
+        let prev_val: u32 = self.runtime_counter;
         self.runtime_counter = next_val;
+        prev_val
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn get_delay_aborted (&self) -> u8 {self.delay_aborted}
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn set_delay_aborted (&self, next_val: u8) -> u8 {
+        let prev_val: u8 = self.delay_aborted;
+        self.delay_aborted = next_val;
         prev_val
     }
 }
@@ -381,6 +391,16 @@ impl TaskHandle {
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     pub fn set_run_time(&self, next_val: TickType) -> TickType{
         get_tcb_from_handle_mut!(self).set_run_time(next_val)
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn get_delay_aborted (&self) -> u8 {
+        get_tcb_from_handle!(self).get_delay_aborted()
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn set_delay_aborted (&self, next_val: u8) -> u8 {
+        get_tcb_from_handle!(self).set_delay_aborted(next_val)
     }
 }
 
