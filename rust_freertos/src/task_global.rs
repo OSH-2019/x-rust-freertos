@@ -382,6 +382,14 @@ macro_rules! get_current_task_priority {
         get_current_task_handle!().get_priority()
     )
 }
+
+#[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+#[macro_export]
+macro_rules! get_current_task_delay_aborted {
+    () => (
+        get_current_task_handle!().get_delay_aborted()
+    )
+}
 /* ---------- End of global variable setters and getters -----------*/
 
 #[macro_export]
