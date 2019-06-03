@@ -161,6 +161,55 @@ impl <T>QueueDefinition<T>
         let xEntryTimeSet: bool = false;
         let xYieldRequired: BaseType;
         let xTimeOut: TimeOut;
+
+        assert!(!((xCopyPosition==queueOVERWRITE)&&self.uxLength==1));
+
+        #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
+        assert!(!((xTaskGetSchedulerState() == taskSCHEDULER_SUSPENDED) && (xTicksToWait != 0)));
+
+        loop {
+            taskENTER_CRITICAL!();
+            {
+                if self.uxMessagesWaiting < self.uxLength || xCopyPosition == queueOVERWRITE {
+                    traceQUEUE_SEND(&self);
+                    xYieldRequired = prvCopyDataToQueue(self,pvItemToQueue,xCopyPosition);
+
+                    #[cfg(feature = "configUSE_QUEUE_SETS")]
+                    match self.pxQueueSetContainer {
+                        Some => {
+                            if prvNotifyQueueSetContainer(&self, &xCopyPosition) != false {
+                                queueYIELD_IF_USING_PREEMPTION!();
+                            }
+                            else {
+                                mtCOVERAGE_TEST_MARKER!();
+                            }
+                        },
+                        None => {
+                            if list_is_empty!(self.xTasksWaitingToReceive) == false {
+                                if task_remove_from_event_list(&self.xTasksWaitingToReceive) {
+                                    queueYIELD_IF_USING_PREEMPTION!();
+                                }
+                                else {
+                                    mtCOVERAGE_TEST_MARKER!();
+                                }
+                            }
+                        }
+                    }
+
+                    {
+                        #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
+                        if list_is_empty(&self.xTasksWaitingToReceive) == false {
+                            if task_remove_from_event_list(&self.xTasksWaitingToReceive) != false {
+                                unimplemented!();
+                            }
+                        }
+                    }
+
+                    unimplemented!();
+                }
+            }
+            taskEXIT_CRITICAL!();
+        }
     }
     
     /// # Description
@@ -201,7 +250,7 @@ impl <T>QueueDefinition<T>
                         }
                         None => {
                             if list_is_empty!(self.xTasksWaitingToReceive ) == false{
-                                if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive ) != false{
+                                if task_remove_from_event_list( &self.xTasksWaitingToReceive ) != false{
                                     pxHigherPriorityTaskWoken = true;
                                 }
                                 else {
@@ -217,7 +266,7 @@ impl <T>QueueDefinition<T>
                     {
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
                         if list_is_empty!(self.xTasksWaitingToReceive) == false{
-                            if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive) != false{
+                            if task_remove_from_event_list( &self.xTasksWaitingToReceive) != false{
                                 pxHigherPriorityTaskWoken = true;
                             }
                             else {
@@ -292,7 +341,7 @@ impl <T>QueueDefinition<T>
                     }
                     None =>{
                         if list_is_empty!(self.xTasksWaitingToReceive) == false{
-                            if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive) != false{
+                            if task_remove_from_event_list( &self.xTasksWaitingToReceive) != false{
                                 vTaskMissedYield();
                             }
                             else {
@@ -307,7 +356,7 @@ impl <T>QueueDefinition<T>
                 {
                     #![cfg(not(feature = "configUSE_QUEUE_SETS"))] 
                     if list_is_empty!(self.xTasksWaitingToReceive) == false{
-                        if xTaskRemoveFromEventList( &self.xTasksWaitingToReceive) != false{
+                        if task_remove_from_event_list( &self.xTasksWaitingToReceive) != false{
                             vTaskMissedYield();
                         }
                         else {
@@ -330,7 +379,7 @@ impl <T>QueueDefinition<T>
             let cRxLock:i8 = self.cRxLock;
             while cRxLock > queueLOCKED_UNMODIFIED{
                 if list_is_empty!(self.xTasksWaitingToReceive) == false{
-                    if xTaskRemoveFromEventList(&self.xTasksWaitingToReceive) != false{
+                    if task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
                         vTaskMissedYield();
                     }
                     else {
