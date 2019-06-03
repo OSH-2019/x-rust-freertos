@@ -83,12 +83,9 @@ pub fn init() {
 
 static mut LIST_COUNT: UBaseType = 0;
 
-#[macro_export]
-macro_rules! add_list {
-    () => (
-        global_lists.write().unwrap().push(List_new!());
-        add_list_count!()
-    )
+pub fn add_list() -> UBaseType {
+    global_lists.write().unwrap().push(List_new!());
+    add_list_count!()
 }
 
 #[macro_export]
