@@ -157,9 +157,9 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    fn queue_generic_send(&mut self, pvItemToQueue: T, xTicksToWait: TickType, xCopyPosition: BaseType) {
+    fn queue_generic_send(&mut self, pvItemToQueue: T, xTicksToWait: TickType, xCopyPosition: BaseType) -> (Result<(), QueueError>){
         let xEntryTimeSet: bool = false;
-        let xYieldRequired: BaseType;
+        let xYieldRequired: Result<(), QueueError> = Ok(());
         let xTimeOut: TimeOut;
 
         assert!(!((xCopyPosition==queueOVERWRITE)&&self.uxLength==1));
@@ -171,7 +171,7 @@ impl <T>QueueDefinition<T>
             taskENTER_CRITICAL!();
             {
                 if self.uxMessagesWaiting < self.uxLength || xCopyPosition == queueOVERWRITE {
-                    traceQUEUE_SEND(&self);
+                    traceQUEUE_SEND!(&self);
                     xYieldRequired = prvCopyDataToQueue(self,pvItemToQueue,xCopyPosition);
 
                     #[cfg(feature = "configUSE_QUEUE_SETS")]
@@ -198,17 +198,67 @@ impl <T>QueueDefinition<T>
 
                     {
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                        if list_is_empty(&self.xTasksWaitingToReceive) == false {
+                        if list_is_empty!(&self.xTasksWaitingToReceive) == false {
                             if task_remove_from_event_list(&self.xTasksWaitingToReceive) != false {
-                                unimplemented!();
+                                queueYIELD_IF_USING_PREEMPTION!();
+                            }
+                            else {
+                                mtCOVERAGE_TEST_MARKER!();
                             }
                         }
+                        else if xYieldRequired != Ok(()) {
+                            queueYIELD_IF_USING_PREEMPTION!();
+                        }
+                        else {
+                            mtCOVERAGE_TEST_MARKER!();
+                        }
                     }
-
-                    unimplemented!();
+                    taskEXIT_CRITICAL!();
+                    return Ok(()); //return pdPASS
+                }
+                else {
+                    if xTicksToWait == 0 as TickType {
+                        taskEXIT_CRITICAL!();
+                        traceQUEUE_SEND_FAILED!(&self);
+                        return Err(QueueError::QueueFull);
+                    }
+                    else if xEntryTimeSet == false {
+                        task_set_time_out_state(xTimeOut);
+                        xEntryTimeSet = true;
+                    }
+                    else {
+                        mtCOVERAGE_TEST_MARKER!();
+                    }
                 }
             }
             taskEXIT_CRITICAL!();
+
+            kernel::task_suspend_all();
+            self.lock_queue();
+
+            if task_check_for_time_out(xTimeOut, xTicksToWait) == false {
+                if self.is_queue_full() != false {
+                    traceBLOCKING_ON_QUEUE_SEND!(self);
+                    task_place_on_event_list(&self.xTasksWaitingToSend, xTicksToWait);
+
+                    self.unlock_queue();
+
+                    if kernel::task_resume_all() == false {
+                        portYIELD_WITHIN_API!();
+                    }
+                }
+                else {
+                    self.unlock_queue();
+                    kernel::task_resume_all();
+                }                
+            }
+            else {
+                self.unlock_queue();
+                kernel::task_resume_all();
+
+                traceQUEUE_SEND_FAILED!(self);
+                return Err(QueueError::QueueFull);
+            }
         }
     }
     
@@ -491,7 +541,7 @@ impl <T>QueueDefinition<T>
             self.lock_queue();
             
             /* Update the timeout state to see if it has expired yet. */
-            if xTaskCheckForTimeOut(xTimeOut,xTicksToWait) == false {
+            if task_check_for_time_out(xTimeOut,xTicksToWait) == false {
                 if self.is_queue_empty() != false{
                     traceBLOCKING_ON_QUEUE_RECEIVE!(&self);
                     {
@@ -507,7 +557,7 @@ impl <T>QueueDefinition<T>
                             mtCOVERAGE_TEST_MARKER!();
                         }
                     }
-                    vTaskPlaceOnEventList(self.xTasksWaitingToReceive,xTicksToWait);
+                    task_place_on_event_list(self.xTasksWaitingToReceive,xTicksToWait);
                     self.unlock_queue();
                     if kernel::task_resume_all() == false {
                         portYIELD_WITHIN_API!();
@@ -568,6 +618,24 @@ impl <T>QueueDefinition<T>
         xReturn
     }
 
+    /// # Description
+    ///
+    /// * Implemented by:Lei Siqi
+    /// # Argument
+    ///
+    /// # Return
+    ///
+    fn is_queue_full(&self) -> bool {
+        let mut xReturn: bool = false;
+        taskENTER_CRITICAL!();
+        {
+            if self.uxMessagesWaiting == self.uxLength {
+                xReturn = true;
+            }
+        }
+        taskEXIT_CRITICAL!();
+        xReturn
+    }
 
     /// # Description
     /// * Post an item to the back of a queue.
