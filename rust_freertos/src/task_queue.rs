@@ -125,3 +125,22 @@ fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> (tim
 
 	(pxtimeout, ticks_to_wait, xreturn)
 }
+
+// TODO : vTaskPlaceOnEventList
+// * tasks.c 2820
+pub fn task_place_on_event_list (event_list: List, ticks_to_wait: &mut TickType) {
+	assert! ( event_list );
+
+	/* THIS FUNCTION MUST BE CALLED WITH EITHER INTERRUPTS DISABLED OR THE
+	SCHEDULER SUSPENDED AND THE QUEUE BEING ACCESSED LOCKED. */
+
+	/* Place the event list item of the TCB in the appropriate event list.
+	This is placed in the list in priority order so the highest priority task
+	is the first to be woken by the event.  The queue that contains the event
+	list is locked, preventing simultaneous access from interrupts. */
+
+	let unwrapped_cur = get_current_task_handle!();
+	list_insert!( event_list, &( unwrapped_cur.get_event_list_item() ) );
+
+	add_current_task_to_delayed_list( ticks_to_wait, true );
+}

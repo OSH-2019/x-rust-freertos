@@ -170,7 +170,7 @@ impl task_control_block {
             Ok(_) => {
                 trace!("Stack initialisation succeeded");
                 /* We MUST forget `f`, otherwise it will be freed at the end of this function.
-                 * But we need to call `f` later in `run_wrapper`, which will lead to 
+                 * But we need to call `f` later in `run_wrapper`, which will lead to
                  * some unexpected behavior.
                  */
                 mem::forget(f);
@@ -473,6 +473,123 @@ macro_rules! get_tcb_from_handle_mut {
         }
     };
 }
+
+// TODO : prvAddCurrentTaskToDelayedList tasks.c 4692
+pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_indefinitely: BaseType) {
+
+    let mut time_to_wake :TickType_t = 0;
+
+	let unwrapped_cur = get_current_task_handle!();
+
+	{
+        #![cfg(feature = "INCLUDE_xTaskAbortDelay")]
+		/* About to enter a delayed list, so ensure the ucDelayAborted flag is
+		reset to pdFALSE so it can be detected as having been set to pdTRUE
+		when the task leaves the Blocked state. */
+
+        unwrapped_cur.set_delayed_aborted(false);
+        set_current_task_handle (unwrapped_cur);
+	}
+
+	/* Remove the task from the ready list before adding it to the blocked list
+	as the same list item is used for both lists. */
+	if list_remove!( unwrapped_cur.get_state_list_item() ) == 0
+	{
+		/* The current task must be in a ready list, so there is no need to
+		check, and the port reset macro can be called directly. */
+		portRESET_READY_PRIORITY! ( unwrapped_cur.get_priority () , get_top_ready_priority!() );
+	}
+	else
+	{
+		mtCOVERAGE_TEST_MARKER!();
+	}
+
+	{
+        #![cfg(feature = "INCLUDE_vTaskSuspend")]
+		if ticks_to_wait == portMAX_DELAY && can_block_indefinitely
+		{
+			/* Add the task to the suspended task list instead of a delayed task
+			list to ensure it is not woken by a timing event.  It will block
+			indefinitely. */
+			list_insert_end! ( SUSPENDED_TASK_LIST , unwrapped_cur.get_state_list_item() );
+		}
+		else
+		{
+			/* Calculate the time at which the task should be woken if the event
+			does not occur.  This may overflow but this doesn't matter, the
+			kernel will manage it correctly. */
+			time_to_wake = get_tick_count!() + ticks_to_wait;
+
+			/* The list item will be inserted in wake time order. */
+			set_list_item_value!( unwrapped_cur.get_state_list_item(), time_to_wake );
+
+			if( time_to_wake < get_tick_count!() )
+			{
+				/* Wake time has overflowed.  Place this item in the overflow
+				list. */
+				list_insert! ( OVERFLOW_DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item() );
+			}
+			else
+			{
+				/* The wake time has not overflowed, so the current block list
+				is used. */
+				list_insert! ( DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item() );
+
+				/* If the task entering the blocked state was placed at the
+				head of the list of blocked tasks then xNextTaskUnblockTime
+				needs to be updated too. */
+				if time_to_wake < get_next_task_unblock_time!()
+				{
+					set_next_task_unblock_time!( time_to_wake );
+				}
+				else
+				{
+					mtCOVERAGE_TEST_MARKER!();vListInsert
+				}
+			}
+		}
+	}
+
+	{
+        #![cfg(not(feature = "INCLUDE_vTaskSuspend")]
+		/* Calculate the time at which the task should be woken if the event
+		does not occur.  This may overflow but this doesn't matter, the kernel
+		will manage it correctly. */
+		time_to_wake = get_tick_count!() + ticks_to_wait;
+
+		/* The list item will be inserted in wake time order. */
+		set_list_item_value!( unwrapped_cur.get_state_list_item(), time_to_wake );
+
+		if( time_to_wake < get_tick_count!() )
+		{
+			/* Wake time has overflowed.  Place this item in the overflow list. */
+			list_insert! ( OVERFLOW_DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item() );
+		}
+		else
+		{
+			/* The wake time has not overflowed, so the current block list is used. */
+			list_insert! ( DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item() );
+
+			/* If the task entering the blocked state was placed at the head of the
+			list of blocked tasks then xNextTaskUnblockTime needs to be updated
+			too. */
+			if time_to_wake < get_next_task_unblock_time!()
+            {
+                set_next_task_unblock_time!( time_to_wake );
+            }
+            else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+
+		/* Avoid compiler warning when INCLUDE_vTaskSuspend is not 1. */
+		// ( void ) xCanBlockIndefinitely;
+	}
+}
+
+}
+
 /*
 
 /*
