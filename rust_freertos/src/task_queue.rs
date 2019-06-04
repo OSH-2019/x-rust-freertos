@@ -16,15 +16,15 @@ pub fn task_remove_from_event_list (event_list: List) -> bool {
 
     list_remove! ( unblocked_tcb.event_list_item );
 
-    if get_scheduler_suspended!() {
-        list_remove! ( unblocked_tcb.state_list_item );
+    if get_scheduler_suspended!() > 0 {
+        list_remove! ( unblocked_tcb.get_state_list_item() );
         add_new_task_to_ready_list ( unblocked_tcb );
     }
     else {
         list_insert_end! (xPendingReadyList , unblocked_tcb.event_list_item);
     }
 
-    if( unblocked_tcb.priority > get_current_task_priority!() )
+    if( unblocked_tcb.get_priotity() > get_current_task_priority!() )
 	{
 		/* Return true if the task removed from the event list has a higher
 		priority than the calling task.  This allows the calling task to know if
@@ -53,6 +53,7 @@ pub fn task_remove_from_event_list (event_list: List) -> bool {
 
 fn task_missed_yield() {
 	set_yield_pending! (false);
+}
 
 // TODO : timeout struct
 // * task.h 135
@@ -69,8 +70,8 @@ struct time_out {
 
 fn task_set_time_out_state ( pxtimeout: &mut time_out ){
 	assert! ( pxtimeout );
-	pxtimeout.overflow_count = NUM_OF_OVERFLOWS;
-	pxtimeout.time_on_entering = TICK_COUNT;
+	pxtimeout.overflow_count = get_num_of_overflows!();
+	pxtimeout.time_on_entering = get_tick_count!();
 }
 
 // TODO : xTaskCheckForTimeOut
