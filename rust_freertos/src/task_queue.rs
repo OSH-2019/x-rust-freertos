@@ -77,10 +77,8 @@ pub fn task_set_time_out_state ( pxtimeout: &mut time_out ){
 //  TODO : xTaskCheckForTimeOut
 // * task.c 3015
 
-fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> (time_out, TickType, bool){
-    let mut pxtimeout = pxtimeout;
+pub fn task_check_for_timeout (pxtimeout: &mut time_out, ticks_to_wait: &mut TickType) -> bool {
     let mut xreturn: bool = false;
-    let mut ticks_to_wait = ticks_to_wait;
     // assert! (pxtimeout);
     // assert! (ticks_to_wait);
 
@@ -107,7 +105,7 @@ fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> (tim
             xreturn = true;
         }
 
-        if cfglock2 && ticks_to_wait == portMAX_DELAY {
+        if cfglock2 && *ticks_to_wait == portMAX_DELAY {
             xreturn = false;
         }
 
@@ -115,9 +113,9 @@ fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> (tim
         {
             xreturn = true;
         }
-        else if const_tick_count - pxtimeout.time_on_entering  < ticks_to_wait{
-            ticks_to_wait -= const_tick_count - pxtimeout.time_on_entering;
-            task_set_time_out_state (&mut pxtimeout);
+        else if const_tick_count - pxtimeout.time_on_entering  < *ticks_to_wait{
+            *ticks_to_wait -= const_tick_count - pxtimeout.time_on_entering;
+            task_set_time_out_state (pxtimeout);
             xreturn = false;
         } else {
             xreturn = true;
@@ -125,7 +123,7 @@ fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> (tim
     }
     taskEXIT_CRITICAL! ();
 
-    (pxtimeout, ticks_to_wait, xreturn)
+    xreturn
 }
 
 // TODO : vTaskPlaceOnEventList
