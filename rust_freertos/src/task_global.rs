@@ -314,6 +314,25 @@ macro_rules! set_tick_count {
 }
 
 #[macro_export]
+macro_rules! get_num_of_overflows {
+    () => (
+        unsafe {
+            crate::task_global::NUM_OF_OVERFLOWS
+        }
+    )
+}
+
+#[macro_export]
+macro_rules! set_num_of_overflows {
+    ($next_tick_count: expr) => (
+        unsafe {
+            trace!("NUM_OF_OVERFLOWS was set to {}", $next_tick_count);
+            crate::task_global::NUM_OF_OVERFLOWS = $next_tick_count;
+        }
+    )
+}
+
+#[macro_export]
 #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
 macro_rules! set_total_run_time {
     ($next_val: expr) => (
