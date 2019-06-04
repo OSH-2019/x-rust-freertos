@@ -2,9 +2,10 @@
 
 use std::sync::{Arc, RwLock};
 use crate::*;
-use crate::port::{TickType, UBaseType};
+use crate::port::{TickType, UBaseType, StackType};
 use crate::task_control::task_control_block;
 use crate::task_control::global_task;
+use crate::task_global::global_lists;
 
 
 /// this should be defined is port.rs
@@ -76,6 +77,8 @@ struct TskTCB {
 #[derive(Debug)]
 pub struct ListItem {
     pub item_value: TickType,
+    //new hash value: to identify which TCB is chosed
+    pub hash: StackType,
     pub container: Option<ListName>,
     // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated, deprecateed
     pub owner: Option<Arc<RwLock<task_control_block>>>,      // the TCB declaration is not defined
@@ -102,7 +105,8 @@ impl ListItem {
         Arc::new(RwLock::new(ListItem {
             item_value: item_value,
             container: None,
-            owner: None
+            owner: None,
+            hash: 0
         }))
     }
 }
@@ -147,6 +151,16 @@ macro_rules! set_list_item_owner {
         $item.write().unwrap().owner = Some(Arc::clone(&$owner));
     });
 }
+
+
+#[macro_export]
+macro_rules! set_list_item_hash {
+    ($item:expr, $value:expr) => ({
+        $item.write().unwrap().hash = $value;       
+    })
+}
+
+
 
 /// # Description
 /// get list item's owner
@@ -201,8 +215,8 @@ macro_rules! get_owner_of_next_entry {
         let index = get_item_index!($list, $item, eq);
         match index {
             Some(index) => {
-                match ($list.read().unwrap())[(index + 1) % current_list_length!($list)].read().unwrap().owner {
-                    Some(owner) => Some(Arc::clone(&owner)),
+                match ($list.read().unwrap())[(index + 1) % current_list_length!($list)].read().unwrap().owner.as_ref() {
+                    Some(owner) => Some(Arc::clone(owner)),
                     None => None,
                 }
             },
@@ -223,7 +237,15 @@ macro_rules! get_owner_of_head_entry {
         if current_list_length!($list) == 0 {
             None
         }else{
-            Some(Arc::clone(&($list.read().unwrap())[0].read().unwrap().owner.unwrap()))
+            // Some(Arc::clone(&($list.read().unwrap())[0].read().unwrap().owner.unwrap()))
+            match ($list.read().unwrap())[0].read().unwrap().owner.as_ref() {
+                Some(owner) => {
+                    Some(Arc::clone(owner))
+                },
+                None => {
+                    None
+                }
+            }
         }
     });
 }
@@ -256,13 +278,15 @@ macro_rules! list_insert_end {
 macro_rules! get_item_index {
     ($list:expr, $item:expr, eq) => ({
         {
-            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value == $item.read().unwrap().item_value);
+            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value == $item.read().unwrap().item_value 
+                                                            &&    x.read().unwrap().hash == $item.read().unwrap().hash);
             index
         }
     });
     ($list:expr, $item:expr, gt) => ({
         {
-            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value > $item.read().unwrap().item_value);
+            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value > $item.read().unwrap().item_value
+                                                            &&    x.read().unwrap().hash == $item.read().unwrap().hash);
             index
         }
     });
@@ -375,8 +399,8 @@ macro_rules! list_remove {
     // not know the container
     ($item:expr) => ({
         {
-            let index = get_list_item_owner!($item) as usize;
-            list_remove!((global_list.write().unwrap())[index], $item);
+            let index = get_list_item_container!($item).unwrap() as usize;
+            list_remove!((global_lists.write().unwrap())[index], $item);
         }
     });
     // konw the container 

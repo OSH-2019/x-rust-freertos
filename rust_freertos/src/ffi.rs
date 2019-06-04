@@ -21,10 +21,10 @@ extern "C" fn xTaskGetCurrentTaskHandle() -> xTaskHandle {
 extern "C" fn xTaskIncrementTick() -> BaseType{
     trace!("xTaskIncrementTick() called from ffi!");
     if kernel::task_increment_tick() {
-        info!("task_increment_tick() returned true");
+        info!("task_increment_tick() returned true, need context switch");
         pdTRUE
     } else {
-        info!("task_increment_tick() returned false");
+        info!("task_increment_tick() returned false, do not need context switch");
         pdFALSE
     }
 }

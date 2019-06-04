@@ -1,39 +1,39 @@
-use crate::port::*;
-use crate::list::*;
 use crate::kernel::*;
-use crate::task_global::*;
+use crate::list::*;
+use crate::port::*;
 use crate::projdefs::FreeRtosError;
+use crate::task_global::*;
 use crate::*;
 use std::boxed::FnBox;
 use std::sync::{Arc, RwLock};
-
+use std::mem;
 
 //* task states
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum task_state {
-    running   = 0,
-    ready     = 1,
-    blocked   = 2,
+    running = 0,
+    ready = 1,
+    blocked = 2,
     suspended = 3,
-    deleted   = 4
+    deleted = 4,
 }
 
-pub enum updated_top_priority{
+pub enum updated_top_priority {
     Updated,
-    Notupdated
+    Notupdated,
 }
 
 #[derive(Debug)]
-pub struct task_control_block{
+pub struct task_control_block {
     //* basic information
     state_list_item: Arc<RwLock<ListItem>>,
     evnet_list_item: Arc<RwLock<ListItem>>,
-    task_priority  : UBaseType,
-    task_stacksize : UBaseType,
-    task_name      : String,
+    task_priority: UBaseType,
+    task_stacksize: UBaseType,
+    task_name: String,
     // `stack_pos` is StackType because raw pointer can't be sent between threads safely.
-    stack_pos      : StackType,
+    stack_pos: StackType,
 
     //* end of stack
     // #[cfg(portStack_GROWTH)]{}
@@ -45,9 +45,9 @@ pub struct task_control_block{
 
     //* reverse priority
     #[cfg(feature = "configUSE_MUTEXES")]
-    base_priority  : UBaseType,
+    base_priority: UBaseType,
     #[cfg(feature = "configUSE_MUTEXES")]
-    mutexes_held   : UBaseType,
+    mutexes_held: UBaseType,
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     runtime_counter: TickType,
@@ -57,6 +57,8 @@ pub struct task_control_block{
     notified_value: u32,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notify_state  : u8,
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    delay_aborted : u8,
 }
 
 pub type TCB = task_control_block;
@@ -64,11 +66,10 @@ pub type Task = task_control_block;
 impl task_control_block {
     pub fn new() -> Self {
         task_control_block {
-            // TODO: What is state_list_item?!
             state_list_item: ListItem::new(0),
             evnet_list_item: ListItem::new(0),
             task_priority  : 1,
-            task_stacksize : configMINIMAL_STACK_SIZE!(), 
+            task_stacksize : configMINIMAL_STACK_SIZE!(),
             task_name      : String::from("Unnamed"),
             stack_pos      : 0,
 
@@ -78,9 +79,9 @@ impl task_control_block {
 
             //* reverse priority
             #[cfg(feature = "configUSE_MUTEXES")]
-            base_priority  : 0,
+            base_priority: 0,
             #[cfg(feature = "configUSE_MUTEXES")]
-            mutexes_held   : 0,
+            mutexes_held: 0,
 
             #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
             runtime_counter: 0,
@@ -90,23 +91,29 @@ impl task_control_block {
             notified_value: 0,
             #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
             notify_state  : 0,
+            #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+            delay_aborted : 0,
         }
     }
 
-    pub fn name (mut self, name:&str) -> Self {
+    pub fn name(mut self, name: &str) -> Self {
         self.task_name = name.to_owned().to_string();
         self
     }
 
-    pub fn stacksize (mut self, stacksize: UBaseType) -> Self {
+    pub fn stacksize(mut self, stacksize: UBaseType) -> Self {
         self.task_stacksize = stacksize;
         self
     }
 
-    pub fn priority (mut self, priority: UBaseType) -> Self {
+    pub fn priority(mut self, priority: UBaseType) -> Self {
         if priority >= configMAX_PRIORITIES!() {
             warn!("Specified priority larger than system maximum priority, will be reduced.");
-            info!("MAX_PRIORITY is {}, but got {}", configMAX_PRIORITIES!() - 1, priority);
+            info!(
+                "MAX_PRIORITY is {}, but got {}",
+                configMAX_PRIORITIES!() - 1,
+                priority
+            );
             self.task_priority = configMAX_PRIORITIES!() - 1;
         } else {
             self.task_priority = priority;
@@ -114,13 +121,18 @@ impl task_control_block {
         self
     }
 
-    pub fn initiailise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError> 
-        where F: FnOnce() -> ()
+    pub fn initialise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
+    where
+        F: FnOnce() -> () + Send + 'static,
     {
         let size_of_stacktype = std::mem::size_of::<StackType>();
         let stacksize_as_bytes = size_of_stacktype * self.task_stacksize as usize;
-        trace!("Initialising Task: {}, stack size: {} bytes", self.task_name, stacksize_as_bytes);
-        
+        trace!(
+            "Initialising Task: {}, stack size: {} bytes",
+            self.task_name,
+            stacksize_as_bytes
+        );
+
         // Return `Err` if malloc fails.
         let px_stack = port::port_malloc(stacksize_as_bytes)?;
 
@@ -129,22 +141,42 @@ impl task_control_block {
         // We don't lost any information here because raw pointers are actually addresses,
         // which can be stored as plain numbers.
         self.stack_pos = px_stack as StackType;
-        trace!("stack_pos for task {} is {}", self.task_name, self.stack_pos);
+        trace!(
+            "stack_pos for task {} is {}",
+            self.task_name,
+            self.stack_pos
+        );
 
         let mut top_of_stack = self.stack_pos + self.task_stacksize as StackType - 1;
         top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as StackType;
 
-        let param_ptr = Box::new(Box::new(func) as Box<FnBox()>); // Pass task function as a parameter.
-        let param_ptr = &*param_ptr as *const _ as *mut _; // Convert to raw pointer.
+        let f = Box::new(Box::new(func) as Box<FnBox()>); // Pass task function as a parameter.
+        let param_ptr = &*f as *const _ as *mut _; // Convert to raw pointer.
+        trace!(
+            "Function ptr of {} is at {:X}",
+            self.get_name(),
+            param_ptr as u64
+        );
 
         /* We use a wrapper function to call the task closure,
          * this is how freertos.rs approaches this problem, and is explained here:
          * https://stackoverflow.com/questions/32270030/how-do-i-convert-a-rust-closure-to-a-c-style-callback
          */
-        port::port_initialise_stack(top_of_stack as *mut _,
-                                    Some(run_wrapper),
-                                    param_ptr
-                                    )?;
+        let result = port::port_initialise_stack(top_of_stack as *mut _,
+                                                 Some(run_wrapper),
+                                                 param_ptr
+        );
+        match result {
+            Ok(_) => {
+                trace!("Stack initialisation succeeded");
+                /* We MUST forget `f`, otherwise it will be freed at the end of this function.
+                 * But we need to call `f` later in `run_wrapper`, which will lead to
+                 * some unexpected behavior.
+                 */
+                mem::forget(f);
+            }
+            Err(e) => return Err(e)
+        }
 
         /* Do a bunch of conditional initialisations. */
         #[cfg(feature = "configUSE_MUTEXES")]
@@ -157,16 +189,6 @@ impl task_control_block {
         list_initialise_item! (self.state_list_item);
         list_initialise_item! (self.evnet_list_item);
         */
-
-        // Create task handle.
-        let handle = TaskHandle(Arc::new(RwLock::new(self)));
-        // TODO: Change type of list_items.
-        let state_list_item = handle.get_state_list_item();
-        let event_list_item = handle.get_event_list_item();
-        set_list_item_owner!(state_list_item, &handle.0);
-        set_list_item_owner!(event_list_item, &handle.0);
-        let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
-        set_list_item_value!(state_list_item, item_value);
 
         #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
         {
@@ -183,6 +205,21 @@ impl task_control_block {
             self.notify_state = taskNOT_WAITING_NOTIFICATION;
             self.notified_value = 0;
         }
+
+        // Create task handle.
+        let sp = self.stack_pos;
+        let handle = TaskHandle(Arc::new(RwLock::new(self)));
+        // TODO: Change type of list_items.
+        let state_list_item = handle.get_state_list_item();
+        let event_list_item = handle.get_event_list_item();
+        set_list_item_owner!(state_list_item, &handle.0);
+        set_list_item_owner!(event_list_item, &handle.0);
+        let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
+        set_list_item_value!(state_list_item, item_value);
+
+        // `stack_pos` is a unique number for each task, so it is prefect to be a hash code.
+        set_list_item_hash!(state_list_item, sp);
+        set_list_item_hash!(event_list_item, sp);
 
         handle.add_new_task_to_ready_list()?;
 
@@ -201,25 +238,39 @@ impl task_control_block {
         self.task_priority
     }
 
-    pub fn get_name(&self) -> &String {
-        &self.task_name
+    pub fn get_name(&self) -> String {
+        self.task_name.clone()
     }
 
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     pub fn get_run_time(&self) -> TickType {
         self.runtime_counter
     }
 
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     pub fn set_run_time(&mut self, next_val: TickType) -> TickType {
-        let prev_val = self.runtime_counter;
+        let prev_val: u32 = self.runtime_counter;
         self.runtime_counter = next_val;
+        prev_val
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn get_delay_aborted (&self) -> u8 {self.delay_aborted}
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn set_delay_aborted (&mut self, next_val: u8) -> u8 {
+        let prev_val: u8 = self.delay_aborted;
+        self.delay_aborted = next_val;
         prev_val
     }
 }
 
 /* Task call wrapper function. */
-extern "C" fn run_wrapper(func_to_run: CVoidPointer)
-{
-    info!("Run_wrapper: The function is at position: {:X}", func_to_run as u64);
+extern "C" fn run_wrapper(func_to_run: CVoidPointer) {
+    info!(
+        "Run_wrapper: The function is at position: {:X}",
+        func_to_run as u64
+    );
     unsafe {
         let func_to_run = Box::from_raw(func_to_run as *mut Box<FnBox() + 'static>);
         func_to_run();
@@ -233,10 +284,11 @@ extern "C" fn run_wrapper(func_to_run: CVoidPointer)
 // * Output: None
 #[macro_export]
 macro_rules! record_ready_priority {
-    ($priority:expr) => ({
-        if $priority > get_top_ready_priority!()
-        {set_top_ready_priority!($priority);}
-    })
+    ($priority:expr) => {{
+        if $priority > get_top_ready_priority!() {
+            set_top_ready_priority!($priority);
+        }
+    }};
 }
 
 /*
@@ -287,19 +339,19 @@ impl TaskHandle {
         Arc::into_raw(self.0) as *mut _
     }
 
-    pub fn get_priority(&self) -> UBaseType{
+    pub fn get_priority(&self) -> UBaseType {
         /* Get the priority of a task.
          * Since this method is so frequently used, I used a funtion to do it.
          */
         self.0.read().unwrap().get_priority()
     }
 
-    pub fn add_task_to_ready_list (&self) -> Result<(), FreeRtosError>{
+    pub fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
         let unwrapped_tcb = get_tcb_from_handle!(self);
         let priority = self.get_priority();
 
         traceMOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
-        record_ready_priority! (priority);
+        record_ready_priority!(priority);
 
         // let list_to_insert = (*READY_TASK_LISTS).write().unwrap();
         /* let list_to_insert = match list_to_insert {
@@ -310,30 +362,38 @@ impl TaskHandle {
             }
         };
         */
-        list_insert_end! (nth_ready_list_mut!(priority), unwrapped_tcb.state_list_item);
+        // TODO: This line is WRONG! (just for test)
+        set_list_item_container!(unwrapped_tcb.state_list_item, list::ListName::READY_TASK_LISTS_1);
+        list_insert_end!(nth_ready_list_mut!(priority), unwrapped_tcb.state_list_item);
         tracePOST_MOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
         Ok(())
     }
 
-    fn add_new_task_to_ready_list (&self) -> Result<(), FreeRtosError>{
+    fn add_new_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
         let unwrapped_tcb = get_tcb_from_handle!(self);
 
         taskENTER_CRITICAL!();
         {
             // We don't need to initialise task lists any more.
-
-            set_current_number_of_tasks!(get_current_number_of_tasks!() + 1);
+            let n_o_t = get_current_number_of_tasks!() + 1;
+            set_current_number_of_tasks!(n_o_t);
             /* CURRENT_TCB won't be None. See task_global.rs. */
-            let unwrapped_cur = get_current_task_handle!();
-            if !get_scheduler_running!() {
-                if unwrapped_cur.get_priority() <= unwrapped_tcb.task_priority {
-                    /* If the scheduler is not already running, make this task the
-                       current task if it is the highest priority task to be created
-                       so far. */
-                    set_current_task_handle!(self.clone());
+            if task_global::CURRENT_TCB.read().unwrap().is_none() {
+                set_current_task_handle!(self.clone());
+                if get_current_number_of_tasks!() != 1 {
+                    mtCOVERAGE_TEST_MARKER!(); // What happened?
                 }
-                else {
-                    mtCOVERAGE_TEST_MARKER! ();
+            } else {
+                let unwrapped_cur = get_current_task_handle!();
+                if !get_scheduler_running!() {
+                    if unwrapped_cur.get_priority() <= unwrapped_tcb.task_priority {
+                        /* If the scheduler is not already running, make this task the
+                        current task if it is the highest priority task to be created
+                        so far. */
+                        set_current_task_handle!(self.clone());
+                    } else {
+                        mtCOVERAGE_TEST_MARKER!();
+                    }
                 }
             }
             set_task_number!(get_task_number!() + 1);
@@ -343,15 +403,13 @@ impl TaskHandle {
         taskEXIT_CRITICAL!();
         if get_scheduler_running!() {
             let current_task_priority = get_current_task_handle!().get_priority();
-            if current_task_priority < unwrapped_tcb.task_priority{
+            if current_task_priority < unwrapped_tcb.task_priority {
                 taskYIELD_IF_USING_PREEMPTION!();
+            } else {
+                mtCOVERAGE_TEST_MARKER!();
             }
-            else {
-                mtCOVERAGE_TEST_MARKER! ();
-            }
-        }
-        else {
-            mtCOVERAGE_TEST_MARKER! ();
+        } else {
+            mtCOVERAGE_TEST_MARKER!();
         }
 
         Ok(())
@@ -365,24 +423,34 @@ impl TaskHandle {
         get_tcb_from_handle!(self).get_state_list_item()
     }
 
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> String {
         get_tcb_from_handle!(self).get_name()
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn get_run_time(&self) -> TickType{
+    pub fn get_run_time(&self) -> TickType {
         get_tcb_from_handle!(self).get_run_time()
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn set_run_time(&self, next_val: TickType) -> TickType{
+    pub fn set_run_time(&self, next_val: TickType) -> TickType {
         get_tcb_from_handle_mut!(self).set_run_time(next_val)
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn get_delay_aborted (&self) -> u8 {
+        get_tcb_from_handle!(self).get_delay_aborted()
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn set_delay_aborted (&self, next_val: u8) -> u8 {
+        get_tcb_from_handle_mut!(self).set_delay_aborted(next_val)
     }
 }
 
 #[macro_export]
 macro_rules! get_tcb_from_handle {
-    ($handle: expr) => (
+    ($handle: expr) => {
         match $handle.0.try_read() {
             Ok(a) => a,
             Err(_) => {
@@ -390,12 +458,12 @@ macro_rules! get_tcb_from_handle {
                 panic!("Task handle locked!");
             }
         }
-    )
+    };
 }
 
 #[macro_export]
 macro_rules! get_tcb_from_handle_mut {
-    ($handle: expr) => (
+    ($handle: expr) => {
         match $handle.0.try_write() {
             Ok(a) => a,
             Err(_) => {
@@ -403,8 +471,125 @@ macro_rules! get_tcb_from_handle_mut {
                 panic!("Task handle locked!");
             }
         }
-    )
+    };
 }
+
+// TODO : prvAddCurrentTaskToDelayedList tasks.c 4692
+pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_indefinitely: BaseType) {
+
+    let mut time_to_wake :TickType_t = 0;
+
+	let unwrapped_cur = get_current_task_handle!();
+
+	{
+        #![cfg(feature = "INCLUDE_xTaskAbortDelay")]
+		/* About to enter a delayed list, so ensure the ucDelayAborted flag is
+		reset to pdFALSE so it can be detected as having been set to pdTRUE
+		when the task leaves the Blocked state. */
+
+        unwrapped_cur.set_delayed_aborted(false);
+        set_current_task_handle (unwrapped_cur);
+	}
+
+	/* Remove the task from the ready list before adding it to the blocked list
+	as the same list item is used for both lists. */
+	if list_remove!( unwrapped_cur.get_state_list_item() ) == 0
+	{
+		/* The current task must be in a ready list, so there is no need to
+		check, and the port reset macro can be called directly. */
+		portRESET_READY_PRIORITY! ( unwrapped_cur.get_priority () , get_top_ready_priority!() );
+	}
+	else
+	{
+		mtCOVERAGE_TEST_MARKER!();
+	}
+
+	{
+        #![cfg(feature = "INCLUDE_vTaskSuspend")]
+		if ticks_to_wait == portMAX_DELAY && can_block_indefinitely
+		{
+			/* Add the task to the suspended task list instead of a delayed task
+			list to ensure it is not woken by a timing event.  It will block
+			indefinitely. */
+			list_insert_end! ( SUSPENDED_TASK_LIST , unwrapped_cur.get_state_list_item() );
+		}
+		else
+		{
+			/* Calculate the time at which the task should be woken if the event
+			does not occur.  This may overflow but this doesn't matter, the
+			kernel will manage it correctly. */
+			time_to_wake = get_tick_count!() + ticks_to_wait;
+
+			/* The list item will be inserted in wake time order. */
+			set_list_item_value!( unwrapped_cur.get_state_list_item(), time_to_wake );
+
+			if( time_to_wake < get_tick_count!() )
+			{
+				/* Wake time has overflowed.  Place this item in the overflow
+				list. */
+				list_insert! ( OVERFLOW_DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item() );
+			}
+			else
+			{
+				/* The wake time has not overflowed, so the current block list
+				is used. */
+				list_insert! ( DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item() );
+
+				/* If the task entering the blocked state was placed at the
+				head of the list of blocked tasks then xNextTaskUnblockTime
+				needs to be updated too. */
+				if time_to_wake < get_next_task_unblock_time!()
+				{
+					set_next_task_unblock_time!( time_to_wake );
+				}
+				else
+				{
+					mtCOVERAGE_TEST_MARKER!();vListInsert
+				}
+			}
+		}
+	}
+
+	{
+        #![cfg(not(feature = "INCLUDE_vTaskSuspend")]
+		/* Calculate the time at which the task should be woken if the event
+		does not occur.  This may overflow but this doesn't matter, the kernel
+		will manage it correctly. */
+		time_to_wake = get_tick_count!() + ticks_to_wait;
+
+		/* The list item will be inserted in wake time order. */
+		set_list_item_value!( unwrapped_cur.get_state_list_item(), time_to_wake );
+
+		if( time_to_wake < get_tick_count!() )
+		{
+			/* Wake time has overflowed.  Place this item in the overflow list. */
+			list_insert! ( OVERFLOW_DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item() );
+		}
+		else
+		{
+			/* The wake time has not overflowed, so the current block list is used. */
+			list_insert! ( DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item() );
+
+			/* If the task entering the blocked state was placed at the head of the
+			list of blocked tasks then xNextTaskUnblockTime needs to be updated
+			too. */
+			if time_to_wake < get_next_task_unblock_time!()
+            {
+                set_next_task_unblock_time!( time_to_wake );
+            }
+            else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+
+		/* Avoid compiler warning when INCLUDE_vTaskSuspend is not 1. */
+		// ( void ) xCanBlockIndefinitely;
+	}
+}
+
+}
+
 /*
 
 /*
@@ -418,7 +603,7 @@ pub prv_reset_next_task_unblock_time () {
     }
     else {
         ( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
-		xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
+        xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
 
     }
 }
