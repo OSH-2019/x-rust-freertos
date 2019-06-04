@@ -551,7 +551,7 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
 	}
 
 	{
-        #![cfg(not(feature = "INCLUDE_vTaskSuspend")]
+        #![cfg(not(feature = "INCLUDE_vTaskSuspend"))]
 		/* Calculate the time at which the task should be woken if the event
 		does not occur.  This may overflow but this doesn't matter, the kernel
 		will manage it correctly. */
@@ -588,7 +588,6 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
 	}
 }
 
-}
 
 /*
 

@@ -25,7 +25,7 @@ pub enum QueueUnion {
 #[derive(Default)]
 pub struct QueueDefinition<T> 
     where T: Default {
-    pcQueue: VecDeque<T>,
+    pcQueue: Option<VecDeque<T>>,
     
     pcHead: UBaseType,
     pcTail: UBaseType,
@@ -131,7 +131,7 @@ impl <T>QueueDefinition<T>
             self.cTxLock = queueUNLOCKED;
             self.pcQueue.clear();//初始化空队列
             if xNewQueue == false {
-                if list_is_empty!(self.xTasksWaitingToSend) == false {
+                if list_is_empty!(get_list!(self.xTasksWaitingToSend)) == false {
                     if task_remove_from_event_list(self.xTasksWaitingToSend) != false{
                         queueYIELD_IF_USING_PREEMPTION!();
                     }
@@ -168,7 +168,7 @@ impl <T>QueueDefinition<T>
         assert!(!((xCopyPosition==queueOVERWRITE)&&self.uxLength==1));
 
         #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
-        assert!(!((task_get_scheduler_state() == taskSCHEDULER_SUSPENDED) && (xTicksToWait != 0)));
+        assert!(!((kernel::task_get_scheduler_state() == SchedulerState::Suspended) && (xTicksToWait != 0)));
 
         loop {
             taskENTER_CRITICAL!();
@@ -188,7 +188,7 @@ impl <T>QueueDefinition<T>
                             }
                         },
                         None => {
-                            if list_is_empty!(self.xTasksWaitingToReceive) == false {
+                            if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false {
                                 if task_remove_from_event_list(&self.xTasksWaitingToReceive) {
                                     queueYIELD_IF_USING_PREEMPTION!();
                                 }
@@ -201,7 +201,7 @@ impl <T>QueueDefinition<T>
 
                     {
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                        if list_is_empty!(&self.xTasksWaitingToReceive) == false {
+                        if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false {
                             if task_remove_from_event_list(&self.xTasksWaitingToReceive) != false {
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
@@ -302,7 +302,7 @@ impl <T>QueueDefinition<T>
                             }
                         }
                         None => {
-                            if list_is_empty!(self.xTasksWaitingToReceive ) == false{
+                            if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
                                 if task_remove_from_event_list( &self.xTasksWaitingToReceive ) != false{
                                     pxHigherPriorityTaskWoken = true;
                                 }
@@ -318,7 +318,7 @@ impl <T>QueueDefinition<T>
                     
                     {
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                        if list_is_empty!(self.xTasksWaitingToReceive) == false{
+                        if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
                             if task_remove_from_event_list( &self.xTasksWaitingToReceive) != false{
                                 pxHigherPriorityTaskWoken = true;
                             }
@@ -393,7 +393,7 @@ impl <T>QueueDefinition<T>
                         }
                     }
                     None =>{
-                        if list_is_empty!(self.xTasksWaitingToReceive) == false{
+                        if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
                             if task_remove_from_event_list( &self.xTasksWaitingToReceive) != false{
                                 task_missed_yield();
                             }
@@ -408,7 +408,7 @@ impl <T>QueueDefinition<T>
                 }
                 {
                     #![cfg(not(feature = "configUSE_QUEUE_SETS"))] 
-                    if list_is_empty!(self.xTasksWaitingToReceive) == false{
+                    if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
                         if task_remove_from_event_list( &self.xTasksWaitingToReceive) != false{
                             task_missed_yield();
                         }
@@ -431,7 +431,7 @@ impl <T>QueueDefinition<T>
         {
             let cRxLock:i8 = self.cRxLock;
             while cRxLock > queueLOCKED_UNMODIFIED{
-                if list_is_empty!(self.xTasksWaitingToReceive) == false{
+                if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
                     if task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
                         task_missed_yield();
                     }
@@ -458,11 +458,12 @@ impl <T>QueueDefinition<T>
     /// * 
     /// # Return
     /// * 
-    fn queue_generic_receive(&mut self,xTicksToWait:TickType,xJustPeeking:bool)->Result<(), QueueError>{
-        let xEntryTimeSet:BaseType = pdFALSE;
-        let xTimeOut:TimeOut;
+    fn queue_generic_receive(&mut self,xTicksToWait:TickType,xJustPeeking:bool)->Result<T, QueueError>{
+        let mut xEntryTimeSet:BaseType = pdFALSE;
+        let mut xTimeOut:TimeOut;
+        let mut buffer:Option<T>;
         #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
-        assert!(!((task_get_scheduler_state() == taskSCHEDULER_SUSPENDED) && (xTicksToWait != 0)));
+        assert!(!((kernel::task_get_scheduler_state() == SchedulerState::Suspended) && (xTicksToWait != 0)));
         loop {
             taskENTER_CRITICAL!();
             {
@@ -472,7 +473,7 @@ impl <T>QueueDefinition<T>
 		    must be the highest priority task wanting to access the queue. */
                 if uxMessagesWaiting > 0 as UBaseType{
                     let pcOriginalReadPosition:UBaseType = self.QueueUnion;
-                    self.copy_data_from_queue();//
+                    buffer = self.copy_data_from_queue();//
                     if xJustPeeking == false {
                         traceQUEUE_RECEIVE!(&self);    
                         /* actually removing data, not just peeking. */
@@ -489,7 +490,7 @@ impl <T>QueueDefinition<T>
                             }
                         }
 
-                        if list_is_empty!(self.xTasksWaitingToSend) == false {
+                        if list_is_empty!(get_list!(self.xTasksWaitingToSend)) == false {
                             if task_remove_from_event_list(&self.xTasksWaitingToSend) != false {
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
@@ -506,7 +507,7 @@ impl <T>QueueDefinition<T>
                         /* The data is not being removed, so reset the read
 			    pointer. */
                         self.QueueUnion = pcOriginalReadPosition;
-                        if list_is_empty!(self.xTasksWaitingToReceive) != false {
+                        if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) != false {
                             if task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
@@ -519,7 +520,7 @@ impl <T>QueueDefinition<T>
                         }
                     }
                     taskEXIT_CRITICAL!();
-                    return Ok(());
+                    return Ok(buffer);
                 }
                 else {
                     if xTicksToWait == 0 as TickType {
@@ -592,7 +593,7 @@ impl <T>QueueDefinition<T>
     }
 
     /// 原先是将队列中pcReadFrom处的内容拷贝到第二个参数pvBuffer中，现改为返回值
-    fn copy_data_from_queue(&self) -> (T){
+    fn copy_data_from_queue(&self) ->Option<T> {
         if self.uxItemSize != 0 as UBaseType{
             self.QueueUnion += self.uxItemSize; //QueueUnion represents pcReadFrom in the original code
             if self.QueueUnion >= self.pcTail {
@@ -601,8 +602,11 @@ impl <T>QueueDefinition<T>
             else {
                 mtCOVERAGE_TEST_MARKER!();
             }
-            self.pcQueue.get(&self.QueueUnion)
-       }
+            Some(*self.pcQueue.get(self.QueueUnion as usize).unwrap())
+        }
+        else{
+            None
+        }
     }
 
 
@@ -711,7 +715,7 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    fn new(uxQueueLength:UBaseType) -> Self {
+    pub fn new(uxQueueLength:UBaseType) -> Self {
         Queue::queue_generic_create(uxQueueLength,queueQUEUE_TYPE_BASE)
     }
 
@@ -728,7 +732,7 @@ impl <T>QueueDefinition<T>
     /// 
     /// # Return
     /// * true if the item was successfully posted, otherwise errQUEUE_FULL.
-    fn send_to_front(&mut self,pvItemToQueue:T,xTicksToWait:TickType)-> (Result<(), QueueError>){
+    pub fn send_to_front(&mut self,pvItemToQueue:T,xTicksToWait:TickType)-> (Result<(), QueueError>){
         self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_FRONT)
     }
     
@@ -743,7 +747,7 @@ impl <T>QueueDefinition<T>
     /// 
     /// # Return
     /// * same to queue_send_to_front
-    fn send_to_back(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> (Result<(), QueueError>){
+    pub fn send_to_back(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> (Result<(), QueueError>){
         self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_BACK)
     }
     
@@ -758,7 +762,7 @@ impl <T>QueueDefinition<T>
     /// 
     /// # Return
     /// * same to queue_send_to_back()
-    fn send(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> (Result<(), QueueError>){
+    pub fn send(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> (Result<(), QueueError>){
         self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_BACK)
     }
 
@@ -776,7 +780,7 @@ impl <T>QueueDefinition<T>
     /// # Return
     /// * pdPASS is the only value that can be returned because queue_overwrite will write to the
     /// queue even when the queue is already full.
-    fn overwrite(&mut self,pvItemToQueue:T) -> (Result<(), QueueError>){
+    pub fn overwrite(&mut self,pvItemToQueue:T) -> (Result<(), QueueError>){
         self.queue_generic_send(pvItemToQueue,0,queueOVERWRITE)
     }
     
@@ -794,7 +798,7 @@ impl <T>QueueDefinition<T>
     /// * `Result` -pdTRUE if the data was successfully sent to the queue, otherwise errQUEUE_FULL.
     /// * `bool` - pxHigherPriorityTaskWoken is changed to be a return value. it is true if sending to the
     /// queue caused a task to unblock,otherwise it is false.
-    fn send_to_front_from_isr(&mut self,pvItemToQueue:T)->(Result<(), QueueError>, bool){
+    pub fn send_to_front_from_isr(&mut self,pvItemToQueue:T)->(Result<(), QueueError>, bool){
         self.queue_generic_send_from_isr(pvItemToQueue,queueSEND_TO_FRONT)
     }
 
@@ -808,7 +812,7 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    fn send_to_back_from_isr(&mut self,pvItemToQueue:T) ->(Result<(), QueueError>, bool){
+    pub fn send_to_back_from_isr(&mut self,pvItemToQueue:T) ->(Result<(), QueueError>, bool){
         self.queue_generic_send_from_isr(pvItemToQueue,queueSEND_TO_BACK)
     }
 
@@ -822,7 +826,7 @@ impl <T>QueueDefinition<T>
     ///
     ///  # Return
     ///
-    fn overwrite_from_isr(&mut self,pvItemToQueue:T)->(Result<(), QueueError>, bool){
+    pub fn overwrite_from_isr(&mut self,pvItemToQueue:T)->(Result<(), QueueError>, bool){
         self.queue_generic_send_from_isr(pvItemToQueue,queueOVERWRITE)
     }
     
@@ -839,8 +843,8 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    fn receive(&mut self,xTicksToWait:TickType) -> Result<(), QueueError> {
-        self.queue_generic_receive(xTicksToWait,pdFALSE)
+    pub fn receive(&mut self,xTicksToWait:TickType) -> Result<(), QueueError> {
+        self.queue_generic_receive(xTicksToWait,false)
     }
 
     /// # Description
@@ -857,12 +861,12 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    fn peek(&mut self,xTicksToWait:TickType) -> Result<(), QueueError>{
-        self.queue_generic_receive(xTicksToWait,pdTRUE)
+    pub fn peek(&mut self,xTicksToWait:TickType) -> Result<(), QueueError>{
+        self.queue_generic_receive(xTicksToWait,true)
     }
 
     #[cfg(feature = "configUSE_TRACE_FACILITY")]
-    fn get_queue_number(&self){
+    pub fn get_queue_number(&self){
         self.uxQueueNumber
     }
 
