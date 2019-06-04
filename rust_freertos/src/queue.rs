@@ -277,7 +277,7 @@ impl <T>QueueDefinition<T>
         //返回值改为struct
 
         let mut xReturn:Result<(), QueueError> = Ok(());
-        let pxHigherPriorityTaskWoken:bool = false;//默认为false,下面一些情况改为true
+        let mut pxHigherPriorityTaskWoken:bool = false;//默认为false,下面一些情况改为true
 
         portASSERT_IF_INTERRUPT_PRIORITY_INVALID!();
         let uxSavedInterruptStatus: UBaseType = portSET_INTERRUPT_MASK_FROM_ISR!();
@@ -458,8 +458,8 @@ impl <T>QueueDefinition<T>
     /// # Return
     /// * 
     fn queue_generic_receive(&mut self,xTicksToWait:TickType,xJustPeeking:bool)->Result<T, QueueError>{
-        let mut xEntryTimeSet:BaseType = pdFALSE;
-        let mut xTimeOut:TimeOut;
+        let mut xEntryTimeSet:bool = false;
+        let mut xTimeOut:time_out;
         let mut buffer:Option<T>;
         #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
         assert!(!((kernel::task_get_scheduler_state() == SchedulerState::Suspended) && (xTicksToWait != 0)));
@@ -481,7 +481,7 @@ impl <T>QueueDefinition<T>
                             #![cfg(feature = "configUSE_MUTEXES")]
                             if self.pcHead == queueQUEUE_IS_MUTEX{
                                 /*actually uxQueueType == pcHead */
-                                self.pcTail = pvTaskIncrementMutexHeldCount();
+                                self.pcTail = task_increment_mutex_held_count();
                                 /*actually pxMutexHolder == pcTail*/
                             }
                             else {

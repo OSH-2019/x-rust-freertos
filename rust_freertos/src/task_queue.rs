@@ -59,10 +59,10 @@ fn task_missed_yield() {
 // * task.h 135
 
 #[derive(Debug)]
-struct time_out {
-	overflow_count: BaseType;
-	time_on_entering: TickType;
-};
+pub struct time_out {
+	overflow_count: BaseType,
+	time_on_entering: TickType,
+}
 
 
 // TODO : vTaskSetTimeOutState
@@ -74,7 +74,7 @@ fn task_set_time_out_state ( pxtimeout: &mut time_out ){
 	pxtimeout.time_on_entering = get_tick_count!();
 }
 
-// TODO : xTaskCheckForTimeOut
+//  TODO : xTaskCheckForTimeOut
 // * task.c 3015
 
 fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> (time_out, TickType, BaseType){
