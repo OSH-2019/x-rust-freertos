@@ -51,7 +51,7 @@ pub fn task_remove_from_event_list (event_list: List) -> bool {
 // TODO : vTaskMissedYield
 // * task.c 3076
 
-pub fn task_missed_yield() {
+fn task_missed_yield() {
 	set_yield_pending! (false);
 
 // TODO : timeout struct
@@ -67,7 +67,7 @@ struct time_out {
 // TODO : vTaskSetTimeOutState
 // * task.c 3007
 
-pub fn task_set_time_out_state ( pxtimeout: &mut time_out ){
+fn task_set_time_out_state ( pxtimeout: &mut time_out ){
 	assert! ( pxtimeout );
 	pxtimeout.overflow_count = NUM_OF_OVERFLOWS;
 	pxtimeout.time_on_entering = TICK_COUNT;
@@ -76,7 +76,7 @@ pub fn task_set_time_out_state ( pxtimeout: &mut time_out ){
 // TODO : xTaskCheckForTimeOut
 // * task.c 3015
 
-pub fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> BaseType {
+fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> (time_out, TickType, BaseType){
 	let mut xreturn: BaseType = false;
 	assert! (pxtimeout);
 	assert! (ticks_to_wait);
@@ -85,23 +85,28 @@ pub fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> 
 	{
 		const const_tick_count: TickType = TICK_COUNT;
 		let unwrapped_cur = get_current_task_handle!();
+		let mut cfglock1 = false;
+		let mut cfglock2 = false;
 
 		{
-			#![cfg(feature = "INCLUDE_xTaskAbortDelay")]
-			if unwrapped_cur.delay_aborted {
-				unwrapped_cur.set_delayed_aborted(false);
-				xreturn = true;
-			}
-			else
+			#![cfg(feature = "INCLUDE_xTaskAbortDelay"]
+			cfglock1 = true;
 		}
 
 		{
 			#![cfg(feature = "INCLUDE_vTaskSuspend")]
-			if ticks_to_wait == portMAX_DELAY {
+			cfglock2 = true;
+		}
+
+
+		if cfglock1 && unwrapped_cur.delay_aborted {
+				unwrapped_cur.set_delayed_aborted(false);
+				xreturn = true;
+		}
+
+		if cfglock2 && ticks_to_wait == portMAX_DELAY {
 				xreturn = false;
 			}
-			else
-		}
 
 		if 0 != pxtimeout.overflow_count && const_tick_count >= pxtimeout.time_on_entering
 		{
@@ -117,5 +122,5 @@ pub fn task_check_for_timeout (pxtimeout: time_out, ticks_to_wait: TickType) -> 
 	}
 	taskEXIT_CRITICAL! ();
 
-	xreturn
+	(pxtimeout, ticks_to_wait, xreturn)
 }
