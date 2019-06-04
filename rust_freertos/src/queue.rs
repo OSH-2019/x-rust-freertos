@@ -16,12 +16,12 @@ pub const queueUNLOCKED:i8 = -1;
 pub const queueLOCKED_UNMODIFIED:i8 = 0;
 pub const queueSEMAPHORE_QUEUE_ITEM_LENGTH:UBaseType = 0;
 pub const queueMUTEX_GIVE_BLOCK_TIME:TickType = 0;
-
+/*
 pub enum QueueUnion {
     pcReadFrom(UBaseType),
     uxRecuriveCallCount(UBaseType),
 }
-
+*/
 #[derive(Default)]
 pub struct QueueDefinition<T> 
     where T: Default {
@@ -59,11 +59,11 @@ pub struct QueueDefinition<T>
 
 type xQueue<T> = QueueDefinition<T>;
 type Queue<T> = QueueDefinition<T>;
-
+/*
 impl Default for QueueUnion{
     fn default() -> Self {QueueUnion::pcReadFrom(0)}
 }
-
+*/
 impl <T>QueueDefinition<T>
     where T: Default{
     
@@ -180,7 +180,7 @@ impl <T>QueueDefinition<T>
                     #[cfg(feature = "configUSE_QUEUE_SETS")]
                     match self.pxQueueSetContainer {
                         Some => {
-                            if prvNotifyQueueSetContainer(&self, &xCopyPosition) != false {
+                            if notify_queue_set_container(&self, &xCopyPosition) != false {
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
@@ -294,7 +294,7 @@ impl <T>QueueDefinition<T>
                     #[cfg(feature = "configUSE_QUEUE_SETS")]
                     match self.pxQueueSetContainer{
                         Some =>{
-                            if prvNotifyQueueSetContainer(self, xCopyPosition ) != false{
+                            if notify_queue_set_container(self, xCopyPosition ) != false{
                                 pxHigherPriorityTaskWoken = true
                             }
                             else {
@@ -385,7 +385,7 @@ impl <T>QueueDefinition<T>
                 #[cfg(feature = "configUSE_QUEUE_SETS")]
                 match self.pxQueueSetContainer{
                     Some =>{
-                        if prvNotifyQueueSetContainer(self, queueSEND_TO_BACK) != false{
+                        if notify_queue_set_container(self, queueSEND_TO_BACK) != false{
                             task_missed_yield();
                         }
                         else {
@@ -458,7 +458,7 @@ impl <T>QueueDefinition<T>
     /// * 
     /// # Return
     /// * 
-    fn queue_generic_receive(&mut self,xTicksToWait:TickType,xJustPeeking:BaseType)->Result<(), QueueError>{
+    fn queue_generic_receive(&mut self,xTicksToWait:TickType,xJustPeeking:bool)->Result<(), QueueError>{
         let xEntryTimeSet:BaseType = pdFALSE;
         let xTimeOut:TimeOut;
         #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
@@ -472,8 +472,8 @@ impl <T>QueueDefinition<T>
 		    must be the highest priority task wanting to access the queue. */
                 if uxMessagesWaiting > 0 as UBaseType{
                     let pcOriginalReadPosition:UBaseType = self.QueueUnion;
-                     self.copy_data_from_queue();//
-                    if xJustPeeking == pdFALSE{
+                    self.copy_data_from_queue();//
+                    if xJustPeeking == false {
                         traceQUEUE_RECEIVE!(&self);    
                         /* actually removing data, not just peeking. */
                         self.uxMessagesWaiting = uxMessagesWaiting - 1;
@@ -490,7 +490,7 @@ impl <T>QueueDefinition<T>
                         }
 
                         if list_is_empty!(self.xTasksWaitingToSend) == false {
-                            if task_remove_from_event_list(self.xTasksWaitingToSend) != false {
+                            if task_remove_from_event_list(&self.xTasksWaitingToSend) != false {
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
@@ -507,7 +507,7 @@ impl <T>QueueDefinition<T>
 			    pointer. */
                         self.QueueUnion = pcOriginalReadPosition;
                         if list_is_empty!(self.xTasksWaitingToReceive) != false {
-                            if task_remove_from_event_list(self.xTasksWaitingToReceive) != false{
+                            if task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
@@ -555,7 +555,7 @@ impl <T>QueueDefinition<T>
                             /* actually uxQueueType == pcHead */
                             taskENTER_CRITICAL!();
                             {
-                                task_priority_inherit(self.pxMutexHolder);
+                                task_priority_inherit(&self.pxMutexHolder);
                             }
                             taskEXIT_CRITICAL!();
                         }
@@ -563,7 +563,7 @@ impl <T>QueueDefinition<T>
                             mtCOVERAGE_TEST_MARKER!();
                         }
                     }
-                    task_place_on_event_list(self.xTasksWaitingToReceive,xTicksToWait);
+                    task_place_on_event_list(&self.xTasksWaitingToReceive,xTicksToWait);
                     self.unlock_queue();
                     if kernel::task_resume_all() == false {
                         portYIELD_WITHIN_API!();
@@ -592,22 +592,18 @@ impl <T>QueueDefinition<T>
     }
 
     /// 原先是将队列中pcReadFrom处的内容拷贝到第二个参数pvBuffer中，现改为返回值
-    /*fn copy_data_from_queue(&self) -> (T){
+    fn copy_data_from_queue(&self) -> (T){
         if self.uxItemSize != 0 as UBaseType{
-             self.u = match self.u {
-                QueueUnion::pcReadFrom(prev) => QueueUnion::pcReadFrom(prev + 1);
-                QueueUnion::
-            }
-            self.u.pcReadFrom = self.u::pcReadFrom + 1;
-            if self.u.pcReadFrom >= self.pcTail{
-                self.u.pcReadFrom = self.pcHead;
+            self.QueueUnion += self.uxItemSize; //QueueUnion represents pcReadFrom in the original code
+            if self.QueueUnion >= self.pcTail {
+                self.QueueUnion = self.pcHead;
             }
             else {
                 mtCOVERAGE_TEST_MARKER!();
             }
-            self.pcQueue.get(self.u.pcReadFrom)
+            self.pcQueue.get(&self.QueueUnion)
        }
-    }*/
+    }
 
 
     fn copy_data_to_queue(&mut self, pvItemToQueue:T,xPosition:BaseType) -> bool{
@@ -869,6 +865,18 @@ impl <T>QueueDefinition<T>
     fn get_queue_number(&self){
         self.uxQueueNumber
     }
+
+
+    /// # Description
+    /// 
+    /// # Argument
+    /// 
+    /// # Return
+    #[cfg(feature = "configUSE_QUEUE_SETS")]
+    fn notify_queue_set_container(&self, xCopyPosition: BaseType) {
+        unimplemented!();
+    }
+
 }
 
 #[macro_export]
