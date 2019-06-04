@@ -25,7 +25,7 @@ pub enum QueueUnion {
 #[derive(Default)]
 pub struct QueueDefinition<T> 
     where T: Default {
-    pcQueue: Option<VecDeque<T>>,
+    pcQueue: VecDeque<T>,
     
     pcHead: UBaseType,
     pcTail: UBaseType,
@@ -39,7 +39,7 @@ pub struct QueueDefinition<T>
 
     uxMessagesWaiting: UBaseType,
     uxLength: UBaseType,
-    uxItemSize: UBaseType,  //这玩意还有必要吗
+    //uxItemSize: UBaseType,  //这玩意还有必要吗
     
     cRxLock: i8,
     cTxLock: i8,
@@ -52,8 +52,8 @@ pub struct QueueDefinition<T>
     
     #[cfg(feature = "configUSE_TRACE_FACILITY")] 
     uxQueueNumber: UBaseType,
-    #[cfg(feature = "configUSE_TRACE_FACILITY")]
-    ucQueueType: u8,
+    //#[cfg(feature = "configUSE_TRACE_FACILITY")]
+    ucQueueType: QueueType,
 
 }
 
@@ -70,16 +70,15 @@ impl <T>QueueDefinition<T>
     /// # Description
     /// * 
     /// * Implemented by:Lei Siqi
+    /// * * Modifiled by: Ning Yuting
     /// # Argument
     ///
     /// # Return
     ///
     #[cfg(feature = "configSUPPORT_DYNAMIC_ALLOCATION")]
-    fn queue_generic_create ( uxQueueLength:UBaseType, ucQueueType:u8) -> Self {
+    fn queue_generic_create ( uxQueueLength:UBaseType, ucQueueType:QueueType) -> Self {
         let mut queue:Queue<T>=Default::default();
-
         queue.pcQueue =  VecDeque::with_capacity(uxQueueLength as usize);
-
         queue.initialise_new_queue(uxQueueLength,ucQueueType);
         queue
     }
@@ -91,15 +90,15 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    fn initialise_new_queue(&mut self, uxQueueLength: UBaseType, ucQueueType: u8)  {
+    fn initialise_new_queue(&mut self, uxQueueLength: UBaseType, ucQueueType: QueueType)  {
         self.pcHead=0;
         self.uxLength=uxQueueLength;
         self.queue_generic_reset(true);
         
-        {
-        #![cfg(feature = "configUSE_TRACE_FACILITY")]
+        //{
+        // #![cfg(feature = "configUSE_TRACE_FACILITY")]
         self.ucQueueType = ucQueueType;
-        }
+        //}
         
         {
         #![cfg(feature = "configUSE_QUEUE_SETS")]
@@ -278,7 +277,7 @@ impl <T>QueueDefinition<T>
         //返回值改为struct
 
         let mut xReturn:Result<(), QueueError> = Ok(());
-        let pxHigherPriorityTaskWoken:bool = false;//默认为false,下面一些情况改为true
+        let mut pxHigherPriorityTaskWoken:bool = false;//默认为false,下面一些情况改为true
 
         portASSERT_IF_INTERRUPT_PRIORITY_INVALID!();
         let uxSavedInterruptStatus: UBaseType = portSET_INTERRUPT_MASK_FROM_ISR!();
@@ -459,8 +458,8 @@ impl <T>QueueDefinition<T>
     /// # Return
     /// * 
     fn queue_generic_receive(&mut self,xTicksToWait:TickType,xJustPeeking:bool)->Result<T, QueueError>{
-        let mut xEntryTimeSet:BaseType = pdFALSE;
-        let mut xTimeOut:TimeOut;
+        let mut xEntryTimeSet:bool = false;
+        let mut xTimeOut:time_out;
         let mut buffer:Option<T>;
         #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
         assert!(!((kernel::task_get_scheduler_state() == SchedulerState::Suspended) && (xTicksToWait != 0)));
@@ -482,7 +481,7 @@ impl <T>QueueDefinition<T>
                             #![cfg(feature = "configUSE_MUTEXES")]
                             if self.pcHead == queueQUEUE_IS_MUTEX{
                                 /*actually uxQueueType == pcHead */
-                                self.pcTail = pvTaskIncrementMutexHeldCount();
+                                self.pcTail = task_increment_mutex_held_count();
                                 /*actually pxMutexHolder == pcTail*/
                             }
                             else {
@@ -520,7 +519,7 @@ impl <T>QueueDefinition<T>
                         }
                     }
                     taskEXIT_CRITICAL!();
-                    return Ok(buffer);
+                    return Ok(buffer.unwrap());
                 }
                 else {
                     if xTicksToWait == 0 as TickType {
@@ -594,15 +593,15 @@ impl <T>QueueDefinition<T>
 
     /// 原先是将队列中pcReadFrom处的内容拷贝到第二个参数pvBuffer中，现改为返回值
     fn copy_data_from_queue(&self) ->Option<T> {
-        if self.uxItemSize != 0 as UBaseType{
-            self.QueueUnion += self.uxItemSize; //QueueUnion represents pcReadFrom in the original code
+        if self.ucQueueType == QueueType::Base || self.ucQueueType == QueueType::Set {
+            self.QueueUnion += 1; //QueueUnion represents pcReadFrom in the original code
             if self.QueueUnion >= self.pcTail {
                 self.QueueUnion = self.pcHead;
             }
             else {
                 mtCOVERAGE_TEST_MARKER!();
             }
-            Some(*self.pcQueue.get(self.QueueUnion as usize).unwrap())
+            Some(*(self.pcQueue.get(self.QueueUnion as usize)).unwrap())
         }
         else{
             None
@@ -716,7 +715,7 @@ impl <T>QueueDefinition<T>
     /// # Return
     ///
     pub fn new(uxQueueLength:UBaseType) -> Self {
-        Queue::queue_generic_create(uxQueueLength,queueQUEUE_TYPE_BASE)
+        Queue::queue_generic_create(uxQueueLength,QueueType::Base)
     }
 
     /// # Description
@@ -843,7 +842,7 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    pub fn receive(&mut self,xTicksToWait:TickType) -> Result<(), QueueError> {
+    pub fn receive(&mut self,xTicksToWait:TickType) -> Result<T, QueueError> {
         self.queue_generic_receive(xTicksToWait,false)
     }
 
@@ -861,7 +860,7 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    pub fn peek(&mut self,xTicksToWait:TickType) -> Result<(), QueueError>{
+    pub fn peek(&mut self,xTicksToWait:TickType) -> Result<T, QueueError>{
         self.queue_generic_receive(xTicksToWait,true)
     }
 
