@@ -28,7 +28,7 @@ pub enum updated_top_priority {
 pub struct task_control_block {
     //* basic information
     state_list_item: Arc<RwLock<ListItem>>,
-    evnet_list_item: Arc<RwLock<ListItem>>,
+    event_list_item: Arc<RwLock<ListItem>>,
     task_priority: UBaseType,
     task_stacksize: UBaseType,
     task_name: String,
@@ -67,7 +67,7 @@ impl task_control_block {
     pub fn new() -> Self {
         task_control_block {
             state_list_item: ListItem::new(0),
-            evnet_list_item: ListItem::new(0),
+            event_list_item: ListItem::new(0),
             task_priority  : 1,
             task_stacksize : configMINIMAL_STACK_SIZE!(),
             task_name      : String::from("Unnamed"),
@@ -187,7 +187,7 @@ impl task_control_block {
 
         /* These list items were already initialised when `self` was created.
         list_initialise_item! (self.state_list_item);
-        list_initialise_item! (self.evnet_list_item);
+        list_initialise_item! (self.event_list_item);
         */
 
         #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
@@ -231,11 +231,15 @@ impl task_control_block {
     }
 
     pub fn get_event_list_item(&self) -> Arc<RwLock<ListItem>> {
-        Arc::clone(&self.evnet_list_item)
+        Arc::clone(&self.event_list_item)
     }
 
     pub fn get_priority(&self) -> UBaseType {
         self.task_priority
+    }
+
+    pub fn set_priority(&mut self, new_priority: UBaseType) {
+        self.task_priority = new_priority;
     }
 
     pub fn get_name(&self) -> String {
@@ -265,8 +269,18 @@ impl task_control_block {
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn increment_mutex_held_count(&mut self) {
-        self.mutexes_held += 1;
+    pub fn get_mutex_held_count(&self) -> UBaseType{
+        self.mutexes_held
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn set_mutex_held_count(&mut self, new_count: UBaseType) {
+        self.mutexes_held = new_count;
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn get_base_priority(&self) -> UBaseType{
+        self.base_priority
     }
 }
 
@@ -349,6 +363,10 @@ impl TaskHandle {
          * Since this method is so frequently used, I used a funtion to do it.
          */
         self.0.read().unwrap().get_priority()
+    }
+
+    pub fn set_priority(&self, new_priority: UBaseType) {
+        get_tcb_from_handle_mut!(self).set_priority(new_priority);
     }
 
     pub fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
@@ -453,8 +471,18 @@ impl TaskHandle {
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn increment_mutex_held_count(&self) {
-        get_tcb_from_handle_mut!(self).increment_mutex_held_count();
+    pub fn get_mutex_held_count(&self) -> UBaseType{
+        get_tcb_from_handle!(self).get_mutex_held_count()
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn set_mutex_held_count(&self, new_count: UBaseType) {
+        get_tcb_from_handle_mut!(self).set_mutex_held_count(new_count)
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn get_base_priority(&self) -> UBaseType{
+        get_tcb_from_handle!(self).get_base_priority()
     }
 }
 
@@ -622,7 +650,7 @@ pub fn delete_task (task_to_delete: task_handle){
             mtCOVERAGE_TEST_MARKER!();
         }
 
-        if get_list_item_container(&px_tcb.evnet_list_item).is_some() {
+        if get_list_item_container(&px_tcb.event_list_item).is_some() {
             list_remove!(&px_tcb.state_list_item);
         }
         else {
@@ -667,7 +695,7 @@ pub fn suspend_task (task_to_suspend: task_handle){
             mtCOVERAGE_TEST_MARKER! ();
         }
 
-        if get_list_item_container!(px_tcb.unwrap().evnet_list_item).is_some() {
+        if get_list_item_container!(px_tcb.unwrap().event_list_item).is_some() {
             list_remove!(px_tcb.unwrap().state_list_item);
         }
         else {
