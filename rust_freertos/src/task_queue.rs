@@ -159,15 +159,16 @@ pub fn task_place_on_event_list (event_list:& List, ticks_to_wait: TickType) {
 }
 
 #[cfg(feature = "configUSE_MUTEXES")]
-pub fn task_increment_mutex_held_count() {
+pub fn task_increment_mutex_held_count() -> Option<TaskHandle> {
     /* If xSemaphoreCreateMutex() is called before any tasks have been created
        then pxCurrentTCB will be NULL. */
     match get_current_task_handle_wrapped!() {
         Some(current_task) => {
             let new_val = current_task.get_mutex_held_count() + 1;
-            current_task.set_mutex_held_count(new_val)
+            current_task.set_mutex_held_count(new_val);
+            Some(current_task.clone())
         },
-        None => ()
+        None => None
     }
 }
 
