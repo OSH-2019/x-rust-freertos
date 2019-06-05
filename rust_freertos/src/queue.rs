@@ -24,7 +24,7 @@ pub enum QueueUnion {
 */
 #[derive(Default)]
 pub struct QueueDefinition<T> 
-    where T: Default {
+    where T: Default + Clone {
     pcQueue: VecDeque<T>,
     
     pcHead: UBaseType,
@@ -65,7 +65,7 @@ impl Default for QueueUnion{
 }
 */
 impl <T>QueueDefinition<T>
-    where T: Default{
+    where T: Default + Clone{
     
     /// # Description
     /// * 
@@ -603,7 +603,8 @@ impl <T>QueueDefinition<T>
             else {
                 mtCOVERAGE_TEST_MARKER!();
             }
-            Some(*((self.pcQueue.get(self.QueueUnion as usize).unwrap())))
+            let ret_val = self.pcQueue.get(self.QueueUnion as usize).cloned();
+            Some(ret_val.unwrap())
         }
         else{
             None
