@@ -125,7 +125,7 @@ impl <T>QueueDefinition<T>
             self.pcTail = self.pcHead + self.uxLength;
             self.uxMessagesWaiting = 0 as UBaseType;
             self.pcWriteTo = self.pcHead;
-            self.QueueUnion = self.pcHead + self.uxLength - (1 as UBaseType);
+            self.QueueUnion = self.pcHead + self.uxLength - (1 as UBaseType);//QueueUnion represents pcReadFrom
             self.cRxLock = queueUNLOCKED;
             self.cTxLock = queueUNLOCKED;
             self.pcQueue.clear();//初始化空队列
@@ -473,7 +473,7 @@ impl <T>QueueDefinition<T>
                 /* Is there data in the queue now?  To be running the calling task
 		    must be the highest priority task wanting to access the queue. */
                 if uxMessagesWaiting > 0 as UBaseType{
-                    let pcOriginalReadPosition:UBaseType = self.QueueUnion;
+                    let pcOriginalReadPosition:UBaseType = self.QueueUnion;//QueueUnion represents pcReadFrom
                     buffer = self.copy_data_from_queue();//
                     if xJustPeeking == false {
                         traceQUEUE_RECEIVE!(&self);    
@@ -481,9 +481,10 @@ impl <T>QueueDefinition<T>
                         self.uxMessagesWaiting = uxMessagesWaiting - 1;
                         {
                             #![cfg(feature = "configUSE_MUTEXES")]
-                            if self.pcHead == queueQUEUE_IS_MUTEX{
+                            /*== mutex | ……？*/
+                            if self.ucQueueType == QueueType::Mutex{
                                 /*actually uxQueueType == pcHead */
-                                //self.pcTail = task_increment_mutex_held_count();
+                                self.pcTail = task_increment_mutex_held_count();
                                 /*actually pxMutexHolder == pcTail*/
                             }
                             else {
@@ -507,7 +508,7 @@ impl <T>QueueDefinition<T>
                         traceQUEUE_PEEK!(&self);
                         /* The data is not being removed, so reset the read
 			    pointer. */
-                        self.QueueUnion = pcOriginalReadPosition;
+                        self.QueueUnion = pcOriginalReadPosition;//QueueUnnion represents pcReadFrom
                         if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) != false {
                             if task_queue::task_remove_from_event_list(get_list!(self.xTasksWaitingToReceive)) != false{
                                 queueYIELD_IF_USING_PREEMPTION!();
@@ -557,7 +558,14 @@ impl <T>QueueDefinition<T>
                             /* actually uxQueueType == pcHead */
                             taskENTER_CRITICAL!();
                             {
-                                //task_priority_inherit(&self.pxMutexHolder);
+                                let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
+                                let untransed_task_handle = Box::new(untransed_task_handle);
+                                let mut task_handle: Option<task_control::TaskHandle>;
+                                unsafe{
+                                    let transed_task_handle = std::mem::transmute::<Box<T>,Box<Option<task_control::TaskHandle>>>(untransed_task_handle);
+                                    task_handle = *transed_task_handle;
+                                }
+                                task_queue::task_priority_inherit(task_handle);
                             }
                             taskEXIT_CRITICAL!();
                         }
@@ -618,12 +626,19 @@ impl <T>QueueDefinition<T>
         let mut uxMessagesWaiting:UBaseType = self.uxMessagesWaiting;
         
         /* 未完成信号量部分处理*/
-        /*
+        /* 
         {
             #![cfg(configUSE_MUTEXES)]
             if self.uxQueueType == queueQUEUE_IS_MUTEX {
-                xReturn = task_priority_disinherit(self.pxMutexHolder);
-                self.pxMutexHolder = None;
+                let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
+                let untransed_task_handle = Box::new(untransed_task_handle);
+                let mut task_handle: Option<task_control::TaskHandle>;
+                unsafe{
+                    let transed_task_handle = std::mem::transmute::<Box<T>,Box<Option<task_control::TaskHandle>>>(untransed_task_handle);
+                    task_handle = *transed_task_handle;
+                }
+                xReturn = task_priority_disinherit(task_handle);
+                self.pxMutexHolder = None;////still wrong
             }
             else {
                 mtCOVERAGE_TEST_MARKER!();
@@ -642,7 +657,7 @@ impl <T>QueueDefinition<T>
             }
         }
         else {
-            self.pcQueue.insert(self.QueueUnion as usize,pvItemToQueue);
+            self.pcQueue.insert(self.QueueUnion as usize,pvItemToQueue);//QueueUnion represents pcReadFrom
             self.QueueUnion = self.QueueUnion - 1;
             if self.QueueUnion < self.pcHead {
                 self.QueueUnion = self.pcTail - 1;
