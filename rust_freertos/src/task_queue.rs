@@ -9,7 +9,7 @@ use std::sync::Arc;
 // TODO : vTaskRemoveFromEventList
 // * task.c 2894
 
-pub fn task_remove_from_event_list (event_list: List) -> bool {
+pub fn task_remove_from_event_list (event_list:& List) -> bool {
     let unblocked_tcb = get_owner_of_head_entry!(event_list).unwrap();
     let unblocked_tcb = TaskHandle::from_arc(unblocked_tcb);
     // configASSERT( unblocked_tcb );
@@ -58,7 +58,7 @@ pub fn task_missed_yield() {
 // TODO : timeout struct
 // * task.h 135
 
-#[derive(Debug)]
+#[derive(Debug,Default)]
 pub struct time_out {
     overflow_count: BaseType,
     time_on_entering: TickType,
@@ -128,7 +128,7 @@ pub fn task_check_for_timeout (pxtimeout: &mut time_out, ticks_to_wait: &mut Tic
 
 // TODO : vTaskPlaceOnEventList
 // * tasks.c 2820
-pub fn task_place_on_event_list (event_list: List, ticks_to_wait: TickType) {
+pub fn task_place_on_event_list (event_list:& List, ticks_to_wait: TickType) {
     // assert! ( event_list );
 
     /* THIS FUNCTION MUST BE CALLED WITH EITHER INTERRUPTS DISABLED OR THE

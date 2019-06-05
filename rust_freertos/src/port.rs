@@ -65,7 +65,7 @@ macro_rules! portSET_INTERRUPT_MASK_FROM_ISR {
 #[macro_export]
 macro_rules! portCLEAR_INTERRUPT_MASK_FROM_ISR {
     ($xMask: expr) => {
-        unsafe { crate::bindings::vPortClearInterruptMask(xMask as BaseType_t) }
+        unsafe { crate::bindings::vPortClearInterruptMask($xMask as BaseType) }
     };
 }
 
