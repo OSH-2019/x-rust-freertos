@@ -144,3 +144,13 @@ pub fn task_place_on_event_list (event_list: List, ticks_to_wait: TickType) {
 
     add_current_task_to_delayed_list( ticks_to_wait, true );
 }
+
+#[cfg(feature = "configUSE_MUTEXES")]
+pub fn task_increment_mutex_held_count() {
+    /* If xSemaphoreCreateMutex() is called before any tasks have been created
+       then pxCurrentTCB will be NULL. */
+    match get_current_task_handle_wrapped!() {
+        Some(current_task) => current_task.increment_mutex_held_count(),
+        None => ()
+    }
+}

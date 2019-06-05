@@ -263,6 +263,11 @@ impl task_control_block {
         self.delay_aborted = next_val;
         prev_val
     }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn increment_mutex_held_count(&mut self) {
+        self.mutexes_held += 1;
+    }
 }
 
 /* Task call wrapper function. */
@@ -445,6 +450,11 @@ impl TaskHandle {
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
     pub fn set_delay_aborted (&self, next_val: bool) -> bool {
         get_tcb_from_handle_mut!(self).set_delay_aborted(next_val)
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn increment_mutex_held_count(&self) {
+        get_tcb_from_handle_mut!(self).increment_mutex_held_count();
     }
 }
 
