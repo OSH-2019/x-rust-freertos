@@ -58,7 +58,7 @@ pub struct QueueDefinition<T>
 }
 
 type xQueue<T> = QueueDefinition<T>;
-type Queue<T> = QueueDefinition<T>;
+pub type Queue<T> = QueueDefinition<T>;
 /*
 impl Default for QueueUnion{
     fn default() -> Self {QueueUnion::pcReadFrom(0)}
