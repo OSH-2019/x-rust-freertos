@@ -284,6 +284,12 @@ impl task_control_block {
     }
 }
 
+impl PartialEq for TCB {
+    fn eq(&self, other: &Self) -> bool {
+        self.stack_pos == other.stack_pos
+    }
+}
+
 /* Task call wrapper function. */
 extern "C" fn run_wrapper(func_to_run: CVoidPointer) {
     info!(
@@ -342,6 +348,12 @@ pub fn initialize_task_list () {
  */
 #[derive(Clone)]
 pub struct TaskHandle(Arc<RwLock<TCB>>);
+
+impl PartialEq for TaskHandle {
+    fn eq(&self, other: &Self) -> bool {
+        *self.0.read().unwrap() == *other.0.read().unwrap()
+    }
+}
 
 impl TaskHandle {
     pub fn from_arc(arc: Arc<RwLock<TCB>>) -> Self {
