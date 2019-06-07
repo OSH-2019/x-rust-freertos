@@ -19,9 +19,6 @@ const taskEVENT_LIST_ITEM_VALUE_IN_USE: TickType = 0x8000;
 #[cfg(not(feature = "configUSE_16_BIT_TICKS"))]
 const taskEVENT_LIST_ITEM_VALUE_IN_USE: TickType = 0x80000000;
 
-// TODO : vTaskRemoveFromEventList
-// * task.c 2894
-
 pub fn task_remove_from_event_list (event_list:& List) -> bool {
     let unblocked_tcb = get_owner_of_head_entry!(event_list).unwrap();
     let unblocked_tcb = TaskHandle::from_arc(unblocked_tcb);
@@ -61,15 +58,9 @@ pub fn task_remove_from_event_list (event_list:& List) -> bool {
     xreturn
 }
 
-// TODO : vTaskMissedYield
-// * task.c 3076
-
 pub fn task_missed_yield() {
     set_yield_pending! (false);
 }
-
-// TODO : timeout struct
-// * task.h 135
 
 #[derive(Debug,Default)]
 pub struct time_out {
@@ -78,17 +69,11 @@ pub struct time_out {
 }
 
 
-// TODO : vTaskSetTimeOutState
-// * task.c 3007
-
 pub fn task_set_time_out_state ( pxtimeout: &mut time_out ){
     // assert! ( pxtimeout );
     pxtimeout.overflow_count = get_num_of_overflows!();
     pxtimeout.time_on_entering = get_tick_count!();
 }
-
-//  TODO : xTaskCheckForTimeOut
-// * task.c 3015
 
 pub fn task_check_for_timeout (pxtimeout: &mut time_out, ticks_to_wait: &mut TickType) -> bool {
     let mut xreturn: bool = false;
@@ -139,8 +124,6 @@ pub fn task_check_for_timeout (pxtimeout: &mut time_out, ticks_to_wait: &mut Tic
     xreturn
 }
 
-// TODO : vTaskPlaceOnEventList
-// * tasks.c 2820
 pub fn task_place_on_event_list (event_list:& List, ticks_to_wait: TickType) {
     // assert! ( event_list );
 
@@ -236,7 +219,7 @@ pub fn task_priority_disinherit(mutex_holder: Option<TaskHandle>) -> bool{
            interrupt, and if a mutex is given by the holding task then it must
            be the running state task. */
 
-        // TODO: is_current_task(). configASSERT( pxTCB == pxCurrentTCB );
+        assert!(task == get_current_task_handle!());
 
         let mutex_held = task.get_mutex_held_count();
         assert!(mutex_held > 0);
