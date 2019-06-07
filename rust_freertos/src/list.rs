@@ -400,7 +400,7 @@ macro_rules! list_remove {
     ($item:expr) => ({
         {
             let index = get_list_item_container!($item).unwrap() as usize;
-            list_remove!((global_lists.write().unwrap())[index], $item);
+            list_remove!((global_lists.write().unwrap())[index], $item)
         }
     });
     // konw the container 

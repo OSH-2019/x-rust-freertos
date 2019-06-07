@@ -27,6 +27,7 @@ default = [
 	"configUSE_MALLOC_FAILED_HOOK",
 	"configUSE_RECURSIVE_MUTEXES",
 	"configUSE_MUTEXES",
+	"configUSE_TRACE_FACILITY",
 	"configIDLE_SHOULD_YIELD",
 	# "configUSE_TICK_HOOK",
 	# "configUSE_IDLE_HOOK",

@@ -869,3 +869,13 @@ pub fn task_get_scheduler_state() -> SchedulerState {
         }
     }
 }
+
+/* Define away taskRESET_READY_PRIORITY() and portRESET_READY_PRIORITY() as
+   they are only required when a port optimised method of task selection is
+   being used. */
+#[macro_export]
+macro_rules! taskRESET_READY_PRIORITY {
+    ($uxPriority: expr) => (
+        
+    )
+}

@@ -25,6 +25,7 @@ pub mod kernel;
 mod queue;
 mod queue_h;
 mod task_queue;
+mod mutex;
 
 #[cfg(test)]
 mod tests {
