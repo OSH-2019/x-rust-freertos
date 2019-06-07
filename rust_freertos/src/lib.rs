@@ -25,7 +25,7 @@ pub mod kernel;
 mod queue;
 mod queue_h;
 mod task_queue;
-mod mutex;
+//mod mutex;
 
 #[cfg(test)]
 mod tests {
@@ -76,7 +76,7 @@ mod tests {
             let sum = 0;
             loop {
                 // receive方法的参数只有ticks_to_wait
-                if let Some(x) = v.receive(pdMS_TO_TICKS!(300)) {
+                if let Ok(x) = v.receive(pdMS_TO_TICKS!(300)) {
                     sum += x;
                 } else {
                     // 若等待300ms仍未收到数据，则认为发送结束。

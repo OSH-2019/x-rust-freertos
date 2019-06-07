@@ -68,10 +68,71 @@ pub enum ListName {
     TASKS_WAITING_TERMINATION,
     SUSPENDED_TASK_LIST,
 }
-#[derive(Debug)]
-struct TskTCB {
+// total lists' number
+static MAX_LIST_NUM: usize = 100;
+// system lists' number
+static KERNEL_LIST_NUM: usize = 15;
+/// if some list is being used, set MAP_LIST[list as usize] = 1, otherwise 0
+static mut MAP_LIST: Vec<UBaseType> = vec![0; MAX_LIST_NUM ];
 
+/// # Description
+/// * initialize the MAP_LIST, making the system lists mapping not available. 
+/// This should be called when system lists first created.
+/// # Argument
+/// * `Nothing` - 
+/// # Return
+/// * Nothing
+pub fn init_map_list() {
+    for i in 0..KERNEL_LIST_NUM {    
+        MAP_LIST[i] = 1;    
+    }
 }
+
+/// # Description
+/// * return the avalible list index
+/// # Argument
+/// * `Nothing` - 
+/// # Return
+/// * UBaseType : avalible list num
+pub fn get_next_available_list() -> UBaseType {
+    for i in 0..MAX_LIST_NUM {
+        if MAP_LIST[i] == 0 {
+            return i as UBaseType
+        }
+    }
+    0xFFFFFFFF as UBaseType
+}
+
+/// # Description
+/// * add a new list, return the list num
+/// # Argument
+/// * `Nothing` - 
+/// # Return
+/// * UBaseType : the index
+pub fn add_list() -> UBaseType {
+    let avail_index = get_next_available_list();
+    if avail_index == 0xFFFFFFFF {
+        panic!("there is no available list!");
+        return;
+    }
+    MAP_LIST[avail_index as usize] = 1;
+    avail_index
+}
+
+/// # Description
+/// * remove a list created, panic if this list has never been created yet.
+/// # Argument
+/// * `index` - the current list num to be removed 
+/// # Return
+/// * Nothing
+pub fn remove_list(index: UBaseType) {
+    if MAP_LIST[index as usize] == 0 {
+        panic!("attempt to remove a null list.");
+    } else {
+        MAP_LIST[index as usize] = 0;
+    }
+}
+
 
 #[derive(Debug)]
 pub struct ListItem {
@@ -83,23 +144,14 @@ pub struct ListItem {
     pub owner: Option<Arc<RwLock<task_control_block>>>,      // the TCB declaration is not defined
 }
 
-// impl ListItem {
-//     /// # Description
-//     /// * constructor
-//     /// # Argument
-//     /// * `item_value` - item_value
-//     /// # Return
-//     /// * Rc<RefCell<Self>>
-//     pub fn new(item_value: TickType) -> Rc<RefCell<Self>> {
-//         Rc::new(RefCell::new(ListItem {
-//             item_value: item_value,
-//             container: None,
-//             owner: None
-//         }))
-//     }
-// }
 
 impl ListItem {
+    /// # Description
+    /// * constructor
+    /// # Argument
+    /// * `item_value` - item_value
+    /// # Return
+    /// * Rc<RefCell<Self>>
     pub fn new(item_value: TickType) -> Arc<RwLock<ListItem>> {
         Arc::new(RwLock::new(ListItem {
             item_value: item_value,
@@ -124,19 +176,7 @@ macro_rules! LIST_new {
         Arc::new(RwLock::new(vec![]))
     })
 }
-// /// # Description
-// /// set list item's owner
-// /// # Arguments
-// /// $item: Rc<RefCell<ListItem>>
-// /// $owner: Rc<RefCell<TCB>>
-// /// #Return
-// /// Nothing
-// #[macro_export]
-// macro_rules! set_list_item_owner {
-//     ($item:expr, $owner:expr) => ({
-//         $item.borrow_mut().owner = Some(Rc::clone(&$owner));
-//     });
-// }
+
 /// # Description
 /// set list item's owner
 /// # Arguments
@@ -151,7 +191,13 @@ macro_rules! set_list_item_owner {
     });
 }
 
-
+/// # Description
+/// * set list item hash value
+/// # Argument
+/// * `$item` - list item
+/// * `$value` - list hash value
+/// # Return
+/// * Nothing
 #[macro_export]
 macro_rules! set_list_item_hash {
     ($item:expr, $value:expr) => ({
@@ -181,25 +227,7 @@ macro_rules! get_list_item_owner {
     });
 }
 
-/// # Description
-/// get list item's owner
-/// # Arguments
-/// $ietm: Rc<Refcell<ListItem>>
-/// #Return
-/// Option<Rc<RefCell<TCB>>>
-// #[macro_export]
-// macro_rules! get_list_item_owner {
-//     ($item:expr) => ({
-//         match $item.read().unwrap().owner {
-//             Some(owner) => {
-//                 Arc::clone(&owner)
-//             },
-//             None => {
-//                 None
-//             }
-//         }
-//     });
-// }
+
 
 /// # Description
 /// get owner of next entry
@@ -361,29 +389,6 @@ macro_rules! list_remove_inner {
         }
     })
 }
-
-
-/// # Description
-/// map the container to index
-/// # Arguments
-/// $item: ListItem
-/// #Return
-/// Nothing
-// #[macro_export]
-// macro_rules!  get_list_container_mapped_index {
-//         ($item:expr) => ({
-//             {
-//                 match $item.read().unwrap().container {
-//                 ListName::LIST0 => 0,
-//                 ListName::LIST1 => 1,
-//                 ListName::LIST2 => 2;
-//                 ListName::LIST3 => 3;
-//                 ListName::LIST4 => 4;
-//                 _               => 0;
-//                 }
-//             }
-//     });
-// }
 
 
 /// # Description
