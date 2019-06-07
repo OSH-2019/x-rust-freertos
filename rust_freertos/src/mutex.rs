@@ -56,7 +56,7 @@ impl Mutex {
     /// 
     /// # Return
     #[cfg(all(feature = "configUSE_MUTEXES", feature = "INCLUDE_xSemaphoreGetMutexHolder"))]
-    fn get_mutex_holder(& mut self) -> Option<TaskHandle> {
+    fn get_mutex_holder(&mut self) -> Option<TaskHandle> {
         let mut mutex_holder: Option<TaskHandle>;
         taskENTER_CRITICAL!();
         {
@@ -66,12 +66,23 @@ impl Mutex {
         mutex_holder
     }
 
-    fn get_mutex(&self, Item:TaskHandle) -> (Result<(), QueueError>) {
-        self.0.send_to_back(Some(Item), 0)
+    fn get_mutex(&mut self, Item:TaskHandle) -> (Result<(), QueueError>) {
+        //FIXME:make sure the mutex is not occupied!
+        match self.0.peek(xTicksToWait: TickType) {
+            Some() => expr,
+            None() => Err(expr),
+        }
     }
 
-    fn release_mutex(&self) -> (Result<(), QueueError>) {
-        self.0.overwrite(None)
+    fn release_mutex(&mut self) -> (Result<(), QueueError>) {
+        //insure the one release the mutex equal to the mutex holder
+        let mut mutex_holder : TaskHandle = self.get_mutex_holder().unwrap();
+        //FIXME:==
+        if mutex_holder == get_current_task_handle!() {
+            self.0.overwrite(None)    
+        }
+        else {
+            unimplemented!();
+        }
     }
-
 }
