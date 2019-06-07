@@ -7,6 +7,7 @@ use crate::*;
 use std::boxed::FnBox;
 use std::sync::{Arc, RwLock};
 use std::mem;
+use std::ops;
 
 //* task states
 #[derive(Copy, Clone, Debug)]
@@ -572,12 +573,12 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
             if time_to_wake < get_tick_count!() {
                 /* Wake time has overflowed.  Place this item in the overflow
                    list. */
-                list_insert! ( get_list!(OVERFLOW_DELAYED_TASK_LIST), 
+                list_insert! ( get_list!(OVERFLOW_DELAYED_TASK_LIST),
                                unwrapped_cur.get_state_list_item() );
             } else {
                 /* The wake time has not overflowed, so the current block list
                    is used. */
-                list_insert! ( get_list!(DELAYED_TASK_LIST), 
+                list_insert! ( get_list!(DELAYED_TASK_LIST),
                                unwrapped_cur.get_state_list_item() );
 
                 /* If the task entering the blocked state was placed at the
@@ -633,6 +634,62 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
 }
 
 
+pub fn reset_next_task_unblock_time () {
+    if list_is_empty! (DELAYED_TASK_LIST) {
+		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
+		the maximum possible value so it is	extremely unlikely that the
+		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
+		there is an item in the delayed list. */
+        set_next_task_unblock_time! (portMAX_DELAY);
+    }
+    else {
+		/* The new current delayed list is not empty, get the value of
+		the item at the head of the delayed list.  This is the time at
+		which the task at the head of the delayed list should be removed
+		from the Blocked state. */
+        let temp = get_owner_of_head_entry! (DELAYED_TASK_LIST);
+        set_next_task_unblock_time! (temp.get_state_list_item());
+    }
+}
+
+pub fn task_delete (task_to_delete: TaskHandle)
+{
+    taskENTER_CRITICAL!();
+    {
+        /* If null is passed in here then it is the calling task that is
+		being deleted. */
+        let mut pxtcb = get_tcb_from_handle! (task_to_delete);
+
+        /* Remove task from the ready list. */
+        if list_remove! (pxtcb.get_state_list_item())
+        {
+            taskRESET_READY_PRIORITY!(pxtcb.get_priority());
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER!();
+        }
+
+        /* Is the task waiting on an event also? */
+		if get_list_item_container! (pxtcb.get_event_list_item ())
+        {
+            list_remove! (pxtcb.get_event_list_item())
+        }else {
+            mtCOVERAGE_TEST_MARKER!();
+        }
+
+
+        /* Increment the uxTaskNumber also so kernel aware debuggers can
+        detect that the task lists need re-generating.  This is done before
+        portPRE_TASK_DELETE_HOOK() as in the Windows port that macro will
+        not return. */
+
+		set_task_number!(get_task_number!() + 1);
+
+        if pxtcb == get_current_task_handle! ()
+		{
+        }
+    }
+}
 /*
 
 /*
