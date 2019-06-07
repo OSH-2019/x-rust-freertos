@@ -2,13 +2,18 @@ use crate::queue::*;
 use crate::task_control::*;
 use crate::queue_h::*;
 use crate::*;
+use crate::port::*;
+//use crate::task_queue::*;
 
 #[derive(Default)]
 #[cfg(feature = "configUSE_MUTEXES")]
-pub struct Mutex(Queue<Option<TaskHandle>>);
+pub struct Semaphore(Queue<Option<TaskHandle>>);
+
+pub type Mutex = Semaphore;
+
 
 #[cfg(feature = "configUSE_MUTEXES")]
-impl Mutex {
+impl Semaphore {
     /// # Description
     /// 
     /// # Argument
@@ -32,7 +37,7 @@ impl Mutex {
 
         traceCREATE_MUTEX!(self);
 
-        self.0.send_to_back(None, 0);
+        self.0.queue_generic_send(None, 0 as TickType, queueSEND_TO_BACK);
     }
 
     /// # Description
@@ -42,7 +47,7 @@ impl Mutex {
     /// # Return
     #[cfg(all(feature = "configUSE_MUTEXES", feature = "configSUPPORT_DYNAMIC_ALLOCATION"))]
     fn mutex_create() -> Self {
-        let mut mutex: Mutex = Mutex(Queue::new_type(1, QueueType::Mutex));
+        let mut mutex: Mutex = Semaphore(Queue::new_type(1, QueueType::Mutex));
         mutex.initialise_mutex();
         mutex
     }
@@ -66,23 +71,25 @@ impl Mutex {
         mutex_holder
     }
 
-    fn get_mutex(&mut self, Item:TaskHandle) -> (Result<(), QueueError>) {
-        //FIXME:make sure the mutex is not occupied!
-        match self.0.peek(xTicksToWait: TickType) {
-            Some() => expr,
-            None() => Err(expr),
-        }
+    fn get_mutex(&mut self, xBlockTime: TickType) -> Result<Option<TaskHandle>, QueueError> {
+        self.semaphore_take(xBlockTime)
+    }
+
+    fn semaphore_take(&mut self,xBlockTime: TickType) -> Result<Option<TaskHandle>, QueueError> {
+        self.0.queue_generic_receive(xBlockTime, false)
     }
 
     fn release_mutex(&mut self) -> (Result<(), QueueError>) {
         //insure the one release the mutex equal to the mutex holder
-        let mut mutex_holder : TaskHandle = self.get_mutex_holder().unwrap();
-        //FIXME:==
-        if mutex_holder == get_current_task_handle!() {
-            self.0.overwrite(None)    
-        }
-        else {
-            unimplemented!();
-        }
+        self.semaphore_give()
     }
+
+    fn semaphore_give(&mut self) -> Result<(), QueueError> {
+        self.0.queue_generic_send(None, semGIVE_BLOCK_TIME, queueSEND_TO_BACK)
+    }
+/*
+    fn name(arg: Type) -> RetType {
+        unimplemented!();
+    }
+*/
 }
