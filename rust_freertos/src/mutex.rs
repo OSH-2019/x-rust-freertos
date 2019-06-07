@@ -10,7 +10,7 @@ use crate::port::*;
 pub struct Semaphore(Queue<Option<TaskHandle>>);
 
 pub type Mutex = Semaphore;
-
+pub type BinarySemaphore = Semaphore;
 
 #[cfg(feature = "configUSE_MUTEXES")]
 impl Semaphore {
@@ -22,8 +22,6 @@ impl Semaphore {
     fn new() -> Self {
         Mutex::mutex_create()
     }
-
-
 
     /// # Description
     /// 
@@ -87,9 +85,27 @@ impl Semaphore {
     fn semaphore_give(&mut self) -> Result<(), QueueError> {
         self.0.queue_generic_send(None, semGIVE_BLOCK_TIME, queueSEND_TO_BACK)
     }
-/*
+
+    /// # Description
+    /// This type of semaphore can be used for pure synchronisation between tasks or
+    /// between an interrupt and a task.  The semaphore need not be given back once
+    /// obtained, so one task/interrupt can continuously 'give' the semaphore while
+    /// another continuously 'takes' the semaphore.  For this reason this type of
+    /// semaphore does not use a priority inheritance mechanism.  For an alternative
+    /// that does use priority inheritance see xSemaphoreCreateMutex().
+    /// old version
+    /// fn semaphore_create_binary() -> Semaphore {
+    ///    let mut binary_semaphore: BinarySemaphore = Semaphore(Queue::new_type(1, QueueType::BinarySemaphre));
+    ///    binary_semaphore.semaphore_give();
+    ///    binary_semaphore
+    ///}
+    /// new version
+    fn semaphore_create_binary() -> Semaphore {
+        Semaphore(Queue::new_type(1, QueueType::BinarySemaphre)
+    }
+    /*
     fn name(arg: Type) -> RetType {
         unimplemented!();
     }
-*/
+    */
 }
