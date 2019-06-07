@@ -350,7 +350,7 @@ pub fn initialize_task_list () {
 #[derive(Clone)]
 pub struct TaskHandle(Arc<RwLock<TCB>>);
 
-impl PartialEq for TaskHandle {
+pub impl PartialEq for TaskHandle {
     fn eq(&self, other: &Self) -> bool {
         *self.0.read().unwrap() == *other.0.read().unwrap()
     }
