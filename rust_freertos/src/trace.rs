@@ -150,7 +150,7 @@ macro_rules! traceQUEUE_CREATE_FAILED {
 #[macro_export]
 macro_rules! traceCREATE_MUTEX {
     ($pxNewQueue: expr) => {
-        trace!("Created mutex {}", $pxNewQueue.get_queue_number());
+        trace!("Created mutex {}", $pxNewQueue.0.get_queue_number());
     };
 }
 

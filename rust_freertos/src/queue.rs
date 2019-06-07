@@ -479,13 +479,16 @@ impl <T>QueueDefinition<T>
                         traceQUEUE_RECEIVE!(&self);    
                         /* actually removing data, not just peeking. */
                         self.uxMessagesWaiting = uxMessagesWaiting - 1;
+                        
                         {
                             #![cfg(feature = "configUSE_MUTEXES")]
-                            /*== mutex | ……？*/
-                            if self.ucQueueType == QueueType::Mutex{
-                                /*actually uxQueueType == pcHead */
-                                self.pcTail = task_increment_mutex_held_count();
-                                /*actually pxMutexHolder == pcTail*/
+                            /*if uxQueueType == queueQUEUE_IS_MUTEX*/
+                            if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex{
+                                ///// 
+                                let mutex_holder = transed_task_handle_to_T(task_increment_mutex_held_count());
+                                self.pcQueue.pop_front();
+                                self.pcQueue.insert(0,mutex_holder);
+                                //self.pxMutexHolder = task_increment_mutex_held_count();
                             }
                             else {
                                 mtCOVERAGE_TEST_MARKER!();
@@ -554,17 +557,11 @@ impl <T>QueueDefinition<T>
                     traceBLOCKING_ON_QUEUE_RECEIVE!(&self);
                     {
                         #![cfg(feature = "configUSE_MUTEXES")]
-                        if self.pcHead == queueQUEUE_IS_MUTEX {
+                        if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex{
                             /* actually uxQueueType == pcHead */
                             taskENTER_CRITICAL!();
                             {
-                                let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
-                                let untransed_task_handle = Box::new(untransed_task_handle);
-                                let mut task_handle: Option<task_control::TaskHandle>;
-                                unsafe{
-                                    let transed_task_handle = std::mem::transmute::<Box<T>,Box<Option<task_control::TaskHandle>>>(untransed_task_handle);
-                                    task_handle = *transed_task_handle;
-                                }
+                                let task_handle = self.transed_task_handle_for_mutex();
                                 task_queue::task_priority_inherit(task_handle);
                             }
                             taskEXIT_CRITICAL!();
@@ -624,26 +621,21 @@ impl <T>QueueDefinition<T>
         /* This function is called from a critical section. */
         let mut xReturn:bool = false;
         let mut uxMessagesWaiting:UBaseType = self.uxMessagesWaiting;
+        /* This function is called from a critical section. */
         
-        /* 未完成信号量部分处理*/
-        /* 
         {
             #![cfg(configUSE_MUTEXES)]
-            if self.uxQueueType == queueQUEUE_IS_MUTEX {
-                let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
-                let untransed_task_handle = Box::new(untransed_task_handle);
-                let mut task_handle: Option<task_control::TaskHandle>;
-                unsafe{
-                    let transed_task_handle = std::mem::transmute::<Box<T>,Box<Option<task_control::TaskHandle>>>(untransed_task_handle);
-                    task_handle = *transed_task_handle;
-                }
+            if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex {
+                let task_handle = self.transed_task_handle_for_mutex(); 
                 xReturn = task_priority_disinherit(task_handle);
-                self.pxMutexHolder = None;////still wrong
+                self.pcQueue.pop_front();
+                self.insert(0,None);
+                //self.pxMutexHolder = None;
             }
             else {
                 mtCOVERAGE_TEST_MARKER!();
             }
-        }*/
+        }
 
         if xPosition == queueSEND_TO_BACK{
             self.pcQueue.insert(self.pcWriteTo as usize,pvItemToQueue);
@@ -757,7 +749,7 @@ impl <T>QueueDefinition<T>
     pub fn send_to_front(&mut self,pvItemToQueue:T,xTicksToWait:TickType)-> (Result<(), QueueError>){
         self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_FRONT)
     }
-    
+
     /// # Description
     /// * Post an item to the back of a queue.
     /// 
@@ -902,7 +894,32 @@ impl <T>QueueDefinition<T>
     fn notify_queue_set_container(&self, xCopyPosition: BaseType) {
         unimplemented!();
     }
+    
 
+    fn transed_task_handle_for_mutex(&self) -> Option<task_control::TaskHandle>{
+        /* use unsafe to get transed_task_handle for mutex
+         * inplemented by: Ning Yuting
+         */
+        let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
+        let untransed_task_handle = Box::new(untransed_task_handle);
+        let mut task_handle: Option<task_control::TaskHandle>;
+        unsafe{
+            let transed_task_handle = std::mem::transmute::<Box<T>,Box<Option<task_control::TaskHandle>>>(untransed_task_handle);
+            task_handle = *transed_task_handle
+        }
+        task_handle
+    }
+
+}
+
+fn transed_task_handle_to_T<T>(task_handle:Option<task_control::TaskHandle>) -> T{
+    let mut T_type:T;
+    let task_handle = Box::new(task_handle);
+    unsafe{
+        let transed_T = std::mem::transmute::<Box<Option<task_control::TaskHandle>>,Box<T>>(task_handle);
+        T_type = *transed_T;
+    }
+    T_type
 }
 
 #[macro_export]
