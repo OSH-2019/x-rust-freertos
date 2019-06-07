@@ -7,6 +7,7 @@ use crate::*;
 use std::boxed::FnBox;
 use std::sync::{Arc, RwLock};
 use std::mem;
+use std::ops;
 
 //* task states
 #[derive(Copy, Clone, Debug)]
@@ -524,6 +525,15 @@ macro_rules! get_tcb_from_handle_mut {
     };
 }
 
+pub fn delete_tcb (tcb_to_delete : TCB)
+{
+    /* This call is required specifically for the TriCore port.  It must be
+	above the vPortFree() calls.  The call is also used by ports/demos that
+	want to allocate and clean RAM statically. */
+
+    port_free (tcb_to_delete.stack_pos);
+}
+
 // TODO : prvAddCurrentTaskToDelayedList tasks.c 4692
 pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_indefinitely: bool) {
 
@@ -572,12 +582,12 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
             if time_to_wake < get_tick_count!() {
                 /* Wake time has overflowed.  Place this item in the overflow
                    list. */
-                list_insert! ( get_list!(OVERFLOW_DELAYED_TASK_LIST), 
+                list_insert! ( get_list!(OVERFLOW_DELAYED_TASK_LIST),
                                unwrapped_cur.get_state_list_item() );
             } else {
                 /* The wake time has not overflowed, so the current block list
                    is used. */
-                list_insert! ( get_list!(DELAYED_TASK_LIST), 
+                list_insert! ( get_list!(DELAYED_TASK_LIST),
                                unwrapped_cur.get_state_list_item() );
 
                 /* If the task entering the blocked state was placed at the
@@ -633,117 +643,160 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
 }
 
 
-/*
-
-/*
-TODO : prvResetNextTaskUnblockTime list.c : 551
-TODO : prvDeleteTCB list.c : 480
-*/
-pub prv_reset_next_task_unblock_time () {
-    if (list_is_empty!(pxDelayedTaskList))
-    {
-        xNextTaskUnblockTime = portMAX_DELAY;
+pub fn reset_next_task_unblock_time () {
+    if list_is_empty! (get_list!(DELAYED_TASK_LIST)) {
+		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
+		the maximum possible value so it is	extremely unlikely that the
+		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
+		there is an item in the delayed list. */
+        set_next_task_unblock_time! (portMAX_DELAY);
     }
     else {
-        ( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
-        xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xStateListItem ) );
-
+		/* The new current delayed list is not empty, get the value of
+		the item at the head of the delayed list.  This is the time at
+		which the task at the head of the delayed list should be removed
+		from the Blocked state. */
+        let temp = get_owner_of_head_entry! (get_list!(DELAYED_TASK_LIST));
+        set_next_task_unblock_time! (temp.get_state_list_item());
     }
 }
 
-pub fn delete_task (task_to_delete: task_handle){
-    let mut px_tcb: *mut task_control_block;
-    taskENTER_CRITICAL!(){
-        px_tcb = get_tcb_from_handle (task_to_delete);
-        if list_remove!(&px_tcb.state_list_item) == 0 {
-            task_reset_ready_priority (&px_tcb.priority);
+pub fn task_delete (task_to_delete: TaskHandle)
+{
+    taskENTER_CRITICAL!();
+    {
+        /* If null is passed in here then it is the calling task that is
+		being deleted. */
+        let mut pxtcb = get_tcb_from_handle! (task_to_delete);
+
+        /* Remove task from the ready list. */
+        if list_remove! (pxtcb.get_state_list_item()) == 0
+        {
+            taskRESET_READY_PRIORITY!(pxtcb.get_priority());
         }
         else {
             mtCOVERAGE_TEST_MARKER!();
         }
 
-        if get_list_item_container(&px_tcb.event_list_item).is_some() {
-            list_remove!(&px_tcb.state_list_item);
-        }
-        else {
-            mtCOVERAGE_TEST_MARKER! ();
+        /* Is the task waiting on an event also? */
+		if get_list_item_container! (pxtcb.get_event_list_item ())
+        {
+            list_remove! (pxtcb.get_event_list_item())
+        }else {
+            mtCOVERAGE_TEST_MARKER!();
         }
 
-        set_task_number!(get_task_number!()+1);
-        if px_tcb == CURRENT_TCB {
-            list_insert_end!(task_waiting_termination,px_tcb.state_list_item);
-            deleted_tasks_waiting_clean_up += 1;
-            //!FIXME YeildPending
-            portPRE_TASK_DELETE_HOOK! (px_tcb,YeildPending);
-        }
-        else {
-            set_task_number!(get_task_number!()-1);
-            //!FIXME todo
-            delete_tcb(pc_tcb);
-            reset_next_task_unblock_time ();
-        }
-        //!FIXME todo
-        trace_task_delete();
-    }taskEXIT_CRITICAL!();
 
-    if get_scheduler_running!(){
-        config_assert (schedule_suspended == 0 ? 1 : 0);
-        portYIELD_WITHIN_API! ();
+        /* Increment the uxTaskNumber also so kernel aware debuggers can
+        detect that the task lists need re-generating.  This is done before
+        portPRE_TASK_DELETE_HOOK() as in the Windows port that macro will
+        not return. */
+
+		set_task_number!(get_task_number!() + 1);
+
+        if *pxtcb == get_current_task_handle!()
+		{
+            /* A task is deleting itself.  This cannot complete within the
+            task itself, as a context switch to another task is required.
+            Place the task in the termination list.  The idle task will
+            check the termination list and free up any memory allocated by
+            the scheduler for the TCB and stack of the deleted task. */
+            list_insert_end! ( TASKS_WAITING_TERMINATION, pxtcb.get_state_list_item()  );
+
+            /* Increment the ucTasksDeleted variable so the idle task knows
+            there is a task that has been deleted and that it should therefore
+            check the xTasksWaitingTermination list. */
+            DELETED_TASKS_WAITING_CLEAN_UP = DELETED_TASKS_WAITING_CLEAN_UP + 1;
+
+            /* The pre-delete hook is primarily for the Windows simulator,
+            in which Windows specific clean up operations are performed,
+            after which it is not possible to yield away from this task -
+            hence xYieldPending is used to latch that a context switch is
+            required. */
+            portPRE_TASK_DELETE_HOOK!( pxtcb, get_yield_pending!() );
+        }
+        else{
+                set_current_number_of_tasks! (get_current_number_of_tasks!() - 1);
+
+				delete_tcb ( *pxtcb );
+
+				/* Reset the next expected unblock time in case it referred to
+				the task that has just been deleted. */
+				reset_next_task_unblock_time ();
+
+		}
+        // FIXME
+		//traceTASK_DELETE!(task_to_delete);
     }
-    else {
-        mtCOVERAGE_TEST_MARKER! ();
-    }
+	taskEXIT_CRITICAL!();
+
+    let mut pxtcb = get_tcb_from_handle! (task_to_delete);
+
+		/* Force a reschedule if it is the currently running task that has just
+		been deleted. */
+		if get_scheduler_suspended!() > 0
+		{
+			if *pxtcb == get_current_task_handle!()
+			{
+				assert!( get_scheduler_suspended!() == 0 );
+				portYIELD_WITHIN_API! ();
+			}
+			else
+			{
+				mtCOVERAGE_TEST_MARKER! ();
+			}
+		}
 }
 
-pub fn suspend_task (task_to_suspend: task_handle){
-    let mut px_tcb: *mut task_control_block;
-    taskENTER_CRITICAL!(){
-        px_tcb = get_tcb_from_handle (task_to_suspend);
-        traceTASK_SUSPEND(&px_tcb);
-        if list_remove!(px_tcb.unwrap().state_list_item) == 0 {
-            task_reset_ready_priority (&px_tcb.unwrap().priority);
+pub fn suspend_task (task_to_suspend: TaskHandle){
+    let mut px_tcb = get_tcb_from_handle! (task_to_suspend);
+    taskENTER_CRITICAL!()
+    {
+        //traceTASK_SUSPEND!(&px_tcb);
+        if list_remove!(px_tcb.get_state_list_item()) == 0 {
+            taskRESET_READY_PRIORITY! (px_tcb.get_priority());
         }
         else {
             mtCOVERAGE_TEST_MARKER! ();
         }
 
-        if get_list_item_container!(px_tcb.unwrap().event_list_item).is_some() {
-            list_remove!(px_tcb.unwrap().state_list_item);
+        if get_list_item_container!(px_tcb.get_event_list_item()).is_some() {
+            list_remove!(px_tcb.get_state_list_item());
         }
         else {
             mtCOVERAGE_TEST_MARKER! ();
         }
-        list_insert_end!(task_waiting_termination,px_tcb.unwrap().state_list_item);
+        list_insert_end!(TASKS_WAITING_TERMINATION,px_tcb.get_state_list_item());
     }taskEXIT_CRITICAL!();
 
-    if get_scheduler_running!(){
+    if get_scheduler_running!() > 0 {
         taskENTER_CRITICAL!(){
-            prv_reset_next_task_unblock_time();
+            reset_next_task_unblock_time();
         }taskEXIT_CRITICAL!();
     }
     else {
         mtCOVERAGE_TEST_MARKER! ();
     }
 
-    if px_tcb == CURRENT_TCB {
+    if *px_tcb == get_current_task_handle!() {
         if get_scheduler_running!(){
-            config_assert (schedule_suspended == 0 ? 1 : 0);
+            assert! (get_scheduler_suspended!() == 0 ? 1 : 0);
             portYIELD_WITHIN_API! ();
         }
         else {
-            if current_list_length!(SUSPEND_TASK_LIST) == get_current_number_of_tasks!() {
+           /* if current_list_length!(SUSPEND_TASK_LIST) == get_current_number_of_tasks!() {
                 px_tcb = None;
             }
             else {
                 task_switch_context();
-            }
+            }*/
         }
     }
     else {
         mtCOVERAGE_TEST_MARKER!()
     }
 }
-
+/*
 pub fn resume_task (task_to_resume: task_handle){
     let mut px_tcb: *mut task_control_block;
     config_assert (task_to_resume);
