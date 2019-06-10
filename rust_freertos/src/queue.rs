@@ -57,8 +57,8 @@ pub struct QueueDefinition<T>
 
 }
 
-type xQueue<T> = QueueDefinition<T>;
-pub type Queue<T> = QueueDefinition<T>;
+//type xQueue<T> = QueueDefinition<T>;
+//pub type Queue<T> = QueueDefinition<T>;
 /*
 impl Default for QueueUnion{
     fn default() -> Self {QueueUnion::pcReadFrom(0)}
@@ -77,7 +77,7 @@ impl <T>QueueDefinition<T>
     ///
     #[cfg(feature = "configSUPPORT_DYNAMIC_ALLOCATION")]
     pub fn queue_generic_create ( uxQueueLength:UBaseType, ucQueueType:QueueType) -> Self {
-        let mut queue:Queue<T>=Default::default();
+        let mut queue:QueueDefinition<T>=Default::default();
         queue.pcQueue =  VecDeque::with_capacity(uxQueueLength as usize);
         queue.initialise_new_queue(uxQueueLength,ucQueueType);
         queue
@@ -159,7 +159,7 @@ impl <T>QueueDefinition<T>
     ///
     /// # Return
     ///
-    pub fn queue_generic_send(&mut self, pvItemToQueue: T, xTicksToWait: TickType, xCopyPosition: BaseType) -> (Result<(), QueueError>){
+    pub fn queue_generic_send(&mut self, pvItemToQueue: T, xTicksToWait: TickType, xCopyPosition: BaseType) -> Result<(), QueueError>{
         let mut xEntryTimeSet: bool = false;
         let mut xYieldRequired: bool = true;
         /*use default to solve the error:unitialized xTimeOut*/
@@ -714,6 +714,8 @@ impl <T>QueueDefinition<T>
 
     /*some api in queue.h*/
 
+    /*
+     * queue APIs are implemented in queue_api.rs
     /// # Description:
     /// * Creates a new queue instance, and returns a handle by which the new queue can be referenced.
     /// * Implemented by: Ning Yuting.
@@ -725,14 +727,17 @@ impl <T>QueueDefinition<T>
     /// # Return
     ///
     pub fn new(uxQueueLength:UBaseType) -> Self {
-        Queue::queue_generic_create(uxQueueLength,QueueType::Base)
+        QueueDefinition::queue_generic_create(uxQueueLength,QueueType::Base)
+    }*/
+    
+    /* `new` has two arguments now:length, QueueType.
+     * Remember to add QueueType when using it.
+     */
+    pub fn new(uxQueueLength:UBaseType, QueueType:QueueType) -> Self{
+        QueueDefinition::queue_generic_create(uxQueueLength,QueueType)
     }
     
-
-    pub fn new_type(uxQueueLength:UBaseType, QueueType:QueueType) -> Self{
-        Queue::queue_generic_create(uxQueueLength,QueueType)
-    }
-
+    /*
     /// # Description
     /// * Post an item to the back of a queue.
     /// 
@@ -746,7 +751,7 @@ impl <T>QueueDefinition<T>
     /// 
     /// # Return
     /// * true if the item was successfully posted, otherwise errQUEUE_FULL.
-    pub fn send_to_front(&mut self,pvItemToQueue:T,xTicksToWait:TickType)-> (Result<(), QueueError>){
+    pub fn send_to_front(&mut self,pvItemToQueue:T,xTicksToWait:TickType)-> Result<(), QueueError>{
         self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_FRONT)
     }
 
@@ -761,7 +766,7 @@ impl <T>QueueDefinition<T>
     /// 
     /// # Return
     /// * same to queue_send_to_front
-    pub fn send_to_back(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> (Result<(), QueueError>){
+    pub fn send_to_back(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> Result<(), QueueError>{
         self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_BACK)
     }
     
@@ -776,7 +781,7 @@ impl <T>QueueDefinition<T>
     /// 
     /// # Return
     /// * same to queue_send_to_back()
-    pub fn send(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> (Result<(), QueueError>){
+    pub fn send(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> Result<(), QueueError>{
         self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_BACK)
     }
 
@@ -878,6 +883,7 @@ impl <T>QueueDefinition<T>
     pub fn peek(&mut self,xTicksToWait:TickType) -> Result<T, QueueError>{
         self.queue_generic_receive(xTicksToWait,true)
     }
+    */
 
     #[cfg(feature = "configUSE_TRACE_FACILITY")]
     pub fn get_queue_number(&self) -> UBaseType{
