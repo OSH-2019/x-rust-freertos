@@ -525,13 +525,13 @@ macro_rules! get_tcb_from_handle_mut {
     };
 }
 
-pub fn delete_tcb (tcb_to_delete : TCB)
+pub fn delete_tcb (tcb_to_delete :std::sync::RwLockReadGuard<'_, task_control::task_control_block>)
 {
     /* This call is required specifically for the TriCore port.  It must be
 	above the vPortFree() calls.  The call is also used by ports/demos that
 	want to allocate and clean RAM statically. */
 
-    port_free (tcb_to_delete.stack_pos);
+    //port_free (*tcb_to_delete.stack_pos);
 }
 
 // TODO : prvAddCurrentTaskToDelayedList tasks.c 4692
@@ -656,8 +656,8 @@ pub fn reset_next_task_unblock_time () {
 		the item at the head of the delayed list.  This is the time at
 		which the task at the head of the delayed list should be removed
 		from the Blocked state. */
-        let temp = get_owner_of_head_entry! (get_list!(DELAYED_TASK_LIST));
-        set_next_task_unblock_time! (temp.get_state_list_item());
+        let mut temp = get_owner_of_head_entry! (get_list!(DELAYED_TASK_LIST));
+        set_next_task_unblock_time! (get_list_item_value!(temp.clone().unwrap().read().unwrap().get_state_list_item()));
     }
 }
 
@@ -667,11 +667,10 @@ pub fn task_delete (task_to_delete: TaskHandle)
     {
         /* If null is passed in here then it is the calling task that is
 		being deleted. */
-        let mut pxtcb = get_tcb_from_handle! (task_to_delete);
+        let pxtcb = get_tcb_from_handle! (task_to_delete);
 
         /* Remove task from the ready list. */
-        if list_remove! (pxtcb.get_state_list_item()) == 0
-        {
+        if list_remove! (pxtcb.get_state_list_item()) == 0 {
             taskRESET_READY_PRIORITY!(pxtcb.get_priority());
         }
         else {
@@ -679,9 +678,8 @@ pub fn task_delete (task_to_delete: TaskHandle)
         }
 
         /* Is the task waiting on an event also? */
-		if get_list_item_container! (pxtcb.get_event_list_item ())
-        {
-            list_remove! (pxtcb.get_event_list_item())
+		if get_list_item_container! (pxtcb.get_event_list_item ()).is_some() {
+            list_remove! (pxtcb.get_event_list_item());
         }else {
             mtCOVERAGE_TEST_MARKER!();
         }
@@ -694,20 +692,21 @@ pub fn task_delete (task_to_delete: TaskHandle)
 
 		set_task_number!(get_task_number!() + 1);
 
-        if *pxtcb == get_current_task_handle!()
+        if *pxtcb == *get_tcb_from_handle! (get_current_task_handle!())
 		{
             /* A task is deleting itself.  This cannot complete within the
             task itself, as a context switch to another task is required.
             Place the task in the termination list.  The idle task will
             check the termination list and free up any memory allocated by
             the scheduler for the TCB and stack of the deleted task. */
-            list_insert_end! ( TASKS_WAITING_TERMINATION, pxtcb.get_state_list_item()  );
+            list_insert_end! ( get_list!(TASKS_WAITING_TERMINATION), pxtcb.get_state_list_item()  );
 
             /* Increment the ucTasksDeleted variable so the idle task knows
             there is a task that has been deleted and that it should therefore
             check the xTasksWaitingTermination list. */
-            DELETED_TASKS_WAITING_CLEAN_UP = DELETED_TASKS_WAITING_CLEAN_UP + 1;
-
+            unsafe{
+                DELETED_TASKS_WAITING_CLEAN_UP = DELETED_TASKS_WAITING_CLEAN_UP + 1;
+            }
             /* The pre-delete hook is primarily for the Windows simulator,
             in which Windows specific clean up operations are performed,
             after which it is not possible to yield away from this task -
@@ -718,12 +717,11 @@ pub fn task_delete (task_to_delete: TaskHandle)
         else{
                 set_current_number_of_tasks! (get_current_number_of_tasks!() - 1);
 
-				delete_tcb ( *pxtcb );
+				delete_tcb ( pxtcb );
 
 				/* Reset the next expected unblock time in case it referred to
 				the task that has just been deleted. */
 				reset_next_task_unblock_time ();
-
 		}
         // FIXME
 		//traceTASK_DELETE!(task_to_delete);
@@ -736,7 +734,7 @@ pub fn task_delete (task_to_delete: TaskHandle)
 		been deleted. */
 		if get_scheduler_suspended!() > 0
 		{
-			if *pxtcb == get_current_task_handle!()
+			if *pxtcb == *get_tcb_from_handle!( get_current_task_handle!())
 			{
 				assert!( get_scheduler_suspended!() == 0 );
 				portYIELD_WITHIN_API! ();
@@ -750,9 +748,9 @@ pub fn task_delete (task_to_delete: TaskHandle)
 
 pub fn suspend_task (task_to_suspend: TaskHandle){
     let mut px_tcb = get_tcb_from_handle! (task_to_suspend);
-    taskENTER_CRITICAL!()
+    taskENTER_CRITICAL!();
     {
-        //traceTASK_SUSPEND!(&px_tcb);
+        traceTASK_SUSPEND!(&px_tcb);
         if list_remove!(px_tcb.get_state_list_item()) == 0 {
             taskRESET_READY_PRIORITY! (px_tcb.get_priority());
         }
@@ -766,25 +764,27 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
         else {
             mtCOVERAGE_TEST_MARKER! ();
         }
-        list_insert_end!(TASKS_WAITING_TERMINATION,px_tcb.get_state_list_item());
+        list_insert_end!(get_list!(TASKS_WAITING_TERMINATION),px_tcb.get_state_list_item());
     }taskEXIT_CRITICAL!();
 
-    if get_scheduler_running!() > 0 {
-        taskENTER_CRITICAL!(){
+    if get_scheduler_running!(){
+        taskENTER_CRITICAL!();
+        {
             reset_next_task_unblock_time();
-        }taskEXIT_CRITICAL!();
+        }
+        taskEXIT_CRITICAL!();
     }
     else {
         mtCOVERAGE_TEST_MARKER! ();
     }
 
-    if *px_tcb == get_current_task_handle!() {
+    if *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
         if get_scheduler_running!(){
-            assert! (get_scheduler_suspended!() == 0 ? 1 : 0);
+            assert! (get_scheduler_suspended!() != 0);
             portYIELD_WITHIN_API! ();
         }
-        else {
-           /* if current_list_length!(SUSPEND_TASK_LIST) == get_current_number_of_tasks!() {
+        else {/*
+            if current_list_length!(SUSPEND_TASK_LIST) == get_current_number_of_tasks!() {
                 px_tcb = None;
             }
             else {
@@ -793,7 +793,7 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
         }
     }
     else {
-        mtCOVERAGE_TEST_MARKER!()
+        mtCOVERAGE_TEST_MARKER!();
     }
 }
 /*
