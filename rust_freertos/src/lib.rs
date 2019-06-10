@@ -27,6 +27,7 @@ mod queue_h;
 mod task_queue;
 mod queue_api;
 //mod mutex;
+mod semaphore;
 
 #[cfg(test)]
 mod tests {

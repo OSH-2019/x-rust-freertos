@@ -712,6 +712,10 @@ impl <T>QueueDefinition<T>
         xReturn
     }
 
+    pub fn initialise_count(&mut self, initial_count:UBaseType) {
+        self.uxMessagesWaiting = initial_count;
+    }
+
     /*some api in queue.h*/
 
     /*

@@ -20,8 +20,8 @@ pub enum QueueType {
     Base,
     Set,
     Mutex,
-    CountingSemaphtore,
-    BinarySemaphre,
+    CountingSemaphore,
+    BinarySemaphore,
     RecursiveMutex
 }
 impl Default for QueueType{
