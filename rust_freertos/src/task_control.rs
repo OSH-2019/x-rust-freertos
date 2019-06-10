@@ -7,7 +7,6 @@ use crate::*;
 use std::boxed::FnBox;
 use std::sync::{Arc, RwLock};
 use std::mem;
-use std::ops;
 
 //* task states
 #[derive(Copy, Clone, Debug)]
@@ -429,7 +428,7 @@ impl TaskHandle {
                         set_current_task_handle!(self.clone());
                     } else {
                         mtCOVERAGE_TEST_MARKER!();
-                    }
+                    }current
                 }
             }
             set_task_number!(get_task_number!() + 1);
@@ -783,31 +782,70 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
             assert! (get_scheduler_suspended!() != 0);
             portYIELD_WITHIN_API! ();
         }
-        else {/*
-            if current_list_length!(SUSPEND_TASK_LIST) == get_current_number_of_tasks!() {
-                px_tcb = None;
-            }
-            else {
+        else {
+            if current_list_length!(get_list!(SUSPENDED_TASK_LIST)) != (get_current_number_of_tasks!()) as usize{
                 task_switch_context();
-            }*/
+            }
         }
     }
     else {
         mtCOVERAGE_TEST_MARKER!();
     }
 }
-/*
-pub fn resume_task (task_to_resume: task_handle){
-    let mut px_tcb: *mut task_control_block;
-    config_assert (task_to_resume);
-    if px_tcb.is_some() && px_tcb!=CURRENT_TCB {
-        taskENTER_CRITICAL!(){
-            if get_task_is_tasksuspended(&px_tcb) {
-                teace_task_RESUME (&px_tcb);
-                list_remove! (px_tcb.unwrap().state_list_item);
-                add_task_to_ready_list(px_tcb);
-                if px_tcb.priority >= CURRENT_TCB.priority {
-                    taskYIELD_IF_USING_PREEMPTION();
+
+pub fn task_is_tasksuspended (xtask: TaskHandle) -> BaseType
+{
+	let mut xreturn:BaseType = 0;
+	let tcb = get_tcb_from_handle! (xtask);
+    /* Accesses xPendingReadyList so must be called from a critical
+    section. */
+
+    /* It does not make sense to check if the calling task is suspended. */
+    //assert!( xtask );
+
+    /* Is the task being resumed actually in the suspended list? */
+    if is_contained_within! ( get_list!(SUSPENDED_TASK_LIST) , tcb.get_state_list_item() )
+    {
+        /* Has the task already been resumed from within an ISR? */
+        if !is_contained_within! ( get_list!(PENDING_READY_LIST) , tcb.get_event_list_item() )
+        {
+            /* Is it in the suspended list because it is in the	Suspended
+            state, or because is is blocked with no timeout? */
+            if is_contained_within! ( get_list!( 0 ), tcb.get_event_list_item() )
+            {
+                xreturn = 1;
+            }
+            else
+            {
+                mtCOVERAGE_TEST_MARKER!();
+            }
+        }
+        else
+        {
+            mtCOVERAGE_TEST_MARKER!();
+        }
+    }
+    else
+    {
+        mtCOVERAGE_TEST_MARKER!();
+    }
+
+    xreturn
+}
+
+pub fn resume_task (task_to_resume: TaskHandle){
+    let mut px_tcb = get_tcb_from_handle! (task_to_resume);
+
+    if /*NULL !*px_tcb && */ *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
+        taskENTER_CRITICAL!();
+        {
+            if task_is_tasksuspended (task_to_resume) == 1 {
+                //trace_task_RESUME! (px_tcb);
+                let current_task_priority = get_current_task_handle!().get_priority();
+                list_remove! (px_tcb.get_state_list_item());
+                task_to_resume.add_task_to_ready_list();
+                if px_tcb.get_priority() >= current_task_priority {
+                    taskYIELD_IF_USING_PREEMPTION!();
                 }else {
                     mtCOVERAGE_TEST_MARKER! ();
                 }
@@ -815,10 +853,10 @@ pub fn resume_task (task_to_resume: task_handle){
             else {
                 mtCOVERAGE_TEST_MARKER! ();
             }
-        }taskEXIT_CRITICAL!();
+        }
+        taskEXIT_CRITICAL!();
     }
     else {
-        mtCOVERAGE_TEST_MARKER! ();
+        mtCOVERAGE_TEST_MARKER!();
     }
 }
-*/
