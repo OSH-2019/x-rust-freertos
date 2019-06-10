@@ -428,7 +428,7 @@ impl TaskHandle {
                         set_current_task_handle!(self.clone());
                     } else {
                         mtCOVERAGE_TEST_MARKER!();
-                    }current
+                    }
                 }
             }
             set_task_number!(get_task_number!() + 1);
@@ -793,7 +793,7 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
     }
 }
 
-pub fn task_is_tasksuspended (xtask: TaskHandle) -> BaseType
+pub fn task_is_tasksuspended (xtask: &TaskHandle) -> BaseType
 {
 	let mut xreturn:BaseType = 0;
 	let tcb = get_tcb_from_handle! (xtask);
@@ -839,7 +839,7 @@ pub fn resume_task (task_to_resume: TaskHandle){
     if /*NULL !*px_tcb && */ *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
         taskENTER_CRITICAL!();
         {
-            if task_is_tasksuspended (task_to_resume) == 1 {
+            if task_is_tasksuspended (&task_to_resume) == 1 {
                 //trace_task_RESUME! (px_tcb);
                 let current_task_priority = get_current_task_handle!().get_priority();
                 list_remove! (px_tcb.get_state_list_item());
