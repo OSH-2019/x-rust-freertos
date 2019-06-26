@@ -1,13 +1,12 @@
 use crate::port::*;
-use crate::list::*;
+use crate::list;
+use crate::list::ListLink;
 // use crate::kernel::*;
 use crate::*;
 use crate::task_control::*;
 use crate::task_global::*;
-use std::sync::Arc;
 
-/* The item value of the event list item is normally used to hold the priority
-of the task to which it belongs (coded to allow it to be held in reverse
+/* The item value of the event list item is normally used to hold the priority of the task to which it belongs (coded to allow it to be held in reverse
 priority order).  However, it is occasionally borrowed for other purposes.  It
 is important its value is not updated due to a task priority change while it is
 being used for another purpose.  The following bit definition is used to inform
@@ -15,23 +14,23 @@ the scheduler that the value should not be changed - in which case it is the
 responsibility of whichever module is using the value to ensure it gets set back
 to its original value when it is released. */
 #[cfg(feature = "configUSE_16_BIT_TICKS")]
-const taskEVENT_LIST_ITEM_VALUE_IN_USE: TickType = 0x8000;
+pub const taskEVENT_LIST_ITEM_VALUE_IN_USE: TickType = 0x8000;
 #[cfg(not(feature = "configUSE_16_BIT_TICKS"))]
-const taskEVENT_LIST_ITEM_VALUE_IN_USE: TickType = 0x80000000;
+pub const taskEVENT_LIST_ITEM_VALUE_IN_USE: TickType = 0x80000000;
 
-pub fn task_remove_from_event_list (event_list:& List) -> bool {
-    let unblocked_tcb = get_owner_of_head_entry!(event_list).unwrap();
-    let unblocked_tcb = TaskHandle::from_arc(unblocked_tcb);
+pub fn task_remove_from_event_list (event_list: &ListLink) -> bool {
+    let unblocked_tcb = list::get_owner_of_head_entry(event_list);
     // configASSERT( unblocked_tcb );
     let mut xreturn: bool = false;
 
-    list_remove! ( unblocked_tcb.get_event_list_item() );
+    list::list_remove( unblocked_tcb.get_event_list_item() );
 
     if get_scheduler_suspended!() > 0 {
-        list_remove! ( unblocked_tcb.get_state_list_item() );
+        list::list_remove( unblocked_tcb.get_state_list_item() );
         unblocked_tcb.add_task_to_ready_list().unwrap();
     } else {
-        list_insert_end! (get_list!(PENDING_READY_LIST) , unblocked_tcb.get_event_list_item());
+        list::list_insert_end(&PENDING_READY_LIST, 
+                             unblocked_tcb.get_event_list_item());
     }
 
     if unblocked_tcb.get_priority() > get_current_task_priority!()
@@ -124,7 +123,7 @@ pub fn task_check_for_timeout (pxtimeout: &mut time_out, ticks_to_wait: &mut Tic
     xreturn
 }
 
-pub fn task_place_on_event_list (event_list:& List, ticks_to_wait: TickType) {
+pub fn task_place_on_event_list (event_list: &ListLink, ticks_to_wait: TickType) {
     // assert! ( event_list );
 
     /* THIS FUNCTION MUST BE CALLED WITH EITHER INTERRUPTS DISABLED OR THE
@@ -136,9 +135,12 @@ pub fn task_place_on_event_list (event_list:& List, ticks_to_wait: TickType) {
        list is locked, preventing simultaneous access from interrupts. */
 
     let unwrapped_cur = get_current_task_handle!();
-    list_insert!( event_list, &( unwrapped_cur.get_event_list_item() ) );
+    trace!("INSERT");
+    list::list_insert( event_list, unwrapped_cur.get_event_list_item() );
+    trace!("INSERT SUCCEEDED");
 
     add_current_task_to_delayed_list( ticks_to_wait, true );
+    trace!("ADD SUCCEEDED");
 }
 
 #[cfg(feature = "configUSE_MUTEXES")]
@@ -176,10 +178,10 @@ pub fn task_priority_inherit(mutex_holder: Option<TaskHandle>) {
                priority.  Only reset the event list item value if the value is
                not being used for anything else. */
             let event_list_item = task.get_event_list_item();
-            if (get_list_item_value!(event_list_item)
+            if (list::get_list_item_value(&event_list_item)
                 & taskEVENT_LIST_ITEM_VALUE_IN_USE) == 0 {
                 let new_item_val = (configMAX_PRIORITIES!() - current_task_priority) as TickType;
-                set_list_item_value!( event_list_item, new_item_val);
+                list::set_list_item_value(&event_list_item, new_item_val);
             } else {
                 mtCOVERAGE_TEST_MARKER!();
             }
@@ -187,8 +189,11 @@ pub fn task_priority_inherit(mutex_holder: Option<TaskHandle>) {
             /* If the task being modified is in the ready state it will need
                to be moved into a new list. */
             let state_list_item = task.get_state_list_item();
-            if is_contained_within!( nth_ready_list!(this_task_priority), state_list_item) {
-                if list_remove!(state_list_item) ==  0 {
+            if list::is_contained_within(
+                &READY_TASK_LISTS[this_task_priority as usize], 
+                &state_list_item
+                ) {
+                if list::list_remove(state_list_item) ==  0 {
                     taskRESET_READY_PRIORITY!( this_task_priority );
                 } else {
                     mtCOVERAGE_TEST_MARKER!();
@@ -240,7 +245,7 @@ pub fn task_priority_disinherit(mutex_holder: Option<TaskHandle>) -> bool{
                    given from an interrupt, and if a mutex is given by the
                    holding	task then it must be the running state task.  Remove
                    the	holding task from the ready	list. */
-                if list_remove!(state_list_item) == 0 {
+                if list::list_remove(state_list_item) == 0 {
                     taskRESET_READY_PRIORITY!(this_task_priority);
                 } else {
                     mtCOVERAGE_TEST_MARKER!();
@@ -255,7 +260,7 @@ pub fn task_priority_disinherit(mutex_holder: Option<TaskHandle>) -> bool{
                    any other purpose if this task is running, and it must be
                    running to give back the mutex. */
                 let new_item_val = (configMAX_PRIORITIES!() - this_task_priority) as TickType;
-                set_list_item_value!(task.get_event_list_item(), new_item_val);
+                list::set_list_item_value(&task.get_event_list_item(), new_item_val);
                 task.add_task_to_ready_list().unwrap();
 
                 /* Return true to indicate that a context switch is required.

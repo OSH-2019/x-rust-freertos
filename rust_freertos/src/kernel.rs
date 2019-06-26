@@ -1,12 +1,12 @@
 // kernel.rs, FreeRTOS scheduler control APIs.
 // This file is created by Fan Jinhao.
 // Functions defined in this file are explained in Chapter 9 and 10.
-use crate::port::{TickType, UBaseType};
+use crate::port::UBaseType;
 use crate::projdefs::pdFALSE;
 use crate::task_control::{TaskHandle, TCB};
 use crate::task_global::*;
+use crate::list;
 use crate::*; // TODO: Is this line necessary?
-use std::sync::{Arc, RwLock};
 // use crate::task_control::TCB;
 
 /* Definitions returned by xTaskGetSchedulerState(). 
@@ -18,12 +18,18 @@ pub enum SchedulerState {
     Running
 }
 
-/*
- * Originally from task. h
- *
- * Macro for forcing a context switch.
- *
- */
+/// # Description:
+/// Macro for forcing a context switch.
+///
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: 
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
 #[macro_export]
 macro_rules! taskYIELD {
     () => {
@@ -38,16 +44,22 @@ macro_rules! taskYIELD_IF_USING_PREEMPTION {
         portYIELD_WITHIN_API!();
     };
 }
-/*
- * Originally from task. h
- *
- * Macro to mark the start of a critical code region.  Preemptive context
- * switches cannot occur when in a critical region.
- *
- * NOTE: This may alter the stack (depending on the portable implementation)
- * so must be used with care!
- *
- */
+
+/// # Description:
+/// Macro to mark the start of a critical code region.  Preemptive context
+/// switches cannot occur when in a critical region.
+/// 
+/// NOTE: This may alter the stack (depending on the portable implementation)
+/// so must be used with care!
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: 
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
 #[macro_export]
 macro_rules! taskENTER_CRITICAL {
     () => {
@@ -62,16 +74,21 @@ macro_rules! taskENTER_CRITICAL_FROM_ISR {
     };
 }
 
-/*
- * Originally from task. h
- *
- * Macro to mark the end of a critical code region.  Preemptive context
- * switches cannot occur when in a critical region.
- *
- * NOTE: This may alter the stack (depending on the portable implementation)
- * so must be used with care!
- *
- */
+/// # Description:
+/// Macro to mark the end of a critical code region.  Preemptive context
+/// switches cannot occur when in a critical region.
+/// 
+/// NOTE: This may alter the stack (depending on the portable implementation)
+/// so must be used with care!
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: 
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
 #[macro_export]
 macro_rules! taskEXIT_CRITICAL {
     () => {
@@ -151,7 +168,7 @@ pub fn task_start_scheduler() {
 }
 
 /// # Description:
-/// The fist  part of task_start_scheduler(), creates the idle task.
+/// The fist part of task_start_scheduler(), creates the idle task.
 /// Will panic if task creation fails.
 /// * Implemented by: Fan Jinhao.
 /// * C implementation: tasks.c 1831-1866
@@ -192,7 +209,7 @@ pub fn create_idle_task() -> TaskHandle {
                 the list, and an occasional incorrect value will not matter.  If
                 the ready list at the idle priority contains more than one task
                 then a task other than the idle task is ready to execute. */
-                if current_list_length!(nth_ready_list!(0)) > 1 {
+                if list::current_list_length(&READY_TASK_LISTS[0]) > 1 {
                     taskYIELD!();
                 } else {
                     mtCOVERAGE_TEST_MARKER!();
@@ -316,30 +333,6 @@ fn initialize_scheduler() {
 /// # Return
 ///
 /// Nothing
-///
-/// # Example
-/// TODO: Finish the doctest.
-/// ```
-/// extern crate rust_freertos;
-/// rust_freertos::task_control::TCB::new()
-///                   .name("NAME")
-///                   .priority(1)
-///                   .initialise(|| { loop {
-///                         println!("Task Code called successfully!");
-///                         // Task code goes here.
-///                         // At some point we want to end the real time kernel processing
-///                         // so call ...
-///                         rust_freertos::kernel::task_end_scheduler();
-///                         }
-///                     });
-///
-/// // Start the real time kernel with preemption.
-/// rust_freertos::kernel::task_start_scheduler();
-/// // Will only get here when the vTaskCode () task has called
-/// // vTaskEndScheduler ().  When we get here we are back to single task
-/// // execution.
-///
-/// ```
 
 pub fn task_end_scheduler() {
     /* Stop the scheduler interrupts and call the portable scheduler end
@@ -350,55 +343,27 @@ pub fn task_end_scheduler() {
     port::port_end_scheduler();
 }
 
-/*
-* task. h
-* <pre>void vTaskSuspendAll( void );</pre>
-*
-* Suspends the scheduler without disabling interrupts.  Context switches will
-* not occur while the scheduler is suspended.
-*
-* After calling vTaskSuspendAll () the calling task will continue to execute
-* without risk of being swapped out until a call to xTaskResumeAll () has been
-* made.
-*
-* API functions that have the potential to cause a context switch (for example,
-* vTaskDelayUntil(), xQueueSend(), etc.) must not be called while the scheduler
-* is suspended.
-*
-* Example usage:
-  <pre>
-void vTask1( void * pvParameters )
-{
-    for( ;; )
-    {
-        // Task code goes here.
-
-        // ...
-
-        // At some point the task wants to perform a long operation during
-        // which it does not want to get swapped out.  It cannot use
-        // taskENTER_CRITICAL ()/taskEXIT_CRITICAL () as the length of the
-        // operation may cause interrupts to be missed - including the
-        // ticks.
-
-        // Prevent the real time kernel swapping out the task.
-        vTaskSuspendAll ();
-
-        // Perform the operation here.  There is no need to use critical
-        // sections as we have all the microcontroller processing time.
-        // During this time interrupts will still operate and the kernel
-        // tick count will be maintained.
-
-        // ...
-
-        // The operation is complete.  Restart the kernel.
-        xTaskResumeAll ();
-    }
-}
-  </pre>
-* \defgroup vTaskSuspendAll vTaskSuspendAll
-* \ingroup SchedulerControl
-*/
+/// # Description:
+/// Suspends the scheduler without disabling interrupts.  Context switches will
+/// not occur while the scheduler is suspended.
+///
+/// After calling vTaskSuspendAll () the calling task will continue to execute
+/// without risk of being swapped out until a call to xTaskResumeAll () has been
+/// made.
+///
+/// API functions that have the potential to cause a context switch (for example,
+/// vTaskDelayUntil(), xQueueSend(), etc.) must not be called while the scheduler
+/// is suspended.
+///
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: 
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// Nothing
 pub fn task_suspend_all() {
     /* A critical section is not required as the variable is of type
     BaseType_t.  Please read Richard Barry's reply in the following link to a
@@ -409,57 +374,24 @@ pub fn task_suspend_all() {
     set_scheduler_suspended!(get_scheduler_suspended!() + 1);
 }
 
-/*
-* task. h
-* <pre>BaseType_t xTaskResumeAll( void );</pre>
-*
-* Resumes scheduler activity after it was suspended by a call to
-* vTaskSuspendAll().
-*
-* xTaskResumeAll() only resumes the scheduler.  It does not unsuspend tasks
-* that were previously suspended by a call to vTaskSuspend().
-*
-* @return If resuming the scheduler caused a context switch then pdTRUE is
-*		  returned, otherwise pdFALSE is returned.
-*
-* Example usage:
-  <pre>
-void vTask1( void * pvParameters )
-{
-    for( ;; )
-    {
-        // Task code goes here.
-
-        // ...
-
-        // At some point the task wants to perform a long operation during
-        // which it does not want to get swapped out.  It cannot use
-        // taskENTER_CRITICAL ()/taskEXIT_CRITICAL () as the length of the
-        // operation may cause interrupts to be missed - including the
-        // ticks.
-
-        // Prevent the real time kernel swapping out the task.
-        vTaskSuspendAll ();
-
-        // Perform the operation here.  There is no need to use critical
-        // sections as we have all the microcontroller processing time.
-        // During this time interrupts will still operate and the real
-        // time kernel tick count will be maintained.
-
-        // ...
-
-        // The operation is complete.  Restart the kernel.  We want to force
-        // a context switch - but there is no point if resuming the scheduler
-        // caused a context switch already.
-        if( !xTaskResumeAll () )
-        {
-             taskYIELD ();
-        }
-    }
-}
-*/
+/// # Description:
+/// Resumes scheduler activity after it was suspended by a call to
+/// vTaskSuspendAll().
+///
+/// xTaskResumeAll() only resumes the scheduler.  It does not unsuspend tasks
+/// that were previously suspended by a call to vTaskSuspend().
+/// * Implemented by: Fan Jinhao.
+/// * C implementation: 
+///
+/// # Arguments 
+/// 
+///
+/// # Return
+/// 
+/// If resuming the scheduler caused a context switch then true is
+/// returned, otherwise false is returned.
 pub fn task_resume_all() -> bool {
-    println!("resume_all called!");
+    trace!("resume_all called!");
     let mut already_yielded = false;
 
     // TODO: This is a recoverable error, use Result<> instead.
@@ -502,7 +434,7 @@ pub fn task_resume_all() -> bool {
 
                 /* If any ticks occurred while the scheduler was suspended then
                 they should be processed now.  This ensures the tick count does
-                not	slip, and that any delayed tasks are resumed at the correct
+                not slip, and that any delayed tasks are resumed at the correct
                 time. */
                 process_pended_ticks();
 
@@ -522,21 +454,20 @@ pub fn task_resume_all() -> bool {
         }
     }
 
+    trace!("Already yielded is {}", already_yielded);
     already_yielded
 }
 
 fn move_tasks_to_ready_list() -> bool {
     let mut has_unblocked_task = false;
-    while !list_is_empty!(get_list!(PENDING_READY_LIST)) {
+    while !list::list_is_empty(&PENDING_READY_LIST) {
         has_unblocked_task = true;
-        let task_handle =
-            TaskHandle::from_arc(get_owner_of_head_entry!(get_list!(PENDING_READY_LIST)).unwrap());
+        let task_handle = list::get_owner_of_head_entry(&PENDING_READY_LIST);
         let event_list_item = task_handle.get_event_list_item();
         let state_list_item = task_handle.get_state_list_item();
 
-        list_remove!(state_list_item);
-
-        list_remove!(event_list_item);
+        list::list_remove(state_list_item);
+        list::list_remove(event_list_item);
 
         task_handle.add_task_to_ready_list().unwrap();
 
@@ -552,7 +483,7 @@ fn move_tasks_to_ready_list() -> bool {
 }
 
 fn reset_next_task_unblock_time() {
-    if list_is_empty!(get_list!(DELAYED_TASK_LIST)) {
+    if list::list_is_empty(&DELAYED_TASK_LIST) {
         /* The new current delayed list is empty.  Set xNextTaskUnblockTime to
         the maximum possible value so it is	extremely unlikely that the
         if( xTickCount >= xNextTaskUnblockTime ) test will pass until
@@ -563,13 +494,13 @@ fn reset_next_task_unblock_time() {
         the item at the head of the delayed list.  This is the time at
         which the task at the head of the delayed list should be removed
         from the Blocked state. */
-        let task_handle =
-            TaskHandle::from_arc(get_owner_of_head_entry!(get_list!(DELAYED_TASK_LIST)).unwrap());
-        set_next_task_unblock_time!(get_list_item_value!(task_handle.get_state_list_item()));
+        let task_handle = list::get_owner_of_head_entry(&DELAYED_TASK_LIST);
+        set_next_task_unblock_time!(list::get_list_item_value(&task_handle.get_state_list_item()));
     }
 }
 
 fn process_pended_ticks() {
+    trace!("Processing pended ticks");
     let mut pended_counts = get_pended_ticks!();
 
     if pended_counts > 0 {
@@ -664,24 +595,22 @@ pub fn task_switch_context() {
     }
 }
 
+/* If configUSE_PORT_OPTIMISED_TASK_SELECTION is 0 then task selection is
+   performed in a generic way that is not optimised to any particular
+   microcontroller architecture. */
+#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
 fn task_select_highest_priority_task() {
     let mut top_priority: UBaseType = get_top_ready_priority!();
 
     /* Find the highest priority queue that contains ready tasks. */
-    while list_is_empty!(nth_ready_list!(top_priority)) {
+    while list::list_is_empty(&READY_TASK_LISTS[top_priority as usize]) {
         assert!(top_priority > 0, "No task found with a non-zero priority");
         top_priority -= 1;
     }
 
     /* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of
     the same priority get an equal share of the processor time. */
-    let next_task = TaskHandle::from_arc(
-        get_owner_of_next_entry!(
-            nth_ready_list!(top_priority),
-            get_current_task_handle!().get_state_list_item()
-        )
-        .unwrap(),
-    );
+    let next_task = list::get_owner_of_next_entry(&READY_TASK_LISTS[top_priority as usize]);
 
     trace!("Next task is {}", next_task.get_name());
     set_current_task_handle!(next_task);
@@ -750,7 +679,7 @@ pub fn task_increment_tick() -> bool {
         look any further down the list. */
         if const_tick_count >= get_next_task_unblock_time!() {
             loop {
-                if list_is_empty!(get_list!(DELAYED_TASK_LIST)) {
+                if list::list_is_empty(&DELAYED_TASK_LIST) {
                     /* The delayed list is empty.  Set xNextTaskUnblockTime
                     to the maximum possible value so it is extremely
                     unlikely that the
@@ -763,13 +692,11 @@ pub fn task_increment_tick() -> bool {
                     item at the head of the delayed list.  This is the time
                     at which the task at the head of the delayed list must
                     be removed from the Blocked state. */
-                    let delay_head_entry_owner =
-                        get_owner_of_head_entry!(get_list!(DELAYED_TASK_LIST)).unwrap();
-                    // TODO: This is probably an error of `list`
-                    let task_handle = TaskHandle::from_arc(delay_head_entry_owner);
+                    let delay_head_entry_owner = list::get_owner_of_head_entry(&DELAYED_TASK_LIST);
+                    let task_handle = delay_head_entry_owner;
                     let state_list_item = task_handle.get_state_list_item();
                     let event_list_item = task_handle.get_event_list_item();
-                    let item_value = get_list_item_value!(state_list_item);
+                    let item_value = list::get_list_item_value(&state_list_item);
 
                     if const_tick_count < item_value {
                         /* It is not time to unblock this item yet, but the
@@ -784,15 +711,15 @@ pub fn task_increment_tick() -> bool {
                     }
 
                     /* It is time to remove the item from the Blocked state. */
-                    list_remove!(state_list_item);
+                    list::list_remove(state_list_item.clone());
 
                     /* Is the task waiting on an event also?  If so remove
                     it from the event list. */
-                    list_remove!(event_list_item);
+                    list::list_remove(event_list_item.clone());
 
                     /* Place the unblocked task into the appropriate ready
                     list. */
-                    task_handle.add_task_to_ready_list();
+                    task_handle.add_task_to_ready_list().unwrap();
 
                     /* A task being unblocked cannot cause an immediate
                     context switch if preemption is turned off. */
@@ -817,7 +744,9 @@ pub fn task_increment_tick() -> bool {
         writer has not explicitly turned time slicing off. */
         {
             #![cfg(all(feature = "configUSE_PREEMPTION", feature = "configUSE_TIME_SLICING"))]
-            if current_list_length!(nth_ready_list!(get_current_task_priority!())) > 1 {
+            let cur_task_pri = get_current_task_priority!();
+
+            if list::current_list_length(&READY_TASK_LISTS[cur_task_pri as usize]) > 1 {
                 switch_required = true;
             } else {
                 mtCOVERAGE_TEST_MARKER!();
@@ -873,9 +802,22 @@ pub fn task_get_scheduler_state() -> SchedulerState {
 /* Define away taskRESET_READY_PRIORITY() and portRESET_READY_PRIORITY() as
    they are only required when a port optimised method of task selection is
    being used. */
+#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
 #[macro_export]
 macro_rules! taskRESET_READY_PRIORITY {
     ($uxPriority: expr) => (
         
+    )
+}
+
+/* uxTopReadyPriority holds the priority of the highest priority ready
+   state task. */
+#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
+#[macro_export]
+macro_rules! taskRECORD_READY_PRIORITY {
+    ($uxPriority: expr) => (
+        if $uxPriority > get_top_ready_priority!() {
+            set_top_ready_priority!($uxPriority);
+        }
     )
 }

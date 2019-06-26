@@ -1,641 +1,477 @@
-// #![crate_name = "doc"]
+use std::sync::{Arc, RwLock, Weak};
+use std::fmt;
 
-use std::sync::{Arc, RwLock};
-use crate::*;
-use crate::port::{TickType, UBaseType, StackType};
-use crate::task_control::task_control_block;
-use crate::task_global::global_lists;
+use crate::task_control::{TCB, TaskHandle};
+use crate::port::{TickType, UBaseType, portMAX_DELAY};
 
-
-/// this should be defined is port.rs
-// type UBaseType = u16;    // unsighed short
-// type TickType = u16;
-// type TCB = TskTCB;   // not declared
-// type StackType = u16;
-
-// List is a list type, holding the items.
-// type List = Vec<Rc<RefCell<ListItem>>>;
-pub type List = Arc<RwLock<Vec<Arc<RwLock<ListItem>>>>>;
-// LIST is a type that holds all the lists.
-pub type LIST = Arc<RwLock<Vec<List>>>;
-
-/// thing now get better understood here!
-/// suppose we have a list vec, we call it `list`.
-/// now that we have two list, `lista` and `listb`.
-/// we could push the `lista` and `listb` in the `list` given above, meaning that
-/// lista == list[0]
-/// listb == list[1]
-/// we now have three list item named item1, item2, item3, which are created by the method `ListItem::new`
-/// every thim we want insert an item to a list, we should first call `set_list_item_container!` macro, for example:
-/// `
-/// //insert item1 to the lista, since the lista is the first value in list, the index should be 0 --> ListName::READY_TASK_LISTS_0
-/// set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
-/// insert_end!(lista, item1);
-/// `
-/// and in this way, we could easily find the **actural** container.
-/// `
-/// let mut index = get_list_item_container!(item1);
-/// let mut container = match index {
-///     Some(index) => {
-///         let i = index as u32;   // ListName --> u32
-///         &mut list[i]
-///     },
-///     None => {
-///         panic!("no container found!");
-///     }
-/// }
-/// `
-/// 
-/// 
-
-
-/// this is the all lists' mapping index
-#[derive(Debug, Copy, Clone)]
-pub enum ListName {
-    READY_TASK_LISTS_0,
-    READY_TASK_LISTS_1,
-    READY_TASK_LISTS_2,
-    READY_TASK_LISTS_3,
-    READY_TASK_LISTS_4,
-    READY_TASK_LISTS_5,
-    READY_TASK_LISTS_6,
-    READY_TASK_LISTS_7,
-    READY_TASK_LISTS_8,
-    READY_TASK_LISTS_9,
-    DELAYED_TASK_LIST,
-    OVERFLOW_DELAYED_TASK_LIST,
-    PENDING_READY_LIST,
-    TASKS_WAITING_TERMINATION,
-    SUSPENDED_TASK_LIST,
-}
-// total lists' number
-static MAX_LIST_NUM: usize = 100;
-// system lists' number
-static KERNEL_LIST_NUM: usize = 15;
-/// if some list is being used, set MAP_LIST[list as usize] = 1, otherwise 0
-static mut MAP_LIST: Vec<UBaseType> = vec![0; MAX_LIST_NUM ];
-
-/// # Description
-/// * initialize the MAP_LIST, making the system lists mapping not available. 
-/// This should be called when system lists first created.
-/// # Argument
-/// * `Nothing` - 
-/// # Return
-/// * Nothing
-pub fn init_map_list() {
-    for i in 0..KERNEL_LIST_NUM {    
-        MAP_LIST[i] = 1;    
+impl fmt::Debug for ListItem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ListItem with value: {}", self.item_value)
     }
 }
 
-/// # Description
-/// * return the avalible list index
-/// # Argument
-/// * `Nothing` - 
-/// # Return
-/// * UBaseType : avalible list num
-pub fn get_next_available_list() -> UBaseType {
-    for i in 0..MAX_LIST_NUM {
-        if MAP_LIST[i] == 0 {
-            return i as UBaseType
+/*
+ * Definition of the only type of object that a list can contain.
+ */
+pub struct ListItem {
+    /* The value being listed.  In most cases this is used to sort the list in descending order. */   
+    item_value: TickType,
+    /* Pointer to the next ListItem_t in the list. */   
+    next: WeakItemLink,
+    /* Pointer to the previous ListItem_t in the list. */   
+    prev: WeakItemLink,
+    /* Pointer to the object (normally a TCB) that contains the list item.  
+     * There is therefore a two way link between the object containing the list item 
+     * and the list item itself. */   
+    owner: Weak<RwLock<TCB>>,
+    /* Pointer to the list in which this list item is placed (if any). */   
+    container: Weak<RwLock<List>>
+}
+
+pub type ItemLink = Arc<RwLock<ListItem>>;
+pub type WeakItemLink = Weak<RwLock<ListItem>>;
+pub type WeakListLink = Weak<RwLock<List>>;
+pub type ListLink = Arc<RwLock<List>>;
+
+impl Default for ListItem {
+    fn default() -> Self {
+        ListItem {
+            /* The list end value is the highest possible value in the list to
+               ensure it remains at the end of the list. */
+            item_value: portMAX_DELAY,
+            next: Default::default(),
+            owner: Default::default(),
+            prev: Default::default(),
+            container: Default::default(),
         }
     }
-    0xFFFFFFFF as UBaseType
 }
-
-/// # Description
-/// * add a new list, return the list num
-/// # Argument
-/// * `Nothing` - 
-/// # Return
-/// * UBaseType : the index
-pub fn add_list() -> UBaseType {
-    let avail_index = get_next_available_list();
-    if avail_index == 0xFFFFFFFF {
-        panic!("there is no available list!");
-        return;
-    }
-    MAP_LIST[avail_index as usize] = 1;
-    avail_index
-}
-
-/// # Description
-/// * remove a list created, panic if this list has never been created yet.
-/// # Argument
-/// * `index` - the current list num to be removed 
-/// # Return
-/// * Nothing
-pub fn remove_list(index: UBaseType) {
-    if MAP_LIST[index as usize] == 0 {
-        panic!("attempt to remove a null list.");
-    } else {
-        MAP_LIST[index as usize] = 0;
-    }
-}
-
-
-#[derive(Debug)]
-pub struct ListItem {
-    pub item_value: TickType,
-    //new hash value: to identify which TCB is chosed
-    pub hash: StackType,
-    pub container: Option<ListName>,
-    // container: Option<Rc<RefCell<&Vec<Rc<RefCell<ListItem>>>>>>,    // complicated, deprecateed
-    pub owner: Option<Arc<RwLock<task_control_block>>>,      // the TCB declaration is not defined
-}
-
 
 impl ListItem {
-    /// # Description
-    /// * constructor
-    /// # Argument
-    /// * `item_value` - item_value
-    /// # Return
-    /// * Rc<RefCell<Self>>
-    pub fn new(item_value: TickType) -> Arc<RwLock<ListItem>> {
-        Arc::new(RwLock::new(ListItem {
-            item_value: item_value,
-            container: None,
-            owner: None,
-            hash: 0
-        }))
+    pub fn item_value(mut self, item_value: TickType) -> Self{
+        self.item_value = item_value;
+        self
+    }
+
+    pub fn owner(mut self, owner: TaskHandle) -> Self {
+        self.owner = owner.into();
+        self
+    }
+
+    pub fn set_container(&mut self, container: &Arc<RwLock<List>>) {
+        self.container = Arc::downgrade(container);
+    }
+
+    fn remove(&mut self, link: WeakItemLink) -> UBaseType {
+        /* The list item knows which list it is in.  Obtain the list from the list
+           item. */
+        let list = self.container.upgrade().unwrap_or_else(|| panic!("Container not set"));
+        let ret_val = list.write().unwrap().remove_item(&self, link);
+        set_list_item_next(&self.prev, Weak::clone(&self.next));
+        set_list_item_prev(&self.next, Weak::clone(&self.prev));
+        self.container = Weak::new();
+        ret_val
     }
 }
-// initialization of List
-#[macro_export]
-macro_rules! List_new {
-    () => ({
-        Arc::new(RwLock::new(vec![]))
-    })
+
+/*
+ * Definition of the type of queue used by the scheduler.
+ */
+#[derive(Clone)]
+pub struct List {
+    number_of_items: UBaseType,
+    /* Used to walk through the list.  
+     * Points to the last item returned by a call to listGET_OWNER_OF_NEXT_ENTRY (). */   
+    index: WeakItemLink,
+    /* List item that contains the maximum possible item value meaning 
+     * it is always at the end of the list and is therefore used as a marker. */   
+    list_end: ItemLink,
 }
 
-// // initialization of List
-#[macro_export]
-macro_rules! LIST_new {
-    () => ({
-        Arc::new(RwLock::new(vec![]))
-    })
-}
+impl Default for List {
+    fn default() -> Self {
+	/* The list structure contains a list item which is used to mark the
+	end of the list.  To initialise the list the list end is inserted
+	as the only list entry. */
+        let list_end: ItemLink = Arc::new(RwLock::new(ListItem::default()));
 
-/// # Description
-/// set list item's owner
-/// # Arguments
-/// $item: Arc<RwLock<ListItem>>
-/// $owner: Arc<RwLock<TCB>>
-/// #Return
-/// Nothing
-#[macro_export]
-macro_rules! set_list_item_owner {
-    ($item:expr, $owner:expr) => ({
-        $item.write().unwrap().owner = Some(Arc::clone(&$owner));
-    });
-}
+	/* The list end next and previous pointers point to itself so we know
+	when the list is empty. */
+        list_end.write().unwrap().next = Arc::downgrade(&list_end);
+        list_end.write().unwrap().prev = Arc::downgrade(&list_end);
 
-/// # Description
-/// * set list item hash value
-/// # Argument
-/// * `$item` - list item
-/// * `$value` - list hash value
-/// # Return
-/// * Nothing
-#[macro_export]
-macro_rules! set_list_item_hash {
-    ($item:expr, $value:expr) => ({
-        $item.write().unwrap().hash = $value;       
-    })
-}
-
-
-
-/// # Description
-/// get list item's owner
-/// # Arguments
-/// $ietm: Arc<RwLock<ListItem>>
-/// #Return
-/// Option<Arc<RwLock<TCB>>>
-#[macro_export]
-macro_rules! get_list_item_owner {
-    ($item:expr) => ({
-        match $item.read().unwrap().owner {
-            Some(owner) => {
-                Some(Arc::clone(&owner))
-            },
-            None => {
-                None
-            }
+        List {
+            index: Arc::downgrade(&list_end),
+            list_end: list_end,
+            number_of_items: 0
         }
-    });
+    }
 }
 
+fn set_list_item_next(item: &WeakItemLink, next: WeakItemLink) {
+    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    (*owned_item.write().unwrap()).next = next;
+}
 
+fn set_list_item_prev(item: &WeakItemLink, prev: WeakItemLink) {
+    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    (*owned_item.write().unwrap()).prev = prev;
+}
 
-/// # Description
-/// get owner of next entry
-/// # Arguments
-/// $list: Arc<RwLock<List>>
-/// $item: Arc<RwLock<ListItem>>
-/// #Return
-/// Option<Rc<RefCell<TCB>>>
-#[macro_export]
-macro_rules! get_owner_of_next_entry {
-    ($list:expr, $item:expr) => ({
-        let index = get_item_index!($list, $item, eq);
-        match index {
-            Some(index) => {
-                match ($list.read().unwrap())[(index + 1) % current_list_length!($list)].read().unwrap().owner.as_ref() {
-                    Some(owner) => Some(Arc::clone(owner)),
-                    None => None,
+fn get_list_item_next(item: &WeakItemLink) -> WeakItemLink {
+    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let next = Weak::clone(&(*owned_item.read().unwrap()).next);
+    next
+}
+
+fn get_list_item_prev(item: &WeakItemLink) -> WeakItemLink {
+    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let prev = Weak::clone(&(*owned_item.read().unwrap()).prev);
+    prev
+}
+
+/*
+ * Access macro to retrieve the value of the list item.  The value can
+ * represent anything - for example the priority of a task, or the time at
+ * which a task should be unblocked.
+ */
+pub fn get_list_item_value(item: &ItemLink) -> TickType {
+    item.read().unwrap().item_value
+}
+
+/*
+ * Access macro to set the value of the list item.  In most cases the value is
+ * used to sort the list in descending order.
+ */
+pub fn set_list_item_value(item: &ItemLink, item_value: TickType) {
+    item.write().unwrap().item_value = item_value;
+}
+
+fn get_weak_item_value(item: &WeakItemLink) -> TickType {
+    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let value = owned_item.read().unwrap().item_value;
+    value
+}
+
+fn set_weak_item_value(item: &WeakItemLink, item_value: TickType) {
+    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    owned_item.write().unwrap().item_value = item_value;
+}
+
+/*
+ * Return the list a list item is contained within (referenced from).
+ *
+ * @param pxListItem The list item being queried.
+ * @return A pointer to the List_t object that references the pxListItem
+ */
+pub fn get_list_item_container(item: &WeakItemLink) -> ListLink {
+    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let container = Weak::clone(&owned_item.read().unwrap().container);
+    container.upgrade().unwrap_or_else(|| panic!("Container of item was not set"))
+}
+
+/*
+ * Access macro to determine if a list contains any items.  The macro will
+ * only have the value true if the list is empty.
+ */
+pub fn list_is_empty(list: &ListLink) -> bool {
+    list.read().unwrap().is_empty()
+}
+
+/*
+ * Access macro to return the number of items in the list.
+ */
+pub fn current_list_length(list: &ListLink) -> UBaseType {
+    list.read().unwrap().get_length()
+}
+
+/*
+ * Access function to get the owner of a list item.  The owner of a list item
+ * is the object (usually a TCB) that contains the list item.
+ */
+pub fn get_list_item_owner(item_link: &ItemLink) -> TaskHandle {
+    let owner = Weak::clone(&item_link.read().unwrap().owner);
+    owner.into()
+}
+
+/*
+ * Access function to set the owner of a list item.  The owner of a list item
+ * is the object (usually a TCB) that contains the list item.
+ */
+pub fn set_list_item_owner(item_link: &ItemLink, owner: TaskHandle) {
+    item_link.write().unwrap().owner = owner.into()
+}
+
+/*
+ * Access function to obtain the owner of the next entry in a list.
+ *
+ * The list member pxIndex is used to walk through a list.  Calling
+ * listGET_OWNER_OF_NEXT_ENTRY increments pxIndex to the next item in the list
+ * and returns that entry's pxOwner parameter.  Using multiple calls to this
+ * function it is therefore possible to move through every item contained in
+ * a list.
+ *
+ * The pxOwner parameter of a list item is a pointer to the object that owns
+ * the list item.  In the scheduler this is normally a task control block.
+ * The pxOwner parameter effectively creates a two way link between the list
+ * item and its owner.
+ */
+pub fn get_owner_of_next_entry(list: &ListLink) -> TaskHandle {
+    let task = list.write().unwrap().get_owner_of_next_entry();
+    task.into()
+}
+
+/*
+ * Access function to obtain the owner of the first entry in a list.  Lists
+ * are normally sorted in ascending item value order.
+ *
+ * This function returns the pxOwner member of the first item in the list.
+ * The pxOwner parameter of a list item is a pointer to the object that owns
+ * the list item.  In the scheduler this is normally a task control block.
+ * The pxOwner parameter effectively creates a two way link between the list
+ * item and its owner.
+ *
+ * @param pxList The list from which the owner of the head item is to be
+ * returned.
+ */
+pub fn get_owner_of_head_entry(list: &ListLink) -> TaskHandle {
+    let task = list.read().unwrap().get_owner_of_head_entry();
+    task.into()
+}
+
+/*
+ * Check to see if a list item is within a list.  The list item maintains a
+ * "container" pointer that points to the list it is in.  All this macro does
+ * is check to see if the container and the list match.
+ */
+pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
+    let weak_item_link = Arc::downgrade(item_link);
+    let container = get_list_item_container(&weak_item_link);
+    Arc::ptr_eq(list, &container)
+}
+
+/*
+ * Insert a list item into a list.  The item will be inserted into the list in
+ * a position determined by its item value (descending item value order).
+ *
+ * @param pxList The list into which the item is to be inserted.
+ *
+ * @param pxNewListItem The item that is to be placed in the list.
+ */
+pub fn list_insert(list: &ListLink, item_link: ItemLink) {
+    /* Remember which list the item is in.  This allows fast removal of the
+       item later. */
+    item_link.write().unwrap().set_container(&list);
+    println!("Set conatiner");
+    list.write().unwrap().insert(Arc::downgrade(&item_link))
+}
+
+/*
+ * Insert a list item into a list.  The item will be inserted in a position
+ * such that it will be the last item within the list returned by multiple
+ * calls to listGET_OWNER_OF_NEXT_ENTRY.
+ *
+ * The list member pxIndex is used to walk through a list.  Calling
+ * listGET_OWNER_OF_NEXT_ENTRY increments pxIndex to the next item in the list.
+ * Placing an item in a list using vListInsertEnd effectively places the item
+ * in the list position pointed to by pxIndex.  This means that every other
+ * item within the list will be returned by listGET_OWNER_OF_NEXT_ENTRY before
+ * the pxIndex parameter again points to the item being inserted.
+ *
+ * @param pxList The list into which the item is to be inserted.
+ *
+ * @param pxNewListItem The list item to be inserted into the list.
+ */
+pub fn list_insert_end(list: &ListLink, item_link: ItemLink) {
+    /* Insert a new list item into pxList, but rather than sort the list,
+       makes the new list item the last item to be removed by a call to
+       listGET_OWNER_OF_NEXT_ENTRY(). */
+
+    /* Remember which list the item is in. */
+    item_link.write().unwrap().set_container(&list);
+
+    list.write().unwrap().insert_end(Arc::downgrade(&item_link))
+}
+
+/*
+ * Remove an item from a list.  The list item has a pointer to the list that
+ * it is in, so only the list item need be passed into the function.
+ *
+ * @param uxListRemove The item to be removed.  The item will remove itself from
+ * the list pointed to by it's pxContainer parameter.
+ *
+ * @return The number of items that remain in the list after the list item has
+ * been removed.
+ */
+pub fn list_remove(item_link: ItemLink) -> UBaseType {
+    item_link.write().unwrap().remove(Arc::downgrade(&item_link))
+}
+
+impl List {
+    fn insert(&mut self, item_link: WeakItemLink) {
+        println!("in");
+        let value_of_insertion = get_weak_item_value(&item_link);
+        /* Insert the new list item into the list, sorted in xItemValue order.
+
+           If the list already contains a list item with the same item value then the
+           new list item should be placed after it.  This ensures that TCB's which are
+           stored in ready lists (all of which have the same xItemValue value) get a
+           share of the CPU.  However, if the xItemValue is the same as the back marker
+           the iteration loop below will not end.  Therefore the value is checked
+           first, and the algorithm slightly modified if necessary. */
+        let item_to_insert = if value_of_insertion == portMAX_DELAY {
+            get_list_item_prev(&Arc::downgrade(&self.list_end))
+        } else {
+            /* *** NOTE ***********************************************************
+               If you find your application is crashing here then likely causes are
+               listed below.  In addition see http://www.freertos.org/FAQHelp.html for
+               more tips, and ensure configASSERT() is defined!
+               http://www.freertos.org/a00110.html#configASSERT
+
+               1) Stack overflow -
+               see http://www.freertos.org/Stacks-and-stack-overflow-checking.html
+               2) Incorrect interrupt priority assignment, especially on Cortex-M
+               parts where numerically high priority values denote low actual
+               interrupt priorities, which can seem counter intuitive.  See
+               http://www.freertos.org/RTOS-Cortex-M3-M4.html and the definition
+               of configMAX_SYSCALL_INTERRUPT_PRIORITY on
+               http://www.freertos.org/a00110.html
+               3) Calling an API function from within a critical section or when
+               the scheduler is suspended, or calling an API function that does
+               not end in "FromISR" from an interrupt.
+               4) Using a queue or semaphore before it has been initialised or
+               before the scheduler has been started (are interrupts firing
+               before vTaskStartScheduler() has been called?).
+             **********************************************************************/
+            let mut iterator = Arc::downgrade(&self.list_end);
+            loop {
+                /* There is nothing to do here, just iterating to the wanted
+                   insertion position. */
+                let next = get_list_item_next(&iterator);
+                if get_weak_item_value(&next) > value_of_insertion {
+                    break iterator
                 }
-            },
-            None => None,
-        }
-    });
-}
-
-// /// # Description
-// /// get owner of head entry
-// /// # Arguments
-// /// $list: List
-// /// #Return
-// /// Option<Rc<RefCell<TCB>>>
-#[macro_export]
-macro_rules! get_owner_of_head_entry {
-    ($list:expr) => ({
-        if current_list_length!($list) == 0 {
-            None
-        }else{
-            // Some(Arc::clone(&($list.read().unwrap())[0].read().unwrap().owner.unwrap()))
-            match ($list.read().unwrap())[0].read().unwrap().owner.as_ref() {
-                Some(owner) => {
-                    Some(Arc::clone(owner))
-                },
-                None => {
-                    None
-                }
+                iterator = next;
             }
+        };
+
+        let prev = Weak::clone(&item_to_insert);
+        let next = get_list_item_next(&item_to_insert);
+
+        set_list_item_next(&item_link, Weak::clone(&next));
+        set_list_item_prev(&item_link, Weak::clone(&prev));
+        set_list_item_next(&prev, Weak::clone(&item_link));
+        set_list_item_prev(&next, Weak::clone(&item_link));
+
+        self.number_of_items += 1;
+    }
+
+    fn insert_end(&mut self, item_link: WeakItemLink) {
+        let prev = get_list_item_prev(&self.index);
+        let next = Weak::clone(&self.index);
+        set_list_item_next(&item_link, Weak::clone(&next));
+        set_list_item_prev(&item_link, Weak::clone(&prev));
+        set_list_item_next(&prev, Weak::clone(&item_link));
+        set_list_item_prev(&next, Weak::clone(&item_link));
+
+        self.number_of_items += 1;
+    }
+
+    fn remove_item(&mut self, item: &ListItem, link: WeakItemLink) -> UBaseType{
+        // TODO: Find a more effiecient
+        if Weak::ptr_eq(&link, &self.index) {
+            self.index = Weak::clone(&item.prev);
         }
-    });
+
+        self.number_of_items -= 1;
+
+        self.number_of_items
+    }
+
+    fn is_empty(&self) -> bool {
+        self.number_of_items == 0
+    }
+
+    fn get_length(&self) -> UBaseType {
+        self.number_of_items
+    }
+
+    fn increment_index(&mut self) {
+        self.index = get_list_item_next(&self.index);
+        if Weak::ptr_eq(&self.index, &Arc::downgrade(&self.list_end)) {
+            self.index = get_list_item_next(&self.index);
+        }
+    }
+
+    fn get_owner_of_next_entry(&mut self) -> Weak<RwLock<TCB>> {
+        self.increment_index();
+        let owned_index = self.index.upgrade().unwrap_or_else(|| panic!("List item is None"));
+        let owner = Weak::clone(&owned_index.read().unwrap().owner);
+        owner
+    }
+
+    fn get_owner_of_head_entry(&self) -> Weak<RwLock<TCB>> {
+        let list_end = get_list_item_next(&Arc::downgrade(&self.list_end));
+        let owned_index = list_end.upgrade().unwrap_or_else(|| panic!("List item is None"));
+        let owner = Weak::clone(&owned_index.read().unwrap().owner);
+        owner
+    }
 }
 
-// /// # Description
-// /// * append $item to the $list
-// /// # Argument
-// /// * `$list` - list
-// /// * `$item` - list item
-// /// # Return
-// /// * Nothing
-#[macro_export]
-macro_rules! list_insert_end {
-    ($list:expr, $item:expr) => ({
-        {
-
-            ($list.write().unwrap()).push(Arc::clone(&$item));
-        }
-    })
-}
-
-// /// # Description
-// /// * get $item's index in $list, based on the given oprator
-// /// # Argument
-// /// * `$list` - Arc<RwLock<List>>
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// # Return
-// /// * Option<u32>
-#[macro_export]
-macro_rules! get_item_index {
-    ($list:expr, $item:expr, eq) => ({
-        {
-            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value == $item.read().unwrap().item_value 
-                                                            &&    x.read().unwrap().hash == $item.read().unwrap().hash);
-            index
-        }
-    });
-    ($list:expr, $item:expr, gt) => ({
-        {
-            let index = $list.read().unwrap().iter().position(|x| x.read().unwrap().item_value > $item.read().unwrap().item_value
-                                                            &&    x.read().unwrap().hash == $item.read().unwrap().hash);
-            index
-        }
-    });
-}
-
-// /// # Description
-// /// * insert $item in $list in descending order
-// /// # Argument
-// /// * `$list` - List
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// # Return
-// /// * Nothing
-#[macro_export]
-macro_rules! list_insert {
-    ($list:expr, $item:expr) => ({
-        {
-            let index = get_item_index!($list, $item, gt);
-            match index {
-                Some(index) => $list.write().unwrap().insert(index, Arc::clone(&$item)),
-                None => list_insert_end!($list, $item),
-            }
-        }
-    })
-}
-
-// /// # Description
-// /// * set list item container
-// /// # Argument
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// * `$name` - ListName
-// /// # Return
-// /// * Nothing
-#[macro_export]
-macro_rules! set_list_item_container {
-    ($item:expr, $name:expr) => ({
-        {
-            $item.write().unwrap().container = Some($name);
-        }
-    })
-}
-
-// /// # Description
-// /// * get list item container
-// /// # Argument
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// # Return
-// /// * Option<ListName>
-#[macro_export]
-macro_rules! get_list_item_container {
-    ($item:expr) => ({
-        {
-            $item.read().unwrap().container
-        }
-    })
-}
-
-// /// # Description
-// /// * remove the $item in $list, panic if the $item not in $list
-// /// # Argument
-// /// * `$list` - list
-// /// * `$item` - Arc<RwLock<ListItem>>
-// /// # Return
-// /// * Nothing
-#[macro_export]
-macro_rules! list_remove_inner {
-    ($list:expr, $item:expr) => ({
-        {
-            let index = get_item_index!($list, $item, eq);
-            match index {
-                Some(index) => $list.write().unwrap().remove(index),
-                None => panic!("attemp to remove an item that actually not exsited"),
-            }
-        }
-    })
-}
-
-
-/// # Description
-/// remove one item and return the current list length
-/// # Arguments
-/// $item: Arc<RwLock<ListItem>>
-/// $list: List
-/// #Return
-/// current list item
-#[macro_export]
-macro_rules! list_remove {
-    // not know the container
-    ($item:expr) => ({
-        {
-            let index = get_list_item_container!($item).unwrap() as usize;
-            list_remove!((global_lists.write().unwrap())[index], $item)
-        }
-    });
-    // konw the container 
-    ($list:expr, $item:expr) => ({
-        {
-            let index = get_item_index!($list, $item, eq);
-            match index {
-                Some(index) => {
-                    $list.write().unwrap().remove(index);
-                    current_list_length!($list)
-                },
-                None => panic!("item not in list, check your code!"),
-            }
-        }
-    })
-}
-
-/// # Description
-/// * set $item's container None
-/// # Argument
-/// * `$item` - list item
-/// # Return
-/// * Nothing
-#[macro_export]
-macro_rules! list_initialise_item {
-    ($item:expr) => ({
-        {
-            $item.write().unwrap().container = None;
-        }
-    })
-}
-
-/// # Description
-/// * make $list empty with no item in it
-/// # Argument
-/// * `$list` - list
-/// # Return
-/// * Nothing
-#[macro_export]
-macro_rules! list_initialise {
-    ($list:expr) => ({
-        {
-            $list.write().unwrap().clear();
-        }
-    })
-}
-
-/// # Description
-/// * return true if $list contain $item, otherwise false
-/// # Argument
-/// * `$list` - list
-/// * `$item` - list item
-/// # Return
-/// * is_contained: bool
-#[macro_export]
-macro_rules! is_contained_within {
-    ($list:expr, $item:expr) => ({
-        {
-            let index = get_item_index!($list, $item, eq);
-            match index {
-                Some(index) => {
-                    true
-                },
-                None => {
-                    false
-                }
-            }
-
-        }
-    })
-}
-
-/// # Description
-/// * return true if $list is empty, otherwise false
-/// # Argument
-/// * `$list` - list
-/// # Return
-/// * is_empty: bool
-#[macro_export]
-macro_rules! list_is_empty {
-    ($list:expr) => ({
-        {
-            $list.read().unwrap().is_empty()
-        }
-    })
-}
-
-/// # Description
-/// * get current list length
-/// # Argument
-/// * `$list` - list
-/// # Return
-/// * len: u32
-#[macro_export]
-macro_rules! current_list_length {
-    ($list:expr) => ({
-        {
-            $list.read().unwrap().len()
-        }
-    })
-}
-
-/// # Description
-/// * get the next item of $list, and the current item is $item. If $item is not in $list, panic!.
-/// # Argument
-/// * `$list` - Arc<RwLock<List>>
-/// * `$item` - list item
-/// # Return
-/// * item: Arc<RwLock<ListItem>>
-#[macro_export]
-macro_rules! get_next {
-    ($list:expr, $item:expr) => ({
-        {
-            let index = get_item_index!($list, $item, eq);
-            match index {
-                Some(index) => {
-                    Arc::clone(&($list.read().unwrap())[(index + 1) % current_list_length!($list)])
-                },
-                None => panic!("item not found"),
-            }
-        }
-    })
-}
-
-/// # Description
-/// * set list item value
-/// # Argument
-/// * `$item` - list item
-/// * `$value` - item_value
-/// # Return
-/// * No return
-#[macro_export]
-macro_rules! set_list_item_value {
-    ($item:expr, $value:expr) => ({
-        {
-            $item.write().unwrap().item_value = $value;
-        }
-    })
-}
-
-/// # Description
-/// * get list item value
-/// # Argument
-/// * `$item` - list item
-/// # Return
-/// * item_value: TickType
-#[macro_export]
-macro_rules! get_list_item_value {
-    ($item:expr) => ({
-        {
-            $item.read().unwrap().item_value
-        }
-    })
-}
-
-/// # Description
-/// * get item_value of the head_entry of the list. If the list is empty, panic!
-/// # Argument
-/// * `$list` - Arc<RwLock<List>>
-/// # Return
-/// * item_value: TickType
-#[macro_export]
-macro_rules! get_item_value_of_head_entry {
-    ($list:expr) => ({
-        {
-            if !list_is_empty!($list) {
-                ($list.read().unwrap())[0].read().unwrap().item_value
-            } else {
-                panic!("no head entry");
-            }
-        }
-    })
-}
-
+/*
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
+
     #[test]
-    fn test_rwlock() {
-        let lock = ListItem::new(10);
-        lock.write().unwrap().item_value = 11;
-        assert_eq!(lock.read().unwrap().item_value, 11);
-    }
-    #[test]
-    fn test_basic() {
-        let mut item = ListItem::new(100);
-        let mut list1: List = List_new!();
-        let mut list = vec![list1];
-        let mut list1 = &mut list[0];
-        list_insert_end!(list1, item);
-        assert_eq!((list1.read().unwrap())[0].read().unwrap().item_value, 100);
-    }
-    #[test]
-    fn test_some_macros() {
-        let mut item1 = ListItem::new(100);
-        let mut item2 = ListItem::new(200);
-        let mut item3 = ListItem::new(300);
-        let mut item4 = ListItem::new(400);
-        let mut list1: List = List_new!();
+    fn test_all() {
+        let list = Arc::new(RwLock::new(List::default()));
+        println!("List");
 
-        let mut list = vec![list1];
-        let mut list1 = &mut list[0];
+        let t1 = TCB::new(3, &list).init();
+        let t2 = TCB::new(2, &list).init();
 
-        assert_eq!(list_is_empty!(list1), true);
+        let x = get_owner_of_head_entry(&list);
+        println!("{:?}, should be 3", x);
 
-        set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
-        assert_eq!(0, item1.read().unwrap().container.unwrap() as i32);
+        let t3 = TCB::new(5, &list).init();
 
-        list_insert_end!(list1, item1);
-        list_insert_end!(list1, item3);
-        list_insert!(list1, item2);
-        list_insert!(list1, item4);
-        assert_eq!((list1.read().unwrap())[0].read().unwrap().item_value, 100);
-        set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
-        assert_eq!((list1.read().unwrap())[1].read().unwrap().item_value, 200);
-        set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
-        assert_eq!((list1.read().unwrap())[2].read().unwrap().item_value, 300);
-        set_list_item_container!(item1, ListName::READY_TASK_LISTS_0);
-        assert_eq!((list1.read().unwrap())[3].read().unwrap().item_value, 400);
+        let x = get_owner_of_next_entry(&list);
+        println!("{:?}, should be 3", x);
 
-        list_remove!(list1, item3);
-        assert_eq!((list1.read().unwrap())[0].read().unwrap().item_value, 100);
-        assert_eq!((list1.read().unwrap())[1].read().unwrap().item_value, 200);
-        assert_eq!((list1.read().unwrap())[2].read().unwrap().item_value, 400);
+        let t4 = TCB::new(1, &list).init();
 
-        assert_eq!(get_item_value_of_head_entry!(list1), 100);
-        assert_eq!(get_list_item_value!(item2), 200);
+        let x = get_owner_of_next_entry(&list);
+        println!("{:?}, should be 2", x);
 
-        let mut item = get_next!(list1, item4);
-        assert_eq!(get_list_item_value!(item), 100);
+        let t5 = TCB::new(0, &list).init();
 
+        let x = get_owner_of_next_entry(&list);
+        println!("{:?}, should be 5", x);
 
+        let x = list_remove(Arc::clone(&t2.0.read().unwrap().item));
+        assert_eq!(x, 4);
+
+        let x = get_owner_of_head_entry(&list);
+        println!("{:?}, should be 1", x);
+
+        let item = Arc::clone(&t1.0.read().unwrap().item);
+        assert!(is_contained_within(&list, Arc::clone(&item)));
+        let x = list_remove(Arc::clone(&item));
+        // assert!(!is_contained_within(&list, Arc::clone(&item)));
+        assert_eq!(x, 3);
+
+        let x = get_owner_of_next_entry(&list);
+        println!("{:?}, should be 1", x);
+
+        let x = get_owner_of_next_entry(&list);
+        println!("{:?}, should be 0", x);
+
+        let x = get_owner_of_next_entry(&list);
+        println!("{:?}, should be 5", x);
+
+        let x = get_owner_of_next_entry(&list);
+        println!("{:?}, should be 1", x);
     }
 }
+*/

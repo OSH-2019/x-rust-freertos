@@ -1,11 +1,11 @@
-use crate::kernel::*;
-use crate::list::*;
-use crate::port::*;
+use crate::port::*; 
 use crate::projdefs::FreeRtosError;
 use crate::task_global::*;
+use crate::list;
+use crate::list::{ItemLink};
 use crate::*;
 use std::boxed::FnBox;
-use std::sync::{Arc, RwLock};
+use std::sync::{Weak, Arc, RwLock};
 use std::mem;
 
 //* task states
@@ -27,8 +27,8 @@ pub enum updated_top_priority {
 #[derive(Debug)]
 pub struct task_control_block {
     //* basic information
-    state_list_item: Arc<RwLock<ListItem>>,
-    event_list_item: Arc<RwLock<ListItem>>,
+    state_list_item: ItemLink,
+    event_list_item: ItemLink,
     task_priority: UBaseType,
     task_stacksize: UBaseType,
     task_name: String,
@@ -66,8 +66,8 @@ pub type Task = task_control_block;
 impl task_control_block {
     pub fn new() -> Self {
         task_control_block {
-            state_list_item: ListItem::new(0),
-            event_list_item: ListItem::new(0),
+            state_list_item: Default::default(),
+            event_list_item: Default::default(),
             task_priority  : 1,
             task_stacksize : configMINIMAL_STACK_SIZE!(),
             task_name      : String::from("Unnamed"),
@@ -212,25 +212,21 @@ impl task_control_block {
         // TODO: Change type of list_items.
         let state_list_item = handle.get_state_list_item();
         let event_list_item = handle.get_event_list_item();
-        set_list_item_owner!(state_list_item, &handle.0);
-        set_list_item_owner!(event_list_item, &handle.0);
+        list::set_list_item_owner(&state_list_item, handle.clone());
+        list::set_list_item_owner(&event_list_item, handle.clone());
         let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
-        set_list_item_value!(state_list_item, item_value);
-
-        // `stack_pos` is a unique number for each task, so it is prefect to be a hash code.
-        set_list_item_hash!(state_list_item, sp);
-        set_list_item_hash!(event_list_item, sp);
+        list::set_list_item_value(&state_list_item, item_value);
 
         handle.add_new_task_to_ready_list()?;
 
         Ok(handle)
     }
 
-    pub fn get_state_list_item(&self) -> Arc<RwLock<ListItem>> {
+    pub fn get_state_list_item(&self) -> ItemLink {
         Arc::clone(&self.state_list_item)
     }
 
-    pub fn get_event_list_item(&self) -> Arc<RwLock<ListItem>> {
+    pub fn get_event_list_item(&self) -> ItemLink {
         Arc::clone(&self.event_list_item)
     }
 
@@ -339,7 +335,7 @@ pub fn initialize_task_list () {
     /* Start with pxDelayedTaskList using list1 and the pxOverflowDelayedTaskList
        using list2. */
     DELAY_TASK_LIST = &DELAY_TASK_LIST1;
-    OVERFLOW_DELAY_TASK_LIST = &DELAY_TASK_LIST2;
+    OVERFLOW_DELAYED_TASK_LIST = &DELAY_TASK_LIST2;
 }
 */
 
@@ -355,13 +351,40 @@ impl PartialEq for TaskHandle {
     }
 }
 
+impl From<Weak<RwLock<TCB>>> for TaskHandle {
+    fn from(weak_link: Weak<RwLock<TCB>>) -> Self {
+        TaskHandle(weak_link
+                   .upgrade()
+                   .unwrap_or_else(|| panic!("Owner is not set"))
+                   )
+    }
+}
+
+
+impl From<TaskHandle> for Weak<RwLock<TCB>> {
+    fn from(task: TaskHandle) -> Self {
+        Arc::downgrade(&task.0)
+    }
+}
+
 impl TaskHandle {
     pub fn from_arc(arc: Arc<RwLock<TCB>>) -> Self {
         TaskHandle(arc)
     }
 
+    /// # Description:
+    /// Construct a TaskHandle with a TCB. */
+    /// * Implemented by: Fan Jinhao.
+    /// * C implementation: 
+    ///
+    /// # Arguments 
+    /// * `tcb`: The TCB that we want to get TaskHandle from.
+    ///
+    /// # Return
+    /// 
+    /// The created TaskHandle.
     pub fn from(tcb: TCB) -> Self {
-        /* Construct a TaskHandle with a TCB. */
+        // TODO: Implement From.
         TaskHandle(Arc::new(RwLock::new(tcb)))
     }
 
@@ -381,6 +404,19 @@ impl TaskHandle {
         get_tcb_from_handle_mut!(self).set_priority(new_priority);
     }
 
+    /// # Description:
+    /// Place the task represented by pxTCB into the appropriate ready list for
+    /// the task.  It is inserted at the end of the list.
+    ///
+    /// * Implemented by: Fan Jinhao.
+    /// * C implementation: 
+    ///
+    /// # Arguments 
+    /// 
+    ///
+    /// # Return
+    /// 
+    /// TODO
     pub fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
         let unwrapped_tcb = get_tcb_from_handle!(self);
         let priority = self.get_priority();
@@ -398,12 +434,26 @@ impl TaskHandle {
         };
         */
         // TODO: This line is WRONG! (just for test)
-        set_list_item_container!(unwrapped_tcb.state_list_item, list::ListName::READY_TASK_LISTS_1);
-        list_insert_end!(nth_ready_list_mut!(priority), unwrapped_tcb.state_list_item);
+        // set_list_item_container!(unwrapped_tcb.state_list_item, list::ListName::READY_TASK_LISTS_1);
+        list::list_insert_end(&READY_TASK_LISTS[priority as usize], 
+                              Arc::clone(&unwrapped_tcb.state_list_item));
         tracePOST_MOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
         Ok(())
     }
 
+    /// # Description:
+    /// Called after a new task has been created and initialised to place the task
+    /// under the control of the scheduler.
+    /// 
+    /// * Implemented by: Fan Jinhao.
+    /// * C implementation: 
+    ///
+    /// # Arguments 
+    /// 
+    ///
+    /// # Return
+    /// 
+    /// TODO
     fn add_new_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
         let unwrapped_tcb = get_tcb_from_handle!(self);
 
@@ -450,11 +500,11 @@ impl TaskHandle {
         Ok(())
     }
 
-    pub fn get_event_list_item(&self) -> Arc<RwLock<ListItem>> {
+    pub fn get_event_list_item(&self) -> ItemLink {
         get_tcb_from_handle!(self).get_event_list_item()
     }
 
-    pub fn get_state_list_item(&self) -> Arc<RwLock<ListItem>> {
+    pub fn get_state_list_item(&self) -> ItemLink {
         get_tcb_from_handle!(self).get_state_list_item()
     }
 
@@ -533,12 +583,15 @@ pub fn delete_tcb (tcb_to_delete :std::sync::RwLockReadGuard<'_, task_control::t
     //port_free (*tcb_to_delete.stack_pos);
 }
 
-// TODO : prvAddCurrentTaskToDelayedList tasks.c 4692
 pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_indefinitely: bool) {
-
-    let mut time_to_wake :TickType = 0;
+    /*
+     * The currently executing task is entering the Blocked state.  Add the task to
+     * either the current or the overflow delayed task list.
+     */
+    trace!("ADD");
 
     let unwrapped_cur = get_current_task_handle!();
+    trace!("Remove succeeded");
 
     {
         #![cfg(feature = "INCLUDE_xTaskAbortDelay")]
@@ -551,43 +604,48 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
         // NOTE by Fan Jinhao: Is this line necessary?
         // set_current_task_handle!(unwrapped_cur);
     }
+    trace!("Abort succeeded");
 
     /* Remove the task from the ready list before adding it to the blocked list
        as the same list item is used for both lists. */
-    if list_remove!( unwrapped_cur.get_state_list_item() ) == 0 {
+    if list::list_remove(unwrapped_cur.get_state_list_item()) == 0 {
+        trace!("Returned 0");
         /* The current task must be in a ready list, so there is no need to
            check, and the port reset macro can be called directly. */
         portRESET_READY_PRIORITY! ( unwrapped_cur.get_priority () , get_top_ready_priority!() );
     } else {
+        trace!("Returned not 0");
         mtCOVERAGE_TEST_MARKER!();
     }
 
+    trace!("Remove succeeded");
     {
         #![cfg(feature = "INCLUDE_vTaskSuspend")]
         if ticks_to_wait == portMAX_DELAY && can_block_indefinitely {
             /* Add the task to the suspended task list instead of a delayed task
                list to ensure it is not woken by a timing event.  It will block
                indefinitely. */
-            list_insert_end! ( get_list!(SUSPENDED_TASK_LIST) , unwrapped_cur.get_state_list_item() );
+            let cur_state_list_item = unwrapped_cur.get_state_list_item();
+            list::list_insert_end(&SUSPEND_TASK_LIST, cur_state_list_item);
         } else {
             /* Calculate the time at which the task should be woken if the event
                does not occur.  This may overflow but this doesn't matter, the
                kernel will manage it correctly. */
-            time_to_wake = get_tick_count!() + ticks_to_wait;
+            let time_to_wake = get_tick_count!() + ticks_to_wait;
 
             /* The list item will be inserted in wake time order. */
-            set_list_item_value!( unwrapped_cur.get_state_list_item(), time_to_wake );
+            let cur_state_list_item = unwrapped_cur.get_state_list_item();
+            list::set_list_item_value(&cur_state_list_item, time_to_wake);
 
             if time_to_wake < get_tick_count!() {
                 /* Wake time has overflowed.  Place this item in the overflow
                    list. */
-                list_insert! ( get_list!(OVERFLOW_DELAYED_TASK_LIST),
-                               unwrapped_cur.get_state_list_item() );
+                list::list_insert(&OVERFLOW_DELAYED_TASK_LIST, cur_state_list_item);
             } else {
                 /* The wake time has not overflowed, so the current block list
                    is used. */
-                list_insert! ( get_list!(DELAYED_TASK_LIST),
-                               unwrapped_cur.get_state_list_item() );
+                set_list_item_container!(cur_state_list_item, DELAYED_TASK_LIST);
+                list::list_insert(&DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item());
 
                 /* If the task entering the blocked state was placed at the
                    head of the list of blocked tasks then xNextTaskUnblockTime
@@ -606,22 +664,21 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
         /* Calculate the time at which the task should be woken if the event
            does not occur.  This may overflow but this doesn't matter, the kernel
            will manage it correctly. */
-        time_to_wake = get_tick_count!() + ticks_to_wait;
+        let time_to_wake = get_tick_count!() + ticks_to_wait;
 
+        let cur_state_list_item = unwrapped_cur.get_state_list_item();
         /* The list item will be inserted in wake time order. */
-        set_list_item_value!( unwrapped_cur.get_state_list_item(), time_to_wake );
+        list::set_list_item_value(&cur_state_list_item, time_to_wake);
 
-        if( time_to_wake < get_tick_count!() )
+        if time_to_wake < get_tick_count!()
         {
             /* Wake time has overflowed.  Place this item in the overflow list. */
-            list_insert! ( get_list!(OVERFLOW_DELAYED_TASK_LIST),
-                unwrapped_cur.get_state_list_item() );
+            list::list_insert(&OVERFLOW_DELAYED_TASK_LIST, cur_state_list_item);
         }
         else
         {
             /* The wake time has not overflowed, so the current block list is used. */
-            list_insert! ( get_list!(DELAYED_TASK_LIST),
-            unwrapped_cur.get_state_list_item() );
+            list::list_insert(&DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item());
 
             /* If the task entering the blocked state was placed at the head of the
                list of blocked tasks then xNextTaskUnblockTime needs to be updated
@@ -639,9 +696,12 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
         /* Avoid compiler warning when INCLUDE_vTaskSuspend is not 1. */
         // ( void ) xCanBlockIndefinitely;
     }
+
+    trace!("Place succeeded");
 }
 
 
+/*
 pub fn reset_next_task_unblock_time () {
     if list_is_empty! (get_list!(DELAYED_TASK_LIST)) {
 		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
@@ -860,3 +920,4 @@ pub fn resume_task (task_to_resume: TaskHandle){
         mtCOVERAGE_TEST_MARKER!();
     }
 }
+*/

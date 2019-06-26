@@ -1,6 +1,5 @@
 // config.rs - Macros starting with "config" who evaluate to a numeric value. 
 // This file is adapted from FreeRTOSConfig.h
-use crate::port::TickType;
 
 // TODO: Provide configASSERT() (or not?).
 #[macro_export]

@@ -1,8 +1,8 @@
 use crate::*;
 use crate::port::{BaseType, UBaseType, TickType};
-use crate::list::{LIST, List};
+use crate::list::ListLink;
 use crate::task_control::TaskHandle;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 /* Some global variables. */
 pub static mut TICK_COUNT: TickType = 0;
@@ -16,32 +16,6 @@ pub static mut NEXT_TASK_UNBLOCK_TIME: TickType = 0;
 pub static mut CURRENT_NUMBER_OF_TASKS: UBaseType = 0;
 
 /* GLOBAL TASK LISTS ARE CHANGED TO INTEGERS, WHICH ARE THEIR IDS. */
-pub static mut READY_TASK_LISTS: [UBaseType; configMAX_PRIORITIES!()] = [ 0 ; configMAX_PRIORITIES!() ];
-
-/* Delayed tasks (two lists are used - one for delays that have overflowed the current tick count.
-*/
-// Points to the delayed task list currently being used.
-pub static mut DELAYED_TASK_LIST: UBaseType = 0;
-
-/* Points to the delayed task list currently being used
- * to hold tasks that have overflowed the current tick count.
- */
-pub static mut OVERFLOW_DELAYED_TASK_LIST: UBaseType = 0;
-
-/* Tasks that have been readied while the scheduler was suspended.
- * They will be moved to the ready list when the scheduler is resumed.
- */
-pub static mut PENDING_READY_LIST: UBaseType = 0;
-
-// Tasks that have been deleted - but their memory not yet freed.
-#[cfg(feature = "INCLUDE_vTaskDelete")]
-pub static mut TASKS_WAITING_TERMINATION: UBaseType = 0;
-#[cfg(feature = "INCLUDE_vTaskDelete")]
-pub static mut DELETED_TASKS_WAITING_CLEAN_UP: UBaseType = 0;
-
-// Tasks that are currently suspended.
-#[cfg(feature = "INCLUDE_vTaskSuspend")]
-pub static mut SUSPENDED_TASK_LIST: UBaseType = 0;
 
 /* Current_TCB and global task lists. */
 lazy_static! {
@@ -51,80 +25,37 @@ lazy_static! {
      * We use setter and getter to modify CURRENT_TCB, they are defined at the end of this file.
      */
     pub static ref CURRENT_TCB: RwLock<Option<TaskHandle>> = RwLock::new(None);
-    // GLOBAL LISTS are actually stored here.
-    pub static ref global_lists: Arc<RwLock<Vec<List>>> = Arc::new(RwLock::new(
-            Vec::new()
-    ));
+    pub static ref READY_TASK_LISTS: [ListLink; configMAX_PRIORITIES!()] = Default::default();
+
+    /* Delayed tasks (two lists are used - one for delays that have overflowed the current tick count.
+    */
+    // Points to the delayed task list currently being used.
+    pub static ref DELAYED_TASK_LIST: ListLink = Default::default();
+
+    /* Points to the delayed task list currently being used
+     * to hold tasks that have overflowed the current tick count.
+     */
+    pub static ref OVERFLOW_DELAYED_TASK_LIST: ListLink = Default::default();
+
+    /* Tasks that have been readied while the scheduler was suspended.
+     * They will be moved to the ready list when the scheduler is resumed.
+     */
+    pub static ref PENDING_READY_LIST: ListLink = Default::default();
 }
 
+#[cfg(feature = "INCLUDE_vTaskDelete")]
+lazy_static! {
+    // Tasks that have been deleted - but their memory not yet freed.
+    pub static ref TASKS_WAITING_TERMINATION: ListLink = Default::default();
+    pub static ref DELETED_TASKS_WAITING_CLEAN_UP: ListLink = Default::default();
+}
+
+#[cfg(feature = "INCLUDE_vTaskSuspend")]
+lazy_static! {
+    // Tasks that are currently suspended.
+    pub static ref SUSPENDED_TASK_LIST: ListLink = Default::default();
+}
 /* ------------------ End global lists ------------------- */
-
-pub fn init() {
-    unsafe {
-        for i in 0..configMAX_PRIORITIES!() {
-            READY_TASK_LISTS[i] = add_list_count!();
-        }
-        DELAYED_TASK_LIST = add_list_count!();
-        OVERFLOW_DELAYED_TASK_LIST = add_list_count!();
-        PENDING_READY_LIST = add_list_count!();
-
-        #[cfg(feature = "INCLUDE_vTaskDelete")]
-        {
-            TASKS_WAITING_TERMINATION = add_list_count!();
-        }
-
-        #[cfg(feature = "INCLUDE_vTaskSuspend")]
-        {
-            SUSPENDED_TASK_LIST = add_list_count!();
-        }
-    }
-    *global_lists.write().unwrap() = (0..get_list_count!()).map(|_| List_new!()).collect();
-}
-
-static mut LIST_COUNT: UBaseType = 0;
-
-pub fn add_list() -> UBaseType {
-    global_lists.write().unwrap().push(List_new!());
-    add_list_count!()
-}
-
-#[macro_export]
-macro_rules! add_list_count {
-    () => (
-        unsafe {
-            let old_list_count = LIST_COUNT;
-            LIST_COUNT += 1;
-            old_list_count
-        }
-    )
-}
-
-#[macro_export]
-macro_rules! get_list_count {
-    () => (
-        unsafe {
-            LIST_COUNT
-        }
-    )
-}
-
-#[macro_export]
-macro_rules! get_list {
-    ($list_name: expr) => (
-        unsafe {
-            &global_lists.read().unwrap()[$list_name as usize]
-        }
-    )
-}
-
-#[macro_export]
-macro_rules! get_list_mut {
-    ($list_name: expr) => (
-        unsafe {
-            &global_lists.write().unwrap()[$list_name as usize]
-        }
-    )
-}
 
 /* Context switches are held pending while the scheduler is suspended.  Also,
 interrupts must not manipulate the xStateListItem of a TCB, or any of the
@@ -421,29 +352,17 @@ macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
 }
 
 #[macro_export]
-macro_rules! nth_ready_list {
-    ($n: expr) => (
-        get_list!(crate::task_global::READY_TASK_LISTS[$n as usize])
-    )
-}
-
-#[macro_export]
-macro_rules! nth_ready_list_mut {
-    ($n: expr) => (
-        get_list_mut!(crate::task_global::READY_TASK_LISTS[$n as usize])
-    )
-}
-
-#[macro_export]
 macro_rules! switch_delayed_lists {
     () => (
         /* pxDelayedTaskList and pxOverflowDelayedTaskList are switched when the tick
            count overflows. */
         // TODO: tasks.c 239
         unsafe {
-            let tmp = DELAYED_TASK_LIST;
-            DELAYED_TASK_LIST = OVERFLOW_DELAYED_TASK_LIST;
-            OVERFLOW_DELAYED_TASK_LIST = tmp;
+            let mut delayed = DELAYED_TASK_LIST.write().unwrap();
+            let mut overflowed = OVERFLOW_DELAYED_TASK_LIST.write().unwrap();
+            let tmp = (*delayed).clone();
+            *delayed = (*overflowed).clone();
+            *overflowed = tmp;
         }
     )
 }
