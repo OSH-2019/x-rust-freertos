@@ -5,10 +5,10 @@ use crate::port::*;
 //use std::rc::Rc;
 //use std::cell::{RefCell, Ref, RefMut};
 use crate::*;
+use crate::list::*;
 use crate::queue_h::*;
 //use crate::projdefs::*;
 use crate::task_queue::*;
-use crate::task_global::*;
 //use volatile::Volatile;
 //
 pub const queueQUEUE_IS_MUTEX:UBaseType = 0;
@@ -34,8 +34,8 @@ pub struct QueueDefinition<T>
     /*pcReadFrom & uxRecuriveCallCount*/
     QueueUnion:UBaseType,
 
-    xTasksWaitingToSend:UBaseType,
-    xTasksWaitingToReceive:UBaseType,
+    xTasksWaitingToSend:ListLink,
+    xTasksWaitingToReceive:ListLink,
 
     uxMessagesWaiting: UBaseType,
     uxLength: UBaseType,
@@ -130,8 +130,8 @@ impl <T>QueueDefinition<T>
             self.cTxLock = queueUNLOCKED;
             self.pcQueue.clear();//初始化空队列
             if xNewQueue == false {
-                if list_is_empty!(get_list!(self.xTasksWaitingToSend)) == false {
-                    if task_remove_from_event_list(get_list!(self.xTasksWaitingToSend)) != false{
+                if list::list_is_empty(&self.xTasksWaitingToSend) == false {
+                    if task_queue::task_remove_from_event_list(&self.xTasksWaitingToSend) != false{
                         queueYIELD_IF_USING_PREEMPTION!();
                     }
                     else{
@@ -143,8 +143,8 @@ impl <T>QueueDefinition<T>
                 }
             }
             else{
-                self.xTasksWaitingToSend = add_list();
-                self.xTasksWaitingToReceive = add_list();
+                self.xTasksWaitingToSend = Default::default();
+                self.xTasksWaitingToReceive = Default::default();
             }
         }
         taskEXIT_CRITICAL!();
@@ -189,8 +189,8 @@ impl <T>QueueDefinition<T>
                             }
                         },
                         None => {
-                            if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false {
-                                if task_remove_from_event_list(&self.xTasksWaitingToReceive) {
+                            if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
+                                if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) {
                                     queueYIELD_IF_USING_PREEMPTION!();
                                 }
                                 else {
@@ -202,8 +202,8 @@ impl <T>QueueDefinition<T>
 
                     {
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                        if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false {
-                            if task_queue::task_remove_from_event_list(get_list!(self.xTasksWaitingToReceive)) != false {
+                        if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
+                            if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) != false {
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
@@ -243,7 +243,7 @@ impl <T>QueueDefinition<T>
             if task_queue::task_check_for_timeout(&mut xTimeOut, &mut xTicksToWait) == false {
                 if self.is_queue_full() != false {
                     traceBLOCKING_ON_QUEUE_SEND!(self);
-                    task_queue::task_place_on_event_list(get_list!(self.xTasksWaitingToSend), xTicksToWait);
+                    task_queue::task_place_on_event_list(&self.xTasksWaitingToSend, xTicksToWait);
 
                     self.unlock_queue();
 
@@ -303,8 +303,8 @@ impl <T>QueueDefinition<T>
                             }
                         }
                         None => {
-                            if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
-                                if task_remove_from_event_list( &self.xTasksWaitingToReceive ) != false{
+                            if list::list_is_empty(&self.xTasksWaitingToReceive) == false{
+                                if task_queue::task_remove_from_event_list( &self.xTasksWaitingToReceive ) != false{
                                     pxHigherPriorityTaskWoken = true;
                                 }
                                 else {
@@ -319,8 +319,8 @@ impl <T>QueueDefinition<T>
                     
                     {
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                        if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
-                            if task_queue::task_remove_from_event_list(get_list!(self.xTasksWaitingToReceive)) != false{
+                        if list::list_is_empty(&self.xTasksWaitingToReceive) == false{
+                            if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
                                 pxHigherPriorityTaskWoken = true;
                             }
                             else {
@@ -387,16 +387,16 @@ impl <T>QueueDefinition<T>
                 match self.pxQueueSetContainer{
                     Some =>{
                         if notify_queue_set_container(self, queueSEND_TO_BACK) != false{
-                            task_missed_yield();
+                            task_queue::task_missed_yield();
                         }
                         else {
                             mtCOVERAGE_TEST_MARKER!();
                         }
                     }
                     None =>{
-                        if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
-                            if task_remove_from_event_list( &self.xTasksWaitingToReceive) != false{
-                                task_missed_yield();
+                        if list::list_is_empty(&self.xTasksWaitingToReceive) == false{
+                            if task_queue::task_remove_from_event_list( &self.xTasksWaitingToReceive) != false{
+                                task_queue::task_missed_yield();
                             }
                             else {
                                 mtCOVERAGE_TEST_MARKER!();
@@ -409,9 +409,9 @@ impl <T>QueueDefinition<T>
                 }
                 {
                     #![cfg(not(feature = "configUSE_QUEUE_SETS"))] 
-                    if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
-                        if task_queue::task_remove_from_event_list(get_list!(self.xTasksWaitingToReceive)) != false{
-                            task_missed_yield();
+                    if list::list_is_empty(&self.xTasksWaitingToReceive) == false{
+                        if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
+                            task_queue::task_missed_yield();
                         }
                         else {
                             mtCOVERAGE_TEST_MARKER!();
@@ -432,9 +432,9 @@ impl <T>QueueDefinition<T>
         {
             let cRxLock:i8 = self.cRxLock;
             while cRxLock > queueLOCKED_UNMODIFIED{
-                if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) == false{
-                    if task_queue::task_remove_from_event_list(get_list!(self.xTasksWaitingToReceive)) != false{
-                        task_missed_yield();
+                if list::list_is_empty(&self.xTasksWaitingToReceive) == false{
+                    if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
+                        task_queue::task_missed_yield();
                     }
                     else {
                         mtCOVERAGE_TEST_MARKER!();
@@ -495,8 +495,8 @@ impl <T>QueueDefinition<T>
                             }
                         }
 
-                        if list_is_empty!(get_list!(self.xTasksWaitingToSend)) == false {
-                            if task_queue::task_remove_from_event_list(get_list!(self.xTasksWaitingToSend)) != false {
+                        if list::list_is_empty(&self.xTasksWaitingToSend) == false {
+                            if task_queue::task_remove_from_event_list(&self.xTasksWaitingToSend) != false {
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
@@ -512,8 +512,8 @@ impl <T>QueueDefinition<T>
                         /* The data is not being removed, so reset the read
 			    pointer. */
                         self.QueueUnion = pcOriginalReadPosition;//QueueUnnion represents pcReadFrom
-                        if list_is_empty!(get_list!(self.xTasksWaitingToReceive)) != false {
-                            if task_queue::task_remove_from_event_list(get_list!(self.xTasksWaitingToReceive)) != false{
+                        if list::list_is_empty(&self.xTasksWaitingToReceive) != false {
+                            if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
@@ -538,7 +538,7 @@ impl <T>QueueDefinition<T>
                     else if xEntryTimeSet == false {
                         /* The queue was empty and a block time was specified so
 			    configure the timeout structure. */
-                        task_set_time_out_state(&mut xTimeOut);
+                        task_queue::task_set_time_out_state(&mut xTimeOut);
                     }
                     else {
                         /* Entry time was already set. */
@@ -570,7 +570,7 @@ impl <T>QueueDefinition<T>
                             mtCOVERAGE_TEST_MARKER!();
                         }
                     }
-                    task_queue::task_place_on_event_list(get_list!(self.xTasksWaitingToReceive),xTicksToWait);
+                    task_queue::task_place_on_event_list(&self.xTasksWaitingToReceive,xTicksToWait);
                     self.unlock_queue();
                     if kernel::task_resume_all() == false {
                         portYIELD_WITHIN_API!();
@@ -627,7 +627,7 @@ impl <T>QueueDefinition<T>
             #![cfg(configUSE_MUTEXES)]
             if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex {
                 let task_handle = self.transed_task_handle_for_mutex(); 
-                xReturn = task_priority_disinherit(task_handle);
+                xReturn = task_queue::task_priority_disinherit(task_handle);
                 self.pcQueue.pop_front();
                 self.insert(0,None);
                 //self.pxMutexHolder = None;
