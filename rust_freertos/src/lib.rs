@@ -4,7 +4,7 @@
 #![allow(non_snake_case)]
 
 #![feature(fnbox)]
-
+#![feature(weak_ptr_eq)]
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]

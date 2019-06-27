@@ -290,7 +290,7 @@ impl <T>QueueDefinition<T>
                 traceQUEUE_SEND_FROM_ISR!(&self);
                 self.copy_data_to_queue(pvItemToQueue, xCopyPosition);
 
-                if cTxLock == queueUNLOCKED{
+                if cTxLock == queueUNLOCKED {
 
                     #[cfg(feature = "configUSE_QUEUE_SETS")]
                     match self.pxQueueSetContainer{
@@ -380,7 +380,7 @@ impl <T>QueueDefinition<T>
         
         taskENTER_CRITICAL!();
         {
-            let cTxLock:i8 = self.cTxLock;
+            let mut cTxLock:i8 = self.cTxLock;
             while cTxLock > queueLOCKED_UNMODIFIED{
 
                 #[cfg(feature = "configUSE_QUEUE_SETS")]
@@ -422,15 +422,15 @@ impl <T>QueueDefinition<T>
                     }
                 }
 
-                --cTxLock;
+                cTxLock = cTxLock - 1;
             }
-            self.cTxLock == queueUNLOCKED;
+            self.cTxLock = queueUNLOCKED;
         }
         taskEXIT_CRITICAL!();
 
         taskENTER_CRITICAL!();
         {
-            let cRxLock:i8 = self.cRxLock;
+            let mut cRxLock:i8 = self.cRxLock;
             while cRxLock > queueLOCKED_UNMODIFIED{
                 if list::list_is_empty(&self.xTasksWaitingToReceive) == false{
                     if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) != false{
@@ -440,7 +440,7 @@ impl <T>QueueDefinition<T>
                         mtCOVERAGE_TEST_MARKER!();
                     }
 
-                    --cRxLock;
+                    cRxLock = cRxLock - 1;
                 }
                 else {
                     break;
@@ -716,6 +716,22 @@ impl <T>QueueDefinition<T>
         self.uxMessagesWaiting = initial_count;
     }
 
+    pub fn QueueUnion_decrease(&mut self) {
+        self.QueueUnion = self.QueueUnion - 1;
+    }
+
+    pub fn QueueUnion_increase(&mut self) {
+        self.QueueUnion = self.QueueUnion + 1;
+    }
+
+    pub fn is_QueueUnion_zero(&self) -> bool{
+        if self.QueueUnion == 0 as UBaseType {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
     /*some api in queue.h*/
 
     /*
@@ -906,7 +922,7 @@ impl <T>QueueDefinition<T>
     }
     
 
-    fn transed_task_handle_for_mutex(&self) -> Option<task_control::TaskHandle>{
+    pub fn transed_task_handle_for_mutex(&self) -> Option<task_control::TaskHandle>{
         /* use unsafe to get transed_task_handle for mutex
          * inplemented by: Ning Yuting
          */
