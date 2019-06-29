@@ -461,6 +461,7 @@ pub fn task_resume_all() -> bool {
 fn move_tasks_to_ready_list() -> bool {
     let mut has_unblocked_task = false;
     while !list::list_is_empty(&PENDING_READY_LIST) {
+        trace!("PEDING_LIST not empty");
         has_unblocked_task = true;
         let task_handle = list::get_owner_of_head_entry(&PENDING_READY_LIST);
         let event_list_item = task_handle.get_event_list_item();
@@ -658,7 +659,8 @@ pub fn task_increment_tick() -> bool {
     tasks to be unblocked. */
     traceTASK_INCREMENT_TICK!(get_tick_count!());
 
-    if get_scheduler_suspended!() != pdFALSE as UBaseType {
+    trace!("SCHEDULER_SUSP is {}", get_scheduler_suspended!());
+    if get_scheduler_suspended!() == pdFALSE as UBaseType {
         /* Minor optimisation.  The tick count cannot change in this
         block. */
         let const_tick_count = get_tick_count!() + 1;
@@ -678,6 +680,7 @@ pub fn task_increment_tick() -> bool {
         has been found whose block time has not expired there is no need to
         look any further down the list. */
         if const_tick_count >= get_next_task_unblock_time!() {
+            trace!("UNBLOCKING!");
             loop {
                 if list::list_is_empty(&DELAYED_TASK_LIST) {
                     /* The delayed list is empty.  Set xNextTaskUnblockTime

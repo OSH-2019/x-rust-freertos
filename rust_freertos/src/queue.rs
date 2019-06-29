@@ -539,6 +539,7 @@ impl <T>QueueDefinition<T>
                         /* The queue was empty and a block time was specified so
 			    configure the timeout structure. */
                         task_queue::task_set_time_out_state(&mut xTimeOut);
+                        xEntryTimeSet = true;
                     }
                     else {
                         /* Entry time was already set. */

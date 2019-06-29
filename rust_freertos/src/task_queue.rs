@@ -3,6 +3,7 @@ use crate::list;
 use crate::list::ListLink;
 // use crate::kernel::*;
 use crate::*;
+use crate::projdefs::pdFALSE;
 use crate::task_control::*;
 use crate::task_global::*;
 
@@ -25,7 +26,7 @@ pub fn task_remove_from_event_list (event_list: &ListLink) -> bool {
 
     list::list_remove( unblocked_tcb.get_event_list_item() );
 
-    if get_scheduler_suspended!() > 0 {
+    if get_scheduler_suspended!() == pdFALSE as UBaseType {
         list::list_remove( unblocked_tcb.get_state_list_item() );
         unblocked_tcb.add_task_to_ready_list().unwrap();
     } else {
@@ -54,6 +55,7 @@ pub fn task_remove_from_event_list (event_list: &ListLink) -> bool {
         reset_next_task_unblock_time ();
     }
 
+    trace!("xreturn is {}", xreturn);
     xreturn
 }
 
@@ -75,6 +77,8 @@ pub fn task_set_time_out_state ( pxtimeout: &mut time_out ){
 }
 
 pub fn task_check_for_timeout (pxtimeout: &mut time_out, ticks_to_wait: &mut TickType) -> bool {
+    trace!("time_out is {:?}", pxtimeout);
+    trace!("ticks_to_wait is {}", ticks_to_wait);
     let mut xreturn: bool = false;
     // assert! (pxtimeout);
     // assert! (ticks_to_wait);
@@ -82,6 +86,7 @@ pub fn task_check_for_timeout (pxtimeout: &mut time_out, ticks_to_wait: &mut Tic
     taskENTER_CRITICAL! ();
     {
         let const_tick_count: TickType = get_tick_count!();
+        trace!("Tick_count is {}", const_tick_count);
         let unwrapped_cur = get_current_task_handle!();
         let mut cfglock1 = false;
         let mut cfglock2 = false;
@@ -106,15 +111,18 @@ pub fn task_check_for_timeout (pxtimeout: &mut time_out, ticks_to_wait: &mut Tic
             xreturn = false;
         }
 
-        if 0 != pxtimeout.overflow_count && const_tick_count >= pxtimeout.time_on_entering
+        if get_num_of_overflows!() != pxtimeout.overflow_count && const_tick_count >= pxtimeout.time_on_entering
         {
+            trace!("IF");
             xreturn = true;
         }
         else if const_tick_count - pxtimeout.time_on_entering  < *ticks_to_wait{
+            trace!("ELSE IF");
             *ticks_to_wait -= const_tick_count - pxtimeout.time_on_entering;
             task_set_time_out_state (pxtimeout);
             xreturn = false;
         } else {
+            trace!("ELSE");
             xreturn = true;
         }
     }
