@@ -31,3 +31,18 @@ pub fn task_delay (ticks_to_delay:TickType) {
         mtCOVERAGE_TEST_MARKER!();
     }
 }
+
+// pub fn task_delay_until (previous_wait_time: TickType, time_increasement: TickType) {
+//     let mut time_to_wait: TickType = 0;
+//     let mut already_yielded = false;
+//     let mut should_delay = false;
+
+//     assert! (previous_wait_time);
+//     assert! (time_increasement > 0);
+//     assert! (get_scheduler_suspended!() == 0);
+
+//     task_suspend_all ();
+//     {
+//         const const_tick_count: TickType = get_tick_count! ();
+//     }
+// }
