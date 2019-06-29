@@ -1,4 +1,4 @@
-use crate::port::*; 
+use crate::port::*;
 use crate::projdefs::FreeRtosError;
 use crate::task_global::*;
 use crate::list;
@@ -375,13 +375,13 @@ impl TaskHandle {
     /// # Description:
     /// Construct a TaskHandle with a TCB. */
     /// * Implemented by: Fan Jinhao.
-    /// * C implementation: 
+    /// * C implementation:
     ///
-    /// # Arguments 
+    /// # Arguments
     /// * `tcb`: The TCB that we want to get TaskHandle from.
     ///
     /// # Return
-    /// 
+    ///
     /// The created TaskHandle.
     pub fn from(tcb: TCB) -> Self {
         // TODO: Implement From.
@@ -409,13 +409,13 @@ impl TaskHandle {
     /// the task.  It is inserted at the end of the list.
     ///
     /// * Implemented by: Fan Jinhao.
-    /// * C implementation: 
+    /// * C implementation:
     ///
-    /// # Arguments 
-    /// 
+    /// # Arguments
+    ///
     ///
     /// # Return
-    /// 
+    ///
     /// TODO
     pub fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
         let unwrapped_tcb = get_tcb_from_handle!(self);
@@ -435,7 +435,7 @@ impl TaskHandle {
         */
         // TODO: This line is WRONG! (just for test)
         // set_list_item_container!(unwrapped_tcb.state_list_item, list::ListName::READY_TASK_LISTS_1);
-        list::list_insert_end(&READY_TASK_LISTS[priority as usize], 
+        list::list_insert_end(&READY_TASK_LISTS[priority as usize],
                               Arc::clone(&unwrapped_tcb.state_list_item));
         tracePOST_MOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
         Ok(())
@@ -444,15 +444,15 @@ impl TaskHandle {
     /// # Description:
     /// Called after a new task has been created and initialised to place the task
     /// under the control of the scheduler.
-    /// 
-    /// * Implemented by: Fan Jinhao.
-    /// * C implementation: 
     ///
-    /// # Arguments 
-    /// 
+    /// * Implemented by: Fan Jinhao.
+    /// * C implementation:
+    ///
+    /// # Arguments
+    ///
     ///
     /// # Return
-    /// 
+    ///
     /// TODO
     fn add_new_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
         let unwrapped_tcb = get_tcb_from_handle!(self);
