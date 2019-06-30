@@ -95,7 +95,12 @@ upon which the read was attempted.  pxCurrentTCB points to the TCB of the
 task that attempted the read. */
 #[macro_export]
 macro_rules! traceBLOCKING_ON_QUEUE_RECEIVE {
-    ($pxQueue: expr) => {};
+    ($pxQueue: expr) => {
+        trace!("Blocking task {} because it cannot read from {}.",
+               get_current_task_handle!().get_name(),
+               $pxQueue.get_queue_number()
+               );
+    };
 }
 
 /* Task is about to block because it cannot write to a
@@ -104,39 +109,56 @@ upon which the write was attempted.  pxCurrentTCB points to the TCB of the
 task that attempted the write. */
 #[macro_export]
 macro_rules! traceBLOCKING_ON_QUEUE_SEND {
-    ($pxQueue: expr) => {};
+    ($pxQueue: expr) => {
+        trace!("Blocking task {} because it cannot write to {}.",
+               get_current_task_handle!().get_name(),
+               $pxQueue.get_queue_number()
+               );
+    };
 }
 
 /* The following event macros are embedded in the kernel API calls. */
 
 #[macro_export]
 macro_rules! traceMOVED_TASK_TO_READY_STATE {
-    ($pxTCB: expr) => {};
+    ($pxTCB: expr) => {
+        trace!("Moving task {} to ready state.", $pxTCB.get_name());
+    };
 }
 
 #[macro_export]
 macro_rules! tracePOST_MOVED_TASK_TO_READY_STATE {
-    ($pxTCB: expr) => {};
+    ($pxTCB: expr) => {
+        trace!("Task {} was moved to ready state.", $pxTCB.get_name());
+    };
 }
 
 #[macro_export]
 macro_rules! traceQUEUE_CREATE {
-    ($pxNewQueue: expr) => {};
+    ($pxNewQueue: expr) => {
+        trace!("Created queue {}", $pxNewQueue.get_queue_number());
+    };
 }
 
 #[macro_export]
 macro_rules! traceQUEUE_CREATE_FAILED {
-    ($ucQueueType: expr) => {};
+    ($ucQueueType: expr) => {
+        warn!("Queue creation failed.");
+    };
 }
 
 #[macro_export]
 macro_rules! traceCREATE_MUTEX {
-    ($pxNewQueue: expr) => {};
+    ($pxNewQueue: expr) => {
+        trace!("Created mutex {}", $pxNewQueue.0.get_queue_number());
+    };
 }
 
 #[macro_export]
 macro_rules! traceCREATE_MUTEX_FAILED {
-    () => {};
+    () => {
+        warn!("Mutex creation failed.");
+    };
 }
 
 #[macro_export]
@@ -161,32 +183,44 @@ macro_rules! traceTAKE_MUTEX_RECURSIVE_FAILED {
 
 #[macro_export]
 macro_rules! traceCREATE_COUNTING_SEMAPHORE {
-    () => {};
+    () => {
+        trace!("Created counting semaphore: {}");
+    };
 }
 
 #[macro_export]
 macro_rules! traceCREATE_COUNTING_SEMAPHORE_FAILED {
-    () => {};
+    () => {
+        trace!("Counting semaphore creation failed.");
+    };
 }
 
 #[macro_export]
 macro_rules! traceQUEUE_SEND {
-    ($pxQueue: expr) => {};
+    ($pxQueue: expr) => {
+        trace!("Sending to queue {}", $pxQueue.get_queue_number());
+    };
 }
 
 #[macro_export]
 macro_rules! traceQUEUE_SEND_FAILED {
-    ($pxQueue: expr) => {};
+    ($pxQueue: expr) => {
+        warn!("Queue send failed!");
+    };
 }
 
 #[macro_export]
 macro_rules! traceQUEUE_RECEIVE {
-    ($pxQueue: expr) => {};
+    ($pxQueue: expr) => {
+        trace!("Receiving from queue {}", $pxQueue.get_queue_number());
+    };
 }
 
 #[macro_export]
 macro_rules! traceQUEUE_PEEK {
-    ($pxQueue: expr) => {};
+    ($pxQueue: expr) => {
+        trace!("Peeking from queue {}", $pxQueue.get_queue_number());
+    };
 }
 
 #[macro_export]
@@ -226,7 +260,9 @@ macro_rules! traceQUEUE_PEEK_FROM_ISR_FAILED {
 
 #[macro_export]
 macro_rules! traceQUEUE_DELETE {
-    ($pxQueue: expr) => {};
+    ($pxQueue: expr) => {
+        trace!("Deleting queue {}", pxQueue.get_queue_number());
+    };
 }
 
 /* This macro is defined in port.rs
@@ -238,7 +274,9 @@ macro_rules! traceTASK_CREATE {
 
 #[macro_export]
 macro_rules! traceTASK_CREATE_FAILED {
-    () => {};
+    () => {
+        warn!("Task creation failed!");
+    };
 }
 
 /* This macro is defined in port.rs
