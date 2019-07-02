@@ -1,4 +1,5 @@
 use crate::port::*;
+use std::fmt;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum QueueError {
@@ -7,6 +8,18 @@ pub enum QueueError {
     MutexTimeout,
     QueueFull,
     QueueEmpty
+}
+
+impl fmt::Display for QueueError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+          QueueSendTimeout => write!(f, "QueueSendTimeOut"),
+          QueueReceiveTimeout => write!(f, "QueueReceiveTimeOut"),
+          MutexTimeout => write!(f, "MutexSendTimeOut"),
+          QueueFull => write!(f, "QueueFull"),
+          QueueEmpty => write!(f, "QueueEmpty"),
+        }
+    }
 }
 
 pub const queueSEND_TO_BACK: BaseType = 0 ;
