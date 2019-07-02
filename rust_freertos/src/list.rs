@@ -164,10 +164,10 @@ fn set_weak_item_value(item: &WeakItemLink, item_value: TickType) {
  * @param pxListItem The list item being queried.
  * @return A pointer to the List_t object that references the pxListItem
  */
-pub fn get_list_item_container(item: &WeakItemLink) -> ListLink {
+pub fn get_list_item_container(item: &WeakItemLink) -> Option<ListLink> {
     let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
     let container = Weak::clone(&owned_item.read().unwrap().container);
-    container.upgrade().unwrap_or_else(|| panic!("Container of item was not set"))
+    container.upgrade()
 }
 
 /*
@@ -246,7 +246,7 @@ pub fn get_owner_of_head_entry(list: &ListLink) -> TaskHandle {
  */
 pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
     let weak_item_link = Arc::downgrade(item_link);
-    let container = get_list_item_container(&weak_item_link);
+    let container = get_list_item_container(&weak_item_link).unwrap_or_else(|| panic!("Container of item was not set"));
     Arc::ptr_eq(list, &container)
 }
 
