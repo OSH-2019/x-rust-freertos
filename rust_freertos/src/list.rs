@@ -246,8 +246,10 @@ pub fn get_owner_of_head_entry(list: &ListLink) -> TaskHandle {
  */
 pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
     let weak_item_link = Arc::downgrade(item_link);
-    let container = get_list_item_container(&weak_item_link).unwrap_or_else(|| panic!("Container of item was not set"));
-    Arc::ptr_eq(list, &container)
+    match get_list_item_container(&weak_item_link) {
+        Some(container) => Arc::ptr_eq(list, &container),
+        None => false,
+    }
 }
 
 /*
