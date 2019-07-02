@@ -14,17 +14,17 @@ impl fmt::Debug for ListItem {
  * Definition of the only type of object that a list can contain.
  */
 pub struct ListItem {
-    /* The value being listed.  In most cases this is used to sort the list in descending order. */   
+    /* The value being listed.  In most cases this is used to sort the list in descending order. */
     item_value: TickType,
-    /* Pointer to the next ListItem_t in the list. */   
+    /* Pointer to the next ListItem_t in the list. */
     next: WeakItemLink,
-    /* Pointer to the previous ListItem_t in the list. */   
+    /* Pointer to the previous ListItem_t in the list. */
     prev: WeakItemLink,
-    /* Pointer to the object (normally a TCB) that contains the list item.  
-     * There is therefore a two way link between the object containing the list item 
-     * and the list item itself. */   
+    /* Pointer to the object (normally a TCB) that contains the list item.
+     * There is therefore a two way link between the object containing the list item
+     * and the list item itself. */
     owner: Weak<RwLock<TCB>>,
-    /* Pointer to the list in which this list item is placed (if any). */   
+    /* Pointer to the list in which this list item is placed (if any). */
     container: Weak<RwLock<List>>
 }
 
@@ -80,11 +80,11 @@ impl ListItem {
 #[derive(Clone)]
 pub struct List {
     number_of_items: UBaseType,
-    /* Used to walk through the list.  
-     * Points to the last item returned by a call to listGET_OWNER_OF_NEXT_ENTRY (). */   
+    /* Used to walk through the list.
+     * Points to the last item returned by a call to listGET_OWNER_OF_NEXT_ENTRY (). */
     index: WeakItemLink,
-    /* List item that contains the maximum possible item value meaning 
-     * it is always at the end of the list and is therefore used as a marker. */   
+    /* List item that contains the maximum possible item value meaning
+     * it is always at the end of the list and is therefore used as a marker. */
     list_end: ItemLink,
 }
 
