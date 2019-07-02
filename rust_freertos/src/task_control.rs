@@ -858,8 +858,10 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
             /* The scheduler is not running, but the task that was pointed
 				to by pxCurrentTCB has just been suspended and pxCurrentTCB
 				must be adjusted to point to a different task. */
-            if current_list_length(&SUSPENDED_TASK_LIST) != CURRENT_NUMBER_OF_TASKS {
-                task_switch_context();
+            unsafe {
+                if current_list_length(&SUSPENDED_TASK_LIST) != CURRENT_NUMBER_OF_TASKS {
+                    task_switch_context();
+                }
             }
             //TODO: comprehend the implement of cuurrent_tcb
             /* But is the Source code, if the length == current number, it means no other tasks are ready, so set pxCurrentTCB back to

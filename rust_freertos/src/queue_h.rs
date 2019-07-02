@@ -13,11 +13,11 @@ pub enum QueueError {
 impl fmt::Display for QueueError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-          QueueSendTimeout => write!(f, "QueueSendTimeOut"),
-          QueueReceiveTimeout => write!(f, "QueueReceiveTimeOut"),
-          MutexTimeout => write!(f, "MutexSendTimeOut"),
-          QueueFull => write!(f, "QueueFull"),
-          QueueEmpty => write!(f, "QueueEmpty"),
+          QueueError::QueueSendTimeout => write!(f, "QueueSendTimeOut"),
+          QueueError::QueueReceiveTimeout => write!(f, "QueueReceiveTimeOut"),
+          QueueError::MutexTimeout => write!(f, "MutexSendTimeOut"),
+          QueueError::QueueFull => write!(f, "QueueFull"),
+          QueueError::QueueEmpty => write!(f, "QueueEmpty"),
         }
     }
 }
