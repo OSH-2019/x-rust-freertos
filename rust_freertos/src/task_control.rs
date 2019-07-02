@@ -2,6 +2,7 @@ use crate::port::*;
 use crate::projdefs::FreeRtosError;
 use crate::task_global::*;
 use crate::list;
+use crate::list::*;
 use crate::list::{ItemLink};
 use crate::*;
 use std::boxed::FnBox;
@@ -700,10 +701,8 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
     trace!("Place succeeded");
 }
 
-
-/*
 pub fn reset_next_task_unblock_time () {
-    if list_is_empty! (get_list!(DELAYED_TASK_LIST)) {
+    if list_is_empty (DELAYED_TASK_LIST) {
 		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
 		the maximum possible value so it is	extremely unlikely that the
 		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
@@ -715,8 +714,8 @@ pub fn reset_next_task_unblock_time () {
 		the item at the head of the delayed list.  This is the time at
 		which the task at the head of the delayed list should be removed
 		from the Blocked state. */
-        let mut temp = get_owner_of_head_entry! (get_list!(DELAYED_TASK_LIST));
-        set_next_task_unblock_time! (get_list_item_value!(temp.clone().unwrap().read().unwrap().get_state_list_item()));
+        let mut temp = get_owner_of_head_entry (DELAYED_TASK_LIST);
+        set_next_task_unblock_time! (get_list_item_value(temp.clone().unwrap().read().unwrap().get_state_list_item()));
     }
 }
 
@@ -729,7 +728,7 @@ pub fn task_delete (task_to_delete: TaskHandle)
         let pxtcb = get_tcb_from_handle! (task_to_delete);
 
         /* Remove task from the ready list. */
-        if list_remove! (pxtcb.get_state_list_item()) == 0 {
+        if list_remove (pxtcb.get_state_list_item()) == 0 {
             taskRESET_READY_PRIORITY!(pxtcb.get_priority());
         }
         else {
@@ -737,8 +736,8 @@ pub fn task_delete (task_to_delete: TaskHandle)
         }
 
         /* Is the task waiting on an event also? */
-		if get_list_item_container! (pxtcb.get_event_list_item ()).is_some() {
-            list_remove! (pxtcb.get_event_list_item());
+		if get_list_item_container (pxtcb.get_event_list_item ()).is_some() {
+            list_remove (pxtcb.get_event_list_item());
         }else {
             mtCOVERAGE_TEST_MARKER!();
         }
@@ -758,7 +757,7 @@ pub fn task_delete (task_to_delete: TaskHandle)
             Place the task in the termination list.  The idle task will
             check the termination list and free up any memory allocated by
             the scheduler for the TCB and stack of the deleted task. */
-            list_insert_end! ( get_list!(TASKS_WAITING_TERMINATION), pxtcb.get_state_list_item()  );
+            list_insert_end ( TASKS_WAITING_TERMINATION, pxtcb.get_state_list_item()  );
 
             /* Increment the ucTasksDeleted variable so the idle task knows
             there is a task that has been deleted and that it should therefore
@@ -810,20 +809,20 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
     taskENTER_CRITICAL!();
     {
         traceTASK_SUSPEND!(&px_tcb);
-        if list_remove!(px_tcb.get_state_list_item()) == 0 {
+        if list_remove (px_tcb.get_state_list_item()) == 0 {
             taskRESET_READY_PRIORITY! (px_tcb.get_priority());
         }
         else {
             mtCOVERAGE_TEST_MARKER! ();
         }
 
-        if get_list_item_container!(px_tcb.get_event_list_item()).is_some() {
-            list_remove!(px_tcb.get_state_list_item());
+        if get_list_item_container (& px_tcb.get_event_list_item()).is_some() {
+            list_remove (px_tcb.get_state_list_item());
         }
         else {
             mtCOVERAGE_TEST_MARKER! ();
         }
-        list_insert_end!(get_list!(TASKS_WAITING_TERMINATION),px_tcb.get_state_list_item());
+        list_insert_end (TASKS_WAITING_TERMINATION,px_tcb.get_state_list_item());
     }taskEXIT_CRITICAL!();
 
     if get_scheduler_running!(){
@@ -843,7 +842,7 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
             portYIELD_WITHIN_API! ();
         }
         else {
-            if current_list_length!(get_list!(SUSPENDED_TASK_LIST)) != (get_current_number_of_tasks!()) as usize{
+            if current_list_length(SUSPENDED_TASK_LIST) != (get_current_number_of_tasks!()) as usize{
                 task_switch_context();
             }
         }
@@ -864,14 +863,14 @@ pub fn task_is_tasksuspended (xtask: &TaskHandle) -> BaseType
     //assert!( xtask );
 
     /* Is the task being resumed actually in the suspended list? */
-    if is_contained_within! ( get_list!(SUSPENDED_TASK_LIST) , tcb.get_state_list_item() )
+    if list::is_contained_within ( SUSPENDED_TASK_LIST , tcb.get_state_list_item() )
     {
         /* Has the task already been resumed from within an ISR? */
-        if !is_contained_within! ( get_list!(PENDING_READY_LIST) , tcb.get_event_list_item() )
+        if ! list::is_contained_within ( PENDING_READY_LIST , tcb.get_event_list_item() )
         {
             /* Is it in the suspended list because it is in the	Suspended
             state, or because is is blocked with no timeout? */
-            if is_contained_within! ( get_list!( 0 ), tcb.get_event_list_item() )
+            if is_contained_within ( READY_TASK_LISTS , tcb.get_event_list_item() )
             {
                 xreturn = 1;
             }
@@ -902,7 +901,7 @@ pub fn resume_task (task_to_resume: TaskHandle){
             if task_is_tasksuspended (&task_to_resume) == 1 {
                 //trace_task_RESUME! (px_tcb);
                 let current_task_priority = get_current_task_handle!().get_priority();
-                list_remove! (px_tcb.get_state_list_item());
+                list_remove (px_tcb.get_state_list_item());
                 task_to_resume.add_task_to_ready_list();
                 if px_tcb.get_priority() >= current_task_priority {
                     taskYIELD_IF_USING_PREEMPTION!();
@@ -920,4 +919,3 @@ pub fn resume_task (task_to_resume: TaskHandle){
         mtCOVERAGE_TEST_MARKER!();
     }
 }
-*/
