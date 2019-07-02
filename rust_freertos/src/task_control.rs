@@ -3,7 +3,9 @@ use crate::projdefs::FreeRtosError;
 use crate::task_global::*;
 use crate::list;
 use crate::list::{ItemLink};
+use crate::list::*;
 use crate::*;
+use crate::kernel::*;
 use std::boxed::FnBox;
 use std::sync::{Weak, Arc, RwLock};
 use std::mem;
@@ -701,25 +703,25 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
 }
 
 
-/*
+
 pub fn reset_next_task_unblock_time () {
-    if list_is_empty! (get_list!(DELAYED_TASK_LIST)) {
+    if list_is_empty(&DELAYED_TASK_LIST) {
 		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
 		the maximum possible value so it is	extremely unlikely that the
 		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
 		there is an item in the delayed list. */
-        set_next_task_unblock_time! (portMAX_DELAY);
+        set_next_task_unblock_time!(portMAX_DELAY);
     }
     else {
 		/* The new current delayed list is not empty, get the value of
 		the item at the head of the delayed list.  This is the time at
 		which the task at the head of the delayed list should be removed
 		from the Blocked state. */
-        let mut temp = get_owner_of_head_entry! (get_list!(DELAYED_TASK_LIST));
-        set_next_task_unblock_time! (get_list_item_value!(temp.clone().unwrap().read().unwrap().get_state_list_item()));
+        let mut temp = get_owner_of_head_entry(&DELAYED_TASK_LIST);
+        set_next_task_unblock_time!(get_list_item_value(&temp.get_state_list_item()));
     }
 }
-
+/*
 pub fn task_delete (task_to_delete: TaskHandle)
 {
     taskENTER_CRITICAL!();
@@ -804,29 +806,39 @@ pub fn task_delete (task_to_delete: TaskHandle)
 			}
 		}
 }
-
+*/
+#[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn suspend_task (task_to_suspend: TaskHandle){
-    let mut px_tcb = get_tcb_from_handle! (task_to_suspend);
+    /* If null is passed in here then it is the running task that is
+			being suspended. */
+    let mut unwrapped_tcb = get_tcb_from_handle!(task_to_suspend);
     taskENTER_CRITICAL!();
     {
+
         traceTASK_SUSPEND!(&px_tcb);
-        if list_remove!(px_tcb.get_state_list_item()) == 0 {
-            taskRESET_READY_PRIORITY! (px_tcb.get_priority());
+
+        /* Remove task from the ready/delayed list and place in the
+			suspended list. */
+        if list::list_remove(unwrapped_tcb.get_state_list_item()) == 0 {
+            taskRESET_READY_PRIORITY!(unwrapped_tcb.get_priority());
         }
         else {
             mtCOVERAGE_TEST_MARKER! ();
         }
 
-        if get_list_item_container!(px_tcb.get_event_list_item()).is_some() {
-            list_remove!(px_tcb.get_state_list_item());
+        /* Is the task waiting on an event also? */
+        if get_list_item_container(&Arc::downgrade(&unwrapped_tcb.get_event_list_item())).is_some() {
+            list_remove(unwrapped_tcb.get_event_list_item());
         }
         else {
-            mtCOVERAGE_TEST_MARKER! ();
+            mtCOVERAGE_TEST_MARKER!();
         }
-        list_insert_end!(get_list!(TASKS_WAITING_TERMINATION),px_tcb.get_state_list_item());
+        list_insert_end(&SUSPEND_TASK_LIST, unwrapped_tcb.get_state_list_item());
     }taskEXIT_CRITICAL!();
 
     if get_scheduler_running!(){
+        /* Reset the next expected unblock time in case it referred to the
+			task that is now in the Suspended state. */
         taskENTER_CRITICAL!();
         {
             reset_next_task_unblock_time();
@@ -837,22 +849,31 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
         mtCOVERAGE_TEST_MARKER! ();
     }
 
-    if *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
+    if task_to_suspend == get_current_task_handle!() {
         if get_scheduler_running!(){
-            assert! (get_scheduler_suspended!() != 0);
+            /* The current task has just been suspended. */
+            assert! (get_scheduler_suspended!() == 0);
             portYIELD_WITHIN_API! ();
         }
         else {
-            if current_list_length!(get_list!(SUSPENDED_TASK_LIST)) != (get_current_number_of_tasks!()) as usize{
+            /* The scheduler is not running, but the task that was pointed
+				to by pxCurrentTCB has just been suspended and pxCurrentTCB
+				must be adjusted to point to a different task. */
+            if current_list_length(&SUSPENDED_TASK_LIST) != CURRENT_NUMBER_OF_TASKS {
                 task_switch_context();
             }
+            //TODO: comprehend the implement of cuurrent_tcb
+            /* But is the Source code, if the lengtf == current number, it means no other tasks are ready, so set pxCurrentTCB back to
+					NULL so when the next task is created pxCurrentTCB will
+					be set to point to it no matter what its relative priority
+					is. */
         }
     }
     else {
         mtCOVERAGE_TEST_MARKER!();
     }
 }
-
+/*
 pub fn task_is_tasksuspended (xtask: &TaskHandle) -> BaseType
 {
 	let mut xreturn:BaseType = 0;
