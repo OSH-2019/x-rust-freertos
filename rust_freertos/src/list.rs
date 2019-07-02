@@ -164,9 +164,9 @@ fn set_weak_item_value(item: &WeakItemLink, item_value: TickType) {
  * @param pxListItem The list item being queried.
  * @return A pointer to the List_t object that references the pxListItem
  */
-pub fn get_list_item_container(item: &WeakItemLink) -> Option<ListLink> {
-    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
-    let container = Weak::clone(&owned_item.read().unwrap().container);
+pub fn get_list_item_container(item: &ItemLink) -> Option<ListLink> {
+    //let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let container = Weak::clone(&item.read().unwrap().container);
     container.upgrade()
 }
 

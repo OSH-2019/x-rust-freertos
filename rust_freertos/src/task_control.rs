@@ -628,7 +628,7 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
                list to ensure it is not woken by a timing event.  It will block
                indefinitely. */
             let cur_state_list_item = unwrapped_cur.get_state_list_item();
-            list::list_insert_end(&SUSPEND_TASK_LIST, cur_state_list_item);
+            list::list_insert_end(&SUSPENDED_TASK_LIST, cur_state_list_item);
         } else {
             /* Calculate the time at which the task should be woken if the event
                does not occur.  This may overflow but this doesn't matter, the
@@ -646,7 +646,6 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
             } else {
                 /* The wake time has not overflowed, so the current block list
                    is used. */
-                set_list_item_container!(cur_state_list_item, DELAYED_TASK_LIST);
                 list::list_insert(&DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item());
 
                 /* If the task entering the blocked state was placed at the
@@ -809,17 +808,17 @@ pub fn task_delete (task_to_delete: TaskHandle)
 */
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn suspend_task (task_to_suspend: TaskHandle){
-    /* If null is passed in here then it is the running task that is
-			being suspended. */
+    /* origin: If null is passed in here then it is the running task that is
+			being suspended. In our implement, you can just pass the TaskHandle of the current task*/
     let mut unwrapped_tcb = get_tcb_from_handle!(task_to_suspend);
     taskENTER_CRITICAL!();
     {
 
-        traceTASK_SUSPEND!(&px_tcb);
+        traceTASK_SUSPEND!(&unwrapped_tcb);
 
         /* Remove task from the ready/delayed list and place in the
 			suspended list. */
-        if list::list_remove(unwrapped_tcb.get_state_list_item()) == 0 {
+        if list_remove(unwrapped_tcb.get_state_list_item()) == 0 {
             taskRESET_READY_PRIORITY!(unwrapped_tcb.get_priority());
         }
         else {
@@ -827,13 +826,13 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
         }
 
         /* Is the task waiting on an event also? */
-        if get_list_item_container(&Arc::downgrade(&unwrapped_tcb.get_event_list_item())).is_some() {
+        if get_list_item_container(&unwrapped_tcb.get_event_list_item()).is_some() {
             list_remove(unwrapped_tcb.get_event_list_item());
         }
         else {
             mtCOVERAGE_TEST_MARKER!();
         }
-        list_insert_end(&SUSPEND_TASK_LIST, unwrapped_tcb.get_state_list_item());
+        list_insert_end(&SUSPENDED_TASK_LIST, unwrapped_tcb.get_state_list_item());
     }taskEXIT_CRITICAL!();
 
     if get_scheduler_running!(){
@@ -863,7 +862,7 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
                 task_switch_context();
             }
             //TODO: comprehend the implement of cuurrent_tcb
-            /* But is the Source code, if the lengtf == current number, it means no other tasks are ready, so set pxCurrentTCB back to
+            /* But is the Source code, if the length == current number, it means no other tasks are ready, so set pxCurrentTCB back to
 					NULL so when the next task is created pxCurrentTCB will
 					be set to point to it no matter what its relative priority
 					is. */
@@ -873,11 +872,12 @@ pub fn suspend_task (task_to_suspend: TaskHandle){
         mtCOVERAGE_TEST_MARKER!();
     }
 }
-/*
-pub fn task_is_tasksuspended (xtask: &TaskHandle) -> BaseType
-{
-	let mut xreturn:BaseType = 0;
-	let tcb = get_tcb_from_handle! (xtask);
+
+#[cfg(feature = "INCLUDE_vTaskSuspend")]
+pub fn task_is_tasksuspended (xtask: &TaskHandle) -> bool
+{   
+	let mut xreturn:bool = false;
+	let tcb = get_tcb_from_handle!(xtask);
     /* Accesses xPendingReadyList so must be called from a critical
     section. */
 
@@ -885,16 +885,16 @@ pub fn task_is_tasksuspended (xtask: &TaskHandle) -> BaseType
     //assert!( xtask );
 
     /* Is the task being resumed actually in the suspended list? */
-    if is_contained_within! ( get_list!(SUSPENDED_TASK_LIST) , tcb.get_state_list_item() )
+    if is_contained_within(&SUSPENDED_TASK_LIST, &tcb.get_state_list_item())
     {
         /* Has the task already been resumed from within an ISR? */
-        if !is_contained_within! ( get_list!(PENDING_READY_LIST) , tcb.get_event_list_item() )
+        if !is_contained_within(&PENDING_READY_LIST, &tcb.get_event_list_item())
         {
             /* Is it in the suspended list because it is in the	Suspended
             state, or because is is blocked with no timeout? */
-            if is_contained_within! ( get_list!( 0 ), tcb.get_event_list_item() )
+            if get_list_item_container(&tcb.get_event_list_item()).is_none()
             {
-                xreturn = 1;
+                xreturn = true;
             }
             else
             {
@@ -914,25 +914,34 @@ pub fn task_is_tasksuspended (xtask: &TaskHandle) -> BaseType
     xreturn
 }
 
+#[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn resume_task (task_to_resume: TaskHandle){
-    let mut px_tcb = get_tcb_from_handle! (task_to_resume);
+    let mut unwrapped_tcb = get_tcb_from_handle!(task_to_resume);
 
-    if /*NULL !*px_tcb && */ *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
+    if task_to_resume != get_current_task_handle!() {
         taskENTER_CRITICAL!();
         {
-            if task_is_tasksuspended (&task_to_resume) == 1 {
-                //trace_task_RESUME! (px_tcb);
-                let current_task_priority = get_current_task_handle!().get_priority();
-                list_remove! (px_tcb.get_state_list_item());
+            if task_is_tasksuspended(&task_to_resume) {
+                traceTASK_RESUME!(&unwrapped_tcb);
+
+                /* As we are in a critical section we can access the ready
+					lists even if the scheduler is suspended. */
+                list_remove(unwrapped_tcb.get_state_list_item());
                 task_to_resume.add_task_to_ready_list();
-                if px_tcb.get_priority() >= current_task_priority {
+                
+                let current_task_priority = get_current_task_handle!().get_priority();
+                /* We may have just resumed a higher priority task. */
+                if unwrapped_tcb.get_priority() >= current_task_priority {
+                    /* This yield may not cause the task just resumed to run,
+						but will leave the lists in the correct state for the
+						next yield. */
                     taskYIELD_IF_USING_PREEMPTION!();
                 }else {
-                    mtCOVERAGE_TEST_MARKER! ();
+                    mtCOVERAGE_TEST_MARKER!();
                 }
             }
             else {
-                mtCOVERAGE_TEST_MARKER! ();
+                mtCOVERAGE_TEST_MARKER!();
             }
         }
         taskEXIT_CRITICAL!();
@@ -941,4 +950,4 @@ pub fn resume_task (task_to_resume: TaskHandle){
         mtCOVERAGE_TEST_MARKER!();
     }
 }
-*/
+
