@@ -245,8 +245,7 @@ pub fn get_owner_of_head_entry(list: &ListLink) -> TaskHandle {
  * is check to see if the container and the list match.
  */
 pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
-    let weak_item_link = Arc::downgrade(item_link);
-    match get_list_item_container(&weak_item_link) {
+    match get_list_item_container(&item_link) {
         Some(container) => Arc::ptr_eq(list, &container),
         None => false,
     }
