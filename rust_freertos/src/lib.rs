@@ -61,27 +61,30 @@ mod tests {
         // 两个任务共享所有权，所以需Arc包装。
         let q_recv = Arc::new(Queue::new(10));
         let q_sender = Arc::clone(&q_recv);
+        let _ = TermLogger::init(LevelFilter::Trace, Config::default());
 
         // 发送数据的任务代码。
         let sender = move || {
-            let _ = WriteLogger::init(LevelFilter::Info, Config::default(), File::create("sender.log").unwrap());
             for i in 1..11 {
                 // send方法的参数包括要发送的数据和ticks_to_wait
                 q_sender.send(i, pdMS_TO_TICKS!(50)).unwrap();
+            }
+            loop {
+                
             }
         };
 
         // 接收数据的任务代码。
         let receiver = move || {
-            let _ = WriteLogger::init(LevelFilter::Info, Config::default(), File::create("recv.log").unwrap());
             let mut sum = 0;
             loop {
                 // receive方法的参数只有ticks_to_wait
-                if let Ok(x) = q_recv.receive(pdMS_TO_TICKS!(300)) {
+                if let Ok(x) = q_recv.receive(pdMS_TO_TICKS!(10)) {
                     println!("{}", x);
                     sum += x;
                 } else {
-                    // 若等待300ms仍未收到数据，则认为发送结束。
+                    trace!("receive END");
+                    // 若等待30ms仍未收到数据，则认为发送结束。
                     assert_eq!(sum, 55);
                     kernel::task_end_scheduler();
                 }
