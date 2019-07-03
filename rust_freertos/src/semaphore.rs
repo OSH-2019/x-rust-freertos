@@ -13,7 +13,7 @@ impl Semaphore {
     
     pub fn new_mutex( ) -> Self {
         let mut mutex = Semaphore(UnsafeCell::new(QueueDefinition::new(1,QueueType::Mutex)));
-        mutex.initialise_mutex();
+//        mutex.initialise_mutex();
         mutex
     }
 

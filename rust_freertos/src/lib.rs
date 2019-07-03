@@ -29,6 +29,7 @@ mod task_queue;
 mod queue_api;
 //mod mutex;
 mod semaphore;
+mod task_timemanager;
 
 #[cfg(test)]
 mod tests {
@@ -63,19 +64,21 @@ mod tests {
         let mutex1 = Arc::clone(&mutex0);
 
         let task0 = move || {
+            task_timemanager::task_delay(pdMS_TO_TICKS!(1));
             loop {
                 match mutex0.semaphore_down(pdMS_TO_TICKS!(10)) {
                     Ok(_) => {
                         for i in 1..11 {
                             trace!("Task0 owns the mutex! -- {}", i);
                         }
-                        for j in 1..100 {
+                        /*loop {
                             /*you can comment out this loop so that Task1 can successfully down the
                             counting_semaphore*/
-                        }
+                        }*/
                         match mutex0.semaphore_up() {
                             Ok(_) => {
                                 trace!("Task0 dropped the mutex!");
+                                kernel::task_end_scheduler(); 
                             },
                             Err(error) => {
                                 trace!("mutex0 semaphore up triggers {}", error);
@@ -98,10 +101,13 @@ mod tests {
                         for i in 1..11 {
                             trace!("Task1 owns the mutex! -- {}", i);
                         }
+                        trace!("Task1's priority is {}",get_current_task_priority!());
+                        /*loop {
+                        }*/
                         match mutex1.semaphore_up() {
                             Ok(_) => {
                                 trace!("Task1 dropped the mutex!");
-                                kernel::task_end_scheduler();
+                           //     kernel::task_end_scheduler();
                             },
                             Err(error) => {
                                 trace!("mutex1 semaphore up triggers {}", error);
@@ -117,7 +123,7 @@ mod tests {
 
         let Task0 = task_control::TCB::new()
                             .name("Task0")
-                            .priority(3)
+                            .priority(4)
                             .initialise(task0);
 
         let Task1 = task_control::TCB::new()

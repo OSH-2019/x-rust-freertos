@@ -161,7 +161,7 @@ impl <T>QueueDefinition<T>
     ///
     pub fn queue_generic_send(&mut self, pvItemToQueue: T, xTicksToWait: TickType, xCopyPosition: BaseType) -> Result<(), QueueError>{
         let mut xEntryTimeSet: bool = false;
-        let mut xYieldRequired: bool = true;
+        //let mut xYieldRequired: bool = true;
         /*use default to solve the error:unitialized xTimeOut*/
         let mut xTimeOut: time_out = Default::default();
         let mut xTicksToWait = xTicksToWait;
@@ -178,17 +178,17 @@ impl <T>QueueDefinition<T>
             taskENTER_CRITICAL!();
             {
                 /* Is there room on the queue now?  The running task must be the
-	    		highest priority task wanting to access the queue.  If the head item
-		    	in the queue is to be overwritten then it does not matter if the
-			    queue is full. */
+                   highest priority task wanting to access the queue.  If the head item
+                   in the queue is to be overwritten then it does not matter if the
+                   queue is full. */
                 if self.uxMessagesWaiting < self.uxLength || xCopyPosition == queueOVERWRITE {
                     traceQUEUE_SEND!(&self);
-                    xYieldRequired = self.copy_data_to_queue(pvItemToQueue,xCopyPosition);
+                    /*xYieldRequired = */self.copy_data_to_queue(pvItemToQueue,xCopyPosition);
                     trace!("Queue can be sent");
                     
                     /* The queue is a member of a queue set, and posting
-					to the queue set caused a higher priority task to
-					unblock. A context switch is required. */
+                       to the queue set caused a higher priority task to
+                       unblock. A context switch is required. */
                     #[cfg(feature = "configUSE_QUEUE_SETS")]
                     match self.pxQueueSetContainer {
                         Some => {
@@ -213,27 +213,28 @@ impl <T>QueueDefinition<T>
 
                     {
                         /* If there was a task waiting for data to arrive on the
-					    queue then unblock it now. */
+                           queue then unblock it now. */
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
                         if !list::list_is_empty(&self.xTasksWaitingToReceive) {
                             if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) {
                                 /* The unblocked task has a priority higher than
-							    our own so yield immediately.  Yes it is ok to do
-							    this from within the critical section - the kernel
-							    takes care of that. */
+                                   our own so yield immediately.  Yes it is ok to do
+                                   this from within the critical section - the kernel
+                                   takes care of that. */
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
                                 mtCOVERAGE_TEST_MARKER!();
                             }
                         }
-                        else if xYieldRequired {
+                        /*when send = semaphore_take, it does not have to yield*/
+                        /*else if xYieldRequired {
                             /* This path is a special case that will only get
-						    executed if the task was holding multiple mutexes and
-						    the mutexes were given back in an order that is
-						    different to that in which they were taken. */
+                               executed if the task was holding multiple mutexes and
+                               the mutexes were given back in an order that is
+                               different to that in which they were taken. */
                             queueYIELD_IF_USING_PREEMPTION!();
-                        }
+                        }*/
                         else {
                             mtCOVERAGE_TEST_MARKER!();
                         }
@@ -244,17 +245,17 @@ impl <T>QueueDefinition<T>
                 else {
                     if xTicksToWait == 0 as TickType {
                         /* The queue was full and no block time is specified (or
-            			the block time has expired) so leave now. */
+                           the block time has expired) so leave now. */
                         taskEXIT_CRITICAL!();
                         /* Return to the original privilege level before exiting
-					    the function. */
+                           the function. */
                         traceQUEUE_SEND_FAILED!(&self);
                         trace!("Queue Send: QueueFull");
                         return Err(QueueError::QueueFull);
                     }
                     else if !xEntryTimeSet {
                         /* The queue was full and a block time was specified so
-					    configure the timeout structure. */
+                           configure the timeout structure. */
                         task_queue::task_set_time_out_state(&mut xTimeOut);
                         xEntryTimeSet = true;
                     }
@@ -507,6 +508,9 @@ impl <T>QueueDefinition<T>
     pub fn queue_generic_receive(&mut self,mut xTicksToWait:TickType,xJustPeeking:bool)->Result<T, QueueError>{
         let mut xEntryTimeSet:bool = false;
         let mut xTimeOut:time_out = Default::default();
+        /*when receive = give, it has to call the function task_priority_disinherit. It may require
+         * yield.*/
+        let mut xYieldRequired: bool = false;
         let mut buffer:Option<T>;
         #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
         assert!(!((kernel::task_get_scheduler_state() == SchedulerState::Suspended) && (xTicksToWait != 0)));
@@ -517,7 +521,7 @@ impl <T>QueueDefinition<T>
                 let uxMessagesWaiting:UBaseType = self.uxMessagesWaiting;
                 trace!("queue_generic_receive: uxMessageWaiting: {}", uxMessagesWaiting);
                 /* Is there data in the queue now?  To be running the calling task
-		    must be the highest priority task wanting to access the queue. */
+                   must be the highest priority task wanting to access the queue. */
                 if uxMessagesWaiting > 0 as UBaseType{
                     let pcOriginalReadPosition:UBaseType = self.QueueUnion;//QueueUnion represents pcReadFrom
                     buffer = self.copy_data_from_queue();//
@@ -531,9 +535,14 @@ impl <T>QueueDefinition<T>
                             /*if uxQueueType == queueQUEUE_IS_MUTEX*/
                             if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex{
                                 ///// 
-                                let mutex_holder = transed_task_handle_to_T(task_increment_mutex_held_count());
+                                let task_handle = self.transed_task_handle_for_mutex();
+                                xYieldRequired = task_queue::task_priority_disinherit(task_handle);
                                 self.pcQueue.pop_front();
-                                self.pcQueue.insert(0,mutex_holder);
+                                //let transed_none = transed_task_handle_to_T(None); 
+                                //self.pcQueue.insert(0,transed_none);
+                                //let mutex_holder = transed_task_handle_to_T(task_increment_mutex_held_count());
+                                //self.pcQueue.pop_front();
+                                //self.pcQueue.insert(0,mutex_holder);
                                 //self.pxMutexHolder = task_increment_mutex_held_count();
                             }
                             else {
@@ -668,20 +677,23 @@ impl <T>QueueDefinition<T>
     }
 
 
-    pub fn copy_data_to_queue(&mut self, pvItemToQueue:T,xPosition:BaseType) -> bool{
+    pub fn copy_data_to_queue(&mut self, pvItemToQueue:T,xPosition:BaseType) /*-> bool*/{
         /* This function is called from a critical section. */
-        let mut xReturn:bool = false;
+        //let mut xReturn:bool = false;
         let mut uxMessagesWaiting:UBaseType = self.uxMessagesWaiting;
         
         {
             //TODO:understand the usage this part
-            #![cfg(configUSE_MUTEXES)]
+            #![cfg(feature = "configUSE_MUTEXES")]
             if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex {
-                let task_handle = self.transed_task_handle_for_mutex(); 
-                xReturn = task_queue::task_priority_disinherit(task_handle);
-                self.pcQueue.pop_front();
-                self.pcQueue.insert(0,None);
-                self.pxMutexHolder = None;
+                let mutex_holder = transed_task_handle_to_T(task_increment_mutex_held_count());
+                //self.pcQueue.pop_front();
+                self.pcQueue.insert(0,mutex_holder);
+                //let task_handle = self.transed_task_handle_for_mutex(); 
+                //xReturn = task_queue::task_priority_disinherit(task_handle);
+                //self.pcQueue.pop_front();
+                //self.pcQueue.insert(0,None);
+                //self.pxMutexHolder = None;
             }
             else {
                 mtCOVERAGE_TEST_MARKER!();
@@ -726,7 +738,7 @@ impl <T>QueueDefinition<T>
             }
         }
         self.uxMessagesWaiting = uxMessagesWaiting + 1;
-        xReturn
+        //xReturn
     }
 
     /// # Description
@@ -783,23 +795,6 @@ impl <T>QueueDefinition<T>
             return false;
         }
     }
-    /*some api in queue.h*/
-
-    /*
-     * queue APIs are implemented in queue_api.rs
-    /// # Description:
-    /// * Creates a new queue instance, and returns a handle by which the new queue can be referenced.
-    /// * Implemented by: Ning Yuting.
-    /// * C implementation:queue.h 186
-    ///
-    /// # Arguments
-    ///
-    ///
-    /// # Return
-    ///
-    pub fn new(uxQueueLength:UBaseType) -> Self {
-        QueueDefinition::queue_generic_create(uxQueueLength,QueueType::Base)
-    }*/
     
     /* `new` has two arguments now:length, QueueType.
      * Remember to add QueueType when using it.
@@ -808,153 +803,6 @@ impl <T>QueueDefinition<T>
         QueueDefinition::queue_generic_create(uxQueueLength,QueueType)
     }
     
-    /*
-    /// # Description
-    /// * Post an item to the back of a queue.
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation: queue.h 355
-    /// 
-    /// # Argument
-    /// * `&self` - queue on which the item is to be posted.
-    /// * `pvItemToQueue` - the item that is to be placed on the queue.
-    /// * `xTicksToWait` - The maximum amount of time the task should block waiting for space to become available on the queue, should it already be full.
-    /// 
-    /// # Return
-    /// * true if the item was successfully posted, otherwise errQUEUE_FULL.
-    pub fn send_to_front(&mut self,pvItemToQueue:T,xTicksToWait:TickType)-> Result<(), QueueError>{
-        self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_FRONT)
-    }
-
-    /// # Description
-    /// * Post an item to the back of a queue.
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation:queue.h 437
-    /// 
-    /// # Argument
-    /// * same to queue_send_to_front
-    /// 
-    /// # Return
-    /// * same to queue_send_to_front
-    pub fn send_to_back(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> Result<(), QueueError>{
-        self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_BACK)
-    }
-    
-    /// # Description
-    /// * equivalent to queue_send_to_back()
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation:queue.h 521
-    /// 
-    /// # Argument
-    /// * same to queue_send_to_back()
-    /// 
-    /// # Return
-    /// * same to queue_send_to_back()
-    pub fn send(&mut self,pvItemToQueue:T,xTicksToWait:TickType) -> Result<(), QueueError>{
-        self.queue_generic_send(pvItemToQueue,xTicksToWait,queueSEND_TO_BACK)
-    }
-
-    /// # Description
-    /// * Only for use with queues that have a length of one - so the queue is either empty or full.
-    /// * Post an item on a queue.  If the queue is already full then overwrite the value held in the queue. 
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation:queue.h 604
-    /// 
-    /// # Argument
-    /// * `self` - queue
-    /// * `pvItemToQueue` - the item that is to be place on the queue.
-    /// 
-    /// # Return
-    /// * pdPASS is the only value that can be returned because queue_overwrite will write to the
-    /// queue even when the queue is already full.
-    pub fn overwrite(&mut self,pvItemToQueue:T) -> (Result<(), QueueError>){
-        self.queue_generic_send(pvItemToQueue,0,queueOVERWRITE)
-    }
-    
-    /// # Description
-    /// * Post an item to the front ofa queue.  It is safe to use this macro from within an interrupt service routine.
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation:queue.h 1129
-    /// 
-    /// # Argument
-    /// * `self` - queue
-    /// * `pvItemToQueue - the item taht is to be placed on the queue.
-    /// 
-    /// # Return
-    /// * `Result` -pdTRUE if the data was successfully sent to the queue, otherwise errQUEUE_FULL.
-    /// * `bool` - pxHigherPriorityTaskWoken is changed to be a return value. it is true if sending to the
-    /// queue caused a task to unblock,otherwise it is false.
-    pub fn send_to_front_from_isr(&mut self,pvItemToQueue:T)->(Result<(), QueueError>, bool){
-        self.queue_generic_send_from_isr(pvItemToQueue,queueSEND_TO_FRONT)
-    }
-
-    /// # Description
-    /// * Post an item to the back of a queue. Others is same to queue_send_to_front_from_isr
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation:queue.h 1200
-    /// 
-    /// # Argument
-    ///
-    /// # Return
-    ///
-    pub fn send_to_back_from_isr(&mut self,pvItemToQueue:T) ->(Result<(), QueueError>, bool){
-        self.queue_generic_send_from_isr(pvItemToQueue,queueSEND_TO_BACK)
-    }
-
-    /// # Description
-    /// * A version of xQueueOverwrite() that can be used in an interrupt service routine (ISR).
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation:queue.h 1287
-    /// 
-    /// # Argument
-    ///
-    ///  # Return
-    ///
-    pub fn overwrite_from_isr(&mut self,pvItemToQueue:T)->(Result<(), QueueError>, bool){
-        self.queue_generic_send_from_isr(pvItemToQueue,queueOVERWRITE)
-    }
-    
-    /// # Description
-    /// * This is a macro that calls the xQueueGenericReceive() function.
-    /// * Receive an item from a queue.  The item is received by copy so a buffer of
-    /// * adequate size must be provided.  The number of bytes copied into the buffer
-    /// * was defined when the queue was created.
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation:queue.h 913
-    /// 
-    /// # Argument
-    ///
-    /// # Return
-    ///
-    pub fn receive(&mut self,xTicksToWait:TickType) -> Result<T, QueueError> {
-        self.queue_generic_receive(xTicksToWait,false)
-    }
-
-    /// # Description
-    /// * This is a macro that calls the xQueueGenericReceive() function.
-    /// * Receive an item from a queue without removing the item from the queue.
-    /// * The item is received by copy so a buffer of adequate size must be
-    /// * provided.  The number of bytes copied into the buffer was defined when
-    /// * the queue was created.
-    /// 
-    /// * Implemented by:Ning Yuting
-    /// * C implementation:queue.h 787
-    /// 
-    /// # Argument
-    ///
-    /// # Return
-    ///
-    pub fn peek(&mut self,xTicksToWait:TickType) -> Result<T, QueueError>{
-        self.queue_generic_receive(xTicksToWait,true)
-    }
-    */
 
     #[cfg(feature = "configUSE_TRACE_FACILITY")]
     pub fn get_queue_number(&self) -> UBaseType{
@@ -972,7 +820,6 @@ impl <T>QueueDefinition<T>
         unimplemented!();
     }
     
-
     pub fn transed_task_handle_for_mutex(&self) -> Option<task_control::TaskHandle>{
         /* use unsafe to get transed_task_handle for mutex
          * inplemented by: Ning Yuting
@@ -990,6 +837,7 @@ impl <T>QueueDefinition<T>
 }
 
 fn transed_task_handle_to_T<T>(task_handle:Option<task_control::TaskHandle>) -> T{
+    /* use unsafe to transmute Option<TaskHandle> to T type*/
     let mut T_type:T;
     let task_handle = Box::new(task_handle);
     unsafe{
@@ -998,6 +846,7 @@ fn transed_task_handle_to_T<T>(task_handle:Option<task_control::TaskHandle>) -> 
     }
     T_type
 }
+
 
 #[macro_export]
 macro_rules! queueYIELD_IF_USING_PREEMPTION{
