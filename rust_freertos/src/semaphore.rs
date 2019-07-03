@@ -39,12 +39,34 @@ impl Semaphore {
         mutex_holder
     }
 
-    pub fn semaphore_take(&self,xBlockTime: TickType) -> Result<Option<TaskHandle>,QueueError> {
+    pub fn counting_semaphore_up(&self) -> Result<Option<TaskHandle>, QueueError> {
         unsafe {
+            trace!("Counting Semaphore up runs!");
             let inner = self.0.get();
-            (*inner).queue_generic_receive(xBlockTime, false)
+            trace!("Counting Semaphore up get finished!");
+            (*inner).queue_generic_receive(semGIVE_BLOCK_TIME, false)
+            //trace!("Semaphore take finish!");
         }
     }
+
+    pub fn semaphore_take(&self,xBlockTime: TickType) -> Result<Option<TaskHandle>,QueueError> {
+        unsafe {
+            trace!("Semaphore take runs!");
+            let inner = self.0.get();
+            trace!("Semaphore take get finished!");
+            (*inner).queue_generic_receive(xBlockTime, false)
+            //trace!("Semaphore take finish!");
+        }
+    }
+
+    pub fn counting_semaphore_down(&self, xBlockTime: TickType) -> Result<(), QueueError> {
+        let current_task = get_current_task_handle!().clone();
+        unsafe {
+            let inner = self.0.get();
+            (*inner).queue_generic_send(Some(current_task), xBlockTime, queueSEND_TO_BACK)
+        }
+    }
+
 
     pub fn semaphore_give(&self) -> Result<(),QueueError> {
         unsafe {
@@ -57,11 +79,12 @@ impl Semaphore {
         Semaphore(UnsafeCell::new(QueueDefinition::new(1,QueueType::BinarySemaphore)))
     }
     
-    pub fn create_counting(max_count: UBaseType,initial_count:UBaseType) -> Self {
+    pub fn create_counting(max_count: UBaseType/*,initial_count:UBaseType*/) -> Self {
         let mut counting_semphr = Semaphore(UnsafeCell::new(QueueDefinition::new(max_count,QueueType::CountingSemaphore)));
         unsafe {
             let inner = counting_semphr.0.get();
-            (*inner).initialise_count(initial_count);
+            (*inner).initialise_count(0);
+//            (*inner).initialise_count(initial_count);
         }
         //traceCREATE_COUNTING_SEMAPHORE!();
         counting_semphr

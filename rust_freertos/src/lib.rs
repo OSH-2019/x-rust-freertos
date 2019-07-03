@@ -2,6 +2,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(unused)]
 
 #![feature(fnbox)]
 #![feature(weak_ptr_eq)]
@@ -52,6 +53,112 @@ mod tests {
     }
     */
     use std::sync::Arc;
+    #[test]
+    fn test_counting_semaphore() {
+        use simplelog::*;
+        use semaphore::Semaphore;
+
+        let _ = TermLogger::init(LevelFilter::Trace, Config::default());
+        let cs0 = Arc::new(Semaphore::create_counting(2));
+        let cs1 = Arc::clone(&cs0);
+        let cs2 = Arc::clone(&cs0);
+
+        let task_want_resources0 = move || {
+            loop {
+                trace!("Enter Task0!");
+                match cs0.counting_semaphore_down(pdMS_TO_TICKS!(10)) {
+                    Ok(_) => {
+                        for i in 1..11 {
+                            trace!("cs0 owns the counting semaphore! -- {}", i);
+                        }
+                        match cs0.counting_semaphore_up() {
+                            Ok(_) => {
+                                trace!("Task0 Finished!");
+                                break;
+                            }
+                            Err(error) => {
+                                trace!("cs0 semaphore give triggers {}", error);
+                            }
+                        }
+                    },
+                    Err(error) => {
+                        trace!("cs0 semaphore take triggers {}", error);
+                    },
+                }
+            }
+        };
+
+        let task_want_resources1 = move || {
+            loop {
+                trace!("Enter Task1!");
+                match cs1.counting_semaphore_down(pdMS_TO_TICKS!(10)) {
+                    Ok(_) => {
+                        for i in 1..11 {
+                            trace!("cs1 owns the counting semaphore! -- {}", i);
+                        }
+                        match cs1.counting_semaphore_up() {
+                            Ok(_) => {
+                                trace!("Test COUNTING SEMAPHORE COMPLETE!");
+                                kernel::task_end_scheduler();
+                                break;
+                            }
+                            Err(error) => {
+                                trace!("cs1 semaphore give triggers {}", error);
+                            }
+                        }
+                    },
+                    Err(error) => {
+                        trace!("cs1 semaphore take triggers {}", error);
+                    },
+                }
+            }
+        };
+
+        let task_want_resources2 = move || {
+            loop {
+                trace!("Enter Task2!");
+                match cs2.counting_semaphore_down(pdMS_TO_TICKS!(50)) {
+                    Ok(_) => {
+                        trace!("Task2 OK!");
+                        for i in 1..11 {
+                            trace!("cs2 owns the counting semaphore! -- {}", i);
+                        }
+                        match cs2.counting_semaphore_up() {
+                            Ok(_) => {
+                                trace!("Task2 Finished!");
+                                break;
+                            }
+                            Err(error) => {
+                                trace!("cs2 semaphore give triggers {}", error);
+                            }
+                        }
+                    },
+                    Err(error) => {
+                        trace!("cs2 semaphore take triggers {}", error);
+                    },
+                }
+            }
+        };
+
+        let _task0 = task_control::TCB::new()
+                                .name("Task0")
+                                .priority(3)
+                                .initialise(task_want_resources0);
+
+        let _task1 = task_control::TCB::new()
+                                .name("Task1")
+                                .priority(3)
+                                .initialise(task_want_resources1);
+
+        let _task2 = task_control::TCB::new()
+                                .name("Task2")
+                                .priority(3)
+                                .initialise(task_want_resources2);
+        
+        kernel::task_start_scheduler();
+
+    }
+/*
     #[test]
     fn test_queue() {
         use std::fs::File;
@@ -104,4 +211,5 @@ mod tests {
 
         kernel::task_start_scheduler();
     }
+*/
 }

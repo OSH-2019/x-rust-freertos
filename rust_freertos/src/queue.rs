@@ -170,14 +170,25 @@ impl <T>QueueDefinition<T>
 
         #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
         assert!(!((kernel::task_get_scheduler_state() == SchedulerState::Suspended) && (xTicksToWait != 0)));
-
+        trace!("Enter function queue_generic_send! TicksToWait: {}, uxMessageWaiting: {}, xCopyPosition: {}", xTicksToWait ,self.uxMessagesWaiting, xCopyPosition);
+        /* This function relaxes the coding standard somewhat to allow return
+    	statements within the function itself.  This is done in the interest
+	    of execution time efficiency. */
         loop {
             taskENTER_CRITICAL!();
             {
+                /* Is there room on the queue now?  The running task must be the
+	    		highest priority task wanting to access the queue.  If the head item
+		    	in the queue is to be overwritten then it does not matter if the
+			    queue is full. */
                 if self.uxMessagesWaiting < self.uxLength || xCopyPosition == queueOVERWRITE {
                     traceQUEUE_SEND!(&self);
                     xYieldRequired = self.copy_data_to_queue(pvItemToQueue,xCopyPosition);
-
+                    trace!("Queue can be sent");
+                    
+                    /* The queue is a member of a queue set, and posting
+					to the queue set caused a higher priority task to
+					unblock. A context switch is required. */
                     #[cfg(feature = "configUSE_QUEUE_SETS")]
                     match self.pxQueueSetContainer {
                         Some => {
@@ -201,16 +212,26 @@ impl <T>QueueDefinition<T>
                     }
 
                     {
+                        /* If there was a task waiting for data to arrive on the
+					    queue then unblock it now. */
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                        if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
-                            if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) != false {
+                        if !list::list_is_empty(&self.xTasksWaitingToReceive) {
+                            if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive) {
+                                /* The unblocked task has a priority higher than
+							    our own so yield immediately.  Yes it is ok to do
+							    this from within the critical section - the kernel
+							    takes care of that. */
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
                                 mtCOVERAGE_TEST_MARKER!();
                             }
                         }
-                        else if xYieldRequired != true {
+                        else if xYieldRequired {
+                            /* This path is a special case that will only get
+						    executed if the task was holding multiple mutexes and
+						    the mutexes were given back in an order that is
+						    different to that in which they were taken. */
                             queueYIELD_IF_USING_PREEMPTION!();
                         }
                         else {
@@ -222,41 +243,65 @@ impl <T>QueueDefinition<T>
                 }
                 else {
                     if xTicksToWait == 0 as TickType {
+                        /* The queue was full and no block time is specified (or
+            			the block time has expired) so leave now. */
                         taskEXIT_CRITICAL!();
+                        /* Return to the original privilege level before exiting
+					    the function. */
                         traceQUEUE_SEND_FAILED!(&self);
+                        trace!("Queue Send: QueueFull");
                         return Err(QueueError::QueueFull);
                     }
-                    else if xEntryTimeSet == false {
+                    else if !xEntryTimeSet {
+                        /* The queue was full and a block time was specified so
+					    configure the timeout structure. */
                         task_queue::task_set_time_out_state(&mut xTimeOut);
                         xEntryTimeSet = true;
                     }
                     else {
+                        /* Entry time was already set. */
                         mtCOVERAGE_TEST_MARKER!();
                     }
                 }
             }
             taskEXIT_CRITICAL!();
 
+            /* Interrupts and other tasks can send to and receive from the queue
+		    now the critical section has been exited. */
             kernel::task_suspend_all();
             self.lock_queue();
-            let mut is_timeout:bool;
-            if task_queue::task_check_for_timeout(&mut xTimeOut, &mut xTicksToWait) == false {
-                if self.is_queue_full() != false {
-                    traceBLOCKING_ON_QUEUE_SEND!(self);
+
+            /* Update the timeout state to see if it has expired yet. */
+            if !task_queue::task_check_for_timeout(&mut xTimeOut, &mut xTicksToWait) {
+                if self.is_queue_full() {
+                    traceBLOCKING_ON_QUEUE_SEND!(&self);
+                    trace!("queue_generic_send place on event list");
                     task_queue::task_place_on_event_list(&self.xTasksWaitingToSend, xTicksToWait);
 
+                    /* Unlocking the queue means queue events can effect the
+				    event list.  It is possible	that interrupts occurring now
+		    		remove this task from the event	list again - but as the
+			    	scheduler is suspended the task will go onto the pending
+				    ready last instead of the actual ready list. */
                     self.unlock_queue();
 
-                    if kernel::task_resume_all() == false {
+                    /* Resuming the scheduler will move tasks from the pending
+				    ready list into the ready list - so it is feasible that this
+				    task is already in a ready list before it yields - in which
+				    case the yield will not cause a context switch unless there
+				    is also a higher priority task in the pending ready list. */
+                    if !kernel::task_resume_all() {
                         portYIELD_WITHIN_API!();
                     }
                 }
                 else {
+                    /* Try again. */
                     self.unlock_queue();
                     kernel::task_resume_all();
                 }                
             }
             else {
+                /* The timeout has expired. */
                 self.unlock_queue();
                 kernel::task_resume_all();
 
@@ -466,10 +511,11 @@ impl <T>QueueDefinition<T>
         #[cfg(all(feature = "xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
         assert!(!((kernel::task_get_scheduler_state() == SchedulerState::Suspended) && (xTicksToWait != 0)));
         loop {
+            trace!("Enter function queue_generic_receive, TicksToWait:{}, Peeking: {}!", xTicksToWait, xJustPeeking);
             taskENTER_CRITICAL!();
             {
                 let uxMessagesWaiting:UBaseType = self.uxMessagesWaiting;
-                
+                trace!("queue_generic_receive: uxMessageWaiting: {}", uxMessagesWaiting);
                 /* Is there data in the queue now?  To be running the calling task
 		    must be the highest priority task wanting to access the queue. */
                 if uxMessagesWaiting > 0 as UBaseType{
@@ -494,16 +540,18 @@ impl <T>QueueDefinition<T>
                                 mtCOVERAGE_TEST_MARKER!();
                             }
                         }
-
+                        trace!("queue_generic_receive -- line 498");
                         if list::list_is_empty(&self.xTasksWaitingToSend) == false {
                             if task_queue::task_remove_from_event_list(&self.xTasksWaitingToSend) != false {
                                 queueYIELD_IF_USING_PREEMPTION!();
                             }
                             else {
+                                trace!("queue_generic_receive -- line 504");
                                 mtCOVERAGE_TEST_MARKER!();
                             }
                         }
                         else {
+                            trace!("queue_generic_receive -- line 508");
                             mtCOVERAGE_TEST_MARKER!();
                         }
                     }
@@ -525,7 +573,8 @@ impl <T>QueueDefinition<T>
                         }
                     }
                     taskEXIT_CRITICAL!();
-                    return Ok(buffer.unwrap());
+                    trace!("queue_generic_receive -- line 529");
+                    return Ok(buffer.unwrap_or_else(|| panic!("buffer is empty!")));
                 }
                 else {
                     if xTicksToWait == 0 as TickType {
@@ -548,10 +597,10 @@ impl <T>QueueDefinition<T>
                 }
             }
             taskEXIT_CRITICAL!();
-
+            trace!("queue_generic_receive -- line 553");
             kernel::task_suspend_all();
             self.lock_queue();
-            
+            trace!("queue_generic_receive -- line 556");
             /* Update the timeout state to see if it has expired yet. */
             if task_queue::task_check_for_timeout(&mut xTimeOut,&mut xTicksToWait) == false {
                 if self.is_queue_empty() != false{
@@ -584,6 +633,7 @@ impl <T>QueueDefinition<T>
                     self.unlock_queue();
                     kernel::task_resume_all();
                 }
+                trace!("queue_generic_receive -- line 589");
             }
             else {
                 self.unlock_queue();
@@ -601,7 +651,7 @@ impl <T>QueueDefinition<T>
 
     /// 原先是将队列中pcReadFrom处的内容拷贝到第二个参数pvBuffer中，现改为返回值
     pub fn copy_data_from_queue(&mut self) ->Option<T> {
-        if self.ucQueueType == QueueType::Base || self.ucQueueType == QueueType::Set {
+//        if self.ucQueueType == QueueType::Base || self.ucQueueType == QueueType::Set {
             self.QueueUnion += 1; //QueueUnion represents pcReadFrom in the original code
             if self.QueueUnion >= self.pcTail {
                 self.QueueUnion = self.pcHead;
@@ -611,10 +661,10 @@ impl <T>QueueDefinition<T>
             }
             let ret_val = self.pcQueue.get(self.QueueUnion as usize).cloned();
             Some(ret_val.unwrap())
-        }
-        else{
-            None
-        }
+//        }
+//        else{
+//            None
+//        }
     }
 
 
