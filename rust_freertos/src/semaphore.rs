@@ -39,39 +39,21 @@ impl Semaphore {
         mutex_holder
     }
 
-    pub fn counting_semaphore_up(&self) -> Result<Option<TaskHandle>, QueueError> {
+    pub fn semaphore_up(&self) -> Result<Option<TaskHandle>,QueueError> {
         unsafe {
-            trace!("Counting Semaphore up runs!");
+            trace!("Semaphore take runs!");
             let inner = self.0.get();
-            trace!("Counting Semaphore up get finished!");
+            trace!("Semaphore take get finished!");
             (*inner).queue_generic_receive(semGIVE_BLOCK_TIME, false)
             //trace!("Semaphore take finish!");
         }
     }
 
-    pub fn semaphore_take(&self,xBlockTime: TickType) -> Result<Option<TaskHandle>,QueueError> {
-        unsafe {
-            trace!("Semaphore take runs!");
-            let inner = self.0.get();
-            trace!("Semaphore take get finished!");
-            (*inner).queue_generic_receive(xBlockTime, false)
-            //trace!("Semaphore take finish!");
-        }
-    }
-
-    pub fn counting_semaphore_down(&self, xBlockTime: TickType) -> Result<(), QueueError> {
-        let current_task = get_current_task_handle!();
+    //if you successfully call this function, you own the semaphore
+    pub fn semaphore_down(&self, xBlockTime: TickType) -> Result<(),QueueError> {
         unsafe {
             let inner = self.0.get();
-            (*inner).queue_generic_send(Some(current_task), xBlockTime, queueSEND_TO_BACK)
-        }
-    }
-
-
-    pub fn semaphore_give(&self) -> Result<(),QueueError> {
-        unsafe {
-            let inner = self.0.get();
-            (*inner).queue_generic_send(None,semGIVE_BLOCK_TIME,queueSEND_TO_BACK)
+            (*inner).queue_generic_send(None, xBlockTime, queueSEND_TO_BACK)
         }
     }
 

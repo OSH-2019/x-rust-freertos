@@ -54,6 +54,82 @@ mod tests {
     */
     use std::sync::Arc;
     #[test]
+    fn test_mutex() {
+        use simplelog::*;
+        use semaphore::Semaphore;
+
+        let _ = TermLogger::init(LevelFilter::Trace, Config::default());
+        let mutex0 = Arc::new(Semaphore::new_mutex());
+        let mutex1 = Arc::clone(&mutex0);
+
+        let task0 = move || {
+            loop {
+                match mutex0.semaphore_down(pdMS_TO_TICKS!(10)) {
+                    Ok(_) => {
+                        for i in 1..11 {
+                            trace!("Task0 owns the mutex! -- {}", i);
+                        }
+                        for j in 1..100 {
+                            /*you can comment out this loop so that Task1 can successfully down the
+                            counting_semaphore*/
+                        }
+                        match mutex0.semaphore_up() {
+                            Ok(_) => {
+                                trace!("Task0 dropped the mutex!");
+                            },
+                            Err(error) => {
+                                trace!("mutex0 semaphore up triggers {}", error);
+                            }
+                        }
+                    },
+                    Err(error) => {
+                        trace!("mutex0 semaphore take triggers {}", error);
+                    },
+                }
+            }
+
+
+        };
+
+        let task1 = move || {
+            loop {
+                match mutex1.semaphore_down(pdMS_TO_TICKS!(10)) {
+                    Ok(_) => {
+                        for i in 1..11 {
+                            trace!("Task1 owns the mutex! -- {}", i);
+                        }
+                        match mutex1.semaphore_up() {
+                            Ok(_) => {
+                                trace!("Task1 dropped the mutex!");
+                                kernel::task_end_scheduler();
+                            },
+                            Err(error) => {
+                                trace!("mutex1 semaphore up triggers {}", error);
+                            }
+                        }                        
+                    },
+                    Err(error) => {
+                        trace!("mutex1 semaphore give triggers {}", error);
+                    },
+                }
+            }
+        };
+
+        let Task0 = task_control::TCB::new()
+                            .name("Task0")
+                            .priority(3)
+                            .initialise(task0);
+
+        let Task1 = task_control::TCB::new()
+                            .name("Task1")
+                            .priority(3)
+                            .initialise(task1);
+
+        kernel::task_start_scheduler();
+    }
+
+/*
+    #[test]
     fn test_counting_semaphore() {
         use simplelog::*;
         use semaphore::Semaphore;
@@ -66,16 +142,16 @@ mod tests {
         let task_want_resources0 = move || {
             loop {
                 trace!("Enter Task0!");
-                match cs0.counting_semaphore_down(pdMS_TO_TICKS!(10)) {
+                match cs0.semaphore_down(pdMS_TO_TICKS!(10)) {
                     Ok(_) => {
                         for i in 1..11 {
                             trace!("cs0 owns the counting semaphore! -- {}", i);
                         }
-                        loop {
+                        // loop {
                             /*you can comment out this loop so that Task1 can successfully down the
                             counting_semaphore*/
-                        }
-                        match cs0.counting_semaphore_up() {
+                        // }
+                        match cs0.semaphore_up() {
                             Ok(_) => {
                                 trace!("Task0 Finished!");
                                 break;
@@ -98,12 +174,12 @@ mod tests {
         let task_want_resources1 = move || {
             loop {
                 trace!("Enter Task1!");
-                match cs1.counting_semaphore_down(pdMS_TO_TICKS!(10)) {
+                match cs1.semaphore_down(pdMS_TO_TICKS!(10)) {
                     Ok(_) => {
                         for i in 1..11 {
                             trace!("cs1 owns the counting semaphore! -- {}", i);
                         }
-                        match cs1.counting_semaphore_up() {
+                        match cs1.semaphore_up() {
                             Ok(_) => {
                                 trace!("Test COUNTING SEMAPHORE COMPLETE!");
                                 kernel::task_end_scheduler();
@@ -129,7 +205,7 @@ mod tests {
         let task_want_resources2 = move || {
             loop {
                 trace!("Enter Task2!");
-                match cs2.counting_semaphore_down(pdMS_TO_TICKS!(50)) {
+                match cs2.semaphore_down(pdMS_TO_TICKS!(50)) {
                     Ok(_) => {
                         trace!("Task2 OK!");
                         for i in 1..11 {
@@ -139,7 +215,7 @@ mod tests {
                             /*you can comment out this loop so that Task1 can successfully down the
                             counting_semaphore*/
                         }
-                        match cs2.counting_semaphore_up() {
+                        match cs2.semaphore_up() {
                             Ok(_) => {
                                 trace!("Task2 Finished!");
                                 break;
@@ -177,6 +253,8 @@ mod tests {
         kernel::task_start_scheduler();
 
     }
+*/
+
 /*
     #[test]
     fn test_queue() {
