@@ -71,6 +71,10 @@ mod tests {
                         for i in 1..11 {
                             trace!("cs0 owns the counting semaphore! -- {}", i);
                         }
+                        loop {
+                            /*you can comment out this loop so that Task1 can successfully down the
+                            counting_semaphore*/
+                        }
                         match cs0.counting_semaphore_up() {
                             Ok(_) => {
                                 trace!("Task0 Finished!");
@@ -85,6 +89,9 @@ mod tests {
                         trace!("cs0 semaphore take triggers {}", error);
                     },
                 }
+            }
+            loop {
+
             }
         };
 
@@ -104,13 +111,18 @@ mod tests {
                             }
                             Err(error) => {
                                 trace!("cs1 semaphore give triggers {}", error);
+                                kernel::task_end_scheduler();
                             }
                         }
                     },
                     Err(error) => {
                         trace!("cs1 semaphore take triggers {}", error);
+                        kernel::task_end_scheduler();
                     },
                 }
+            }
+            loop {
+
             }
         };
 
@@ -122,6 +134,10 @@ mod tests {
                         trace!("Task2 OK!");
                         for i in 1..11 {
                             trace!("cs2 owns the counting semaphore! -- {}", i);
+                        }
+                        loop {
+                            /*you can comment out this loop so that Task1 can successfully down the
+                            counting_semaphore*/
                         }
                         match cs2.counting_semaphore_up() {
                             Ok(_) => {
@@ -137,6 +153,9 @@ mod tests {
                         trace!("cs2 semaphore take triggers {}", error);
                     },
                 }
+            }
+            loop {
+
             }
         };
 

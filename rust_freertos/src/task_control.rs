@@ -808,6 +808,7 @@ pub fn task_delete (task_to_delete: TaskHandle)
 */
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn suspend_task (task_to_suspend: TaskHandle){
+    trace!("suspend_task called!");
     /* origin: If null is passed in here then it is the running task that is
 			being suspended. In our implement, you can just pass the TaskHandle of the current task*/
     let mut unwrapped_tcb = get_tcb_from_handle!(task_to_suspend);
@@ -918,6 +919,7 @@ pub fn task_is_tasksuspended (xtask: &TaskHandle) -> bool
 
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn resume_task (task_to_resume: TaskHandle){
+    trace!("resume task called!");
     let mut unwrapped_tcb = get_tcb_from_handle!(task_to_resume);
 
     if task_to_resume != get_current_task_handle!() {

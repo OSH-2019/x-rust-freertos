@@ -672,16 +672,16 @@ impl <T>QueueDefinition<T>
         /* This function is called from a critical section. */
         let mut xReturn:bool = false;
         let mut uxMessagesWaiting:UBaseType = self.uxMessagesWaiting;
-        /* This function is called from a critical section. */
         
         {
+            //TODO:understand the usage this part
             #![cfg(configUSE_MUTEXES)]
             if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex {
                 let task_handle = self.transed_task_handle_for_mutex(); 
                 xReturn = task_queue::task_priority_disinherit(task_handle);
                 self.pcQueue.pop_front();
-                self.insert(0,None);
-                //self.pxMutexHolder = None;
+                self.pcQueue.insert(0,None);
+                self.pxMutexHolder = None;
             }
             else {
                 mtCOVERAGE_TEST_MARKER!();

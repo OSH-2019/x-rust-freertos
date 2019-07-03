@@ -60,7 +60,7 @@ impl Semaphore {
     }
 
     pub fn counting_semaphore_down(&self, xBlockTime: TickType) -> Result<(), QueueError> {
-        let current_task = get_current_task_handle!().clone();
+        let current_task = get_current_task_handle!();
         unsafe {
             let inner = self.0.get();
             (*inner).queue_generic_send(Some(current_task), xBlockTime, queueSEND_TO_BACK)
