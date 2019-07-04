@@ -701,221 +701,224 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
     trace!("Place succeeded");
 }
 
-// pub fn reset_next_task_unblock_time () {
-//     if list_is_empty (&DELAYED_TASK_LIST) {
-// 		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
-// 		the maximum possible value so it is	extremely unlikely that the
-// 		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
-// 		there is an item in the delayed list. */
-//         set_next_task_unblock_time! (portMAX_DELAY);
-//     }
-//     else {
-// 		/* The new current delayed list is not empty, get the value of
-// 		the item at the head of the delayed list.  This is the time at
-// 		which the task at the head of the delayed list should be removed
-// 		from the Blocked state. */
-//         let mut temp = get_owner_of_head_entry (&DELAYED_TASK_LIST);
-//         set_next_task_unblock_time! (get_list_item_value(temp.clone().unwrap().read().unwrap().get_state_list_item()));
-//     }
-// }
+pub fn reset_next_task_unblock_time () {
+    if list_is_empty (&DELAYED_TASK_LIST) {
+		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
+		the maximum possible value so it is	extremely unlikely that the
+		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
+		there is an item in the delayed list. */
+        set_next_task_unblock_time! (portMAX_DELAY);
+    }
+    else {
+		/* The new current delayed list is not empty, get the value of
+		the item at the head of the delayed list.  This is the time at
+		which the task at the head of the delayed list should be removed
+		from the Blocked state. */
+        let mut temp = get_owner_of_head_entry (&DELAYED_TASK_LIST);
+        set_next_task_unblock_time! (get_list_item_value(temp.clone().unwrap().read().unwrap().get_state_list_item()));
+    }
+}
 
-// pub fn task_delete (task_to_delete: TaskHandle)
-// {
-//     taskENTER_CRITICAL!();
-//     {
-//         /* If null is passed in here then it is the calling task that is
-// 		being deleted. */
-//         let pxtcb = get_tcb_from_handle! (task_to_delete);
+pub fn task_delete (task_to_delete: TaskHandle)
+{
+    taskENTER_CRITICAL!();
+    {
+        /* If null is passed in here then it is the calling task that is
+		being deleted. */
+        let pxtcb = get_tcb_from_handle! (task_to_delete);
 
-//         /* Remove task from the ready list. */
-//         if list_remove (pxtcb.get_state_list_item()) == 0 {
-//             taskRESET_READY_PRIORITY!(pxtcb.get_priority());
-//         }
-//         else {
-//             mtCOVERAGE_TEST_MARKER!();
-//         }
+        /* Remove task from the ready list. */
+        if list_remove (pxtcb.get_state_list_item()) == 0 {
+            taskRESET_READY_PRIORITY!(pxtcb.get_priority());
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER!();
+        }
 
-//         /* Is the task waiting on an event also? */
-// 		if get_list_item_container (pxtcb.get_event_list_item ()).is_some() {
-//             list_remove (pxtcb.get_event_list_item());
-//         }else {
-//             mtCOVERAGE_TEST_MARKER!();
-//         }
+        /* Is the task waiting on an event also? */
+		if get_list_item_container (pxtcb.get_event_list_item ()).is_some() {
+            list_remove (pxtcb.get_event_list_item());
+        }else {
+            mtCOVERAGE_TEST_MARKER!();
+        }
 
 
-//         /* Increment the uxTaskNumber also so kernel aware debuggers can
-//         detect that the task lists need re-generating.  This is done before
-//         portPRE_TASK_DELETE_HOOK() as in the Windows port that macro will
-//         not return. */
+        /* Increment the uxTaskNumber also so kernel aware debuggers can
+        detect that the task lists need re-generating.  This is done before
+        portPRE_TASK_DELETE_HOOK() as in the Windows port that macro will
+        not return. */
 
-// 		set_task_number!(get_task_number!() + 1);
+		set_task_number!(get_task_number!() + 1);
 
-//         if *pxtcb == *get_tcb_from_handle! (get_current_task_handle!())
-// 		{
-//             /* A task is deleting itself.  This cannot complete within the
-//             task itself, as a context switch to another task is required.
-//             Place the task in the termination list.  The idle task will
-//             check the termination list and free up any memory allocated by
-//             the scheduler for the TCB and stack of the deleted task. */
-//             list_insert_end ( &TASKS_WAITING_TERMINATION, pxtcb.get_state_list_item()  );
+        if *pxtcb == *get_tcb_from_handle! (get_current_task_handle!())
+		{
+            /* A task is deleting itself.  This cannot complete within the
+            task itself, as a context switch to another task is required.
+            Place the task in the termination list.  The idle task will
+            check the termination list and free up any memory allocated by
+            the scheduler for the TCB and stack of the deleted task. */
+            #[cfg(feature = "INCLUDE_vTaskDelete")] {
+                list_insert_end ( &TASKS_WAITING_TERMINATION, pxtcb.get_state_list_item()  );
 
-//             /* Increment the ucTasksDeleted variable so the idle task knows
-//             there is a task that has been deleted and that it should therefore
-//             check the xTasksWaitingTermination list. */
-//             unsafe{
-//                 &DELETED_TASKS_WAITING_CLEAN_UP = &DELETED_TASKS_WAITING_CLEAN_UP + 1;
-//             }
-//             /* The pre-delete hook is primarily for the Windows simulator,
-//             in which Windows specific clean up operations are performed,
-//             after which it is not possible to yield away from this task -
-//             hence xYieldPending is used to latch that a context switch is
-//             required. */
-//             portPRE_TASK_DELETE_HOOK!( pxtcb, get_yield_pending!() );
-//         }
-//         else{
-//                 set_current_number_of_tasks! (get_current_number_of_tasks!() - 1);
+                unsafe{
+                    &DELETED_TASKS_WAITING_CLEAN_UP = &DELETED_TASKS_WAITING_CLEAN_UP + 1;
+                }
+            }
 
-// 				delete_tcb ( pxtcb );
+            /* Increment the ucTasksDeleted variable so the idle task knows
+            there is a task that has been deleted and that it should therefore
+            check the xTasksWaitingTermination list. */
+            /* The pre-delete hook is primarily for the Windows simulator,
+            in which Windows specific clean up operations are performed,
+            after which it is not possible to yield away from this task -
+            hence xYieldPending is used to latch that a context switch is
+            required. */
+            portPRE_TASK_DELETE_HOOK!( pxtcb, get_yield_pending!() );
+        }
+        else{
+                set_current_number_of_tasks! (get_current_number_of_tasks!() - 1);
 
-// 				/* Reset the next expected unblock time in case it referred to
-// 				the task that has just been deleted. */
-// 				reset_next_task_unblock_time ();
-// 		}
-//         // FIXME
-// 		//traceTASK_DELETE!(task_to_delete);
-//     }
-// 	taskEXIT_CRITICAL!();
+				delete_tcb ( pxtcb );
 
-//     let mut pxtcb = get_tcb_from_handle! (task_to_delete);
+				/* Reset the next expected unblock time in case it referred to
+				the task that has just been deleted. */
+				reset_next_task_unblock_time ();
+		}
+        // FIXME
+		//traceTASK_DELETE!(task_to_delete);
+    }
+	taskEXIT_CRITICAL!();
 
-// 		/* Force a reschedule if it is the currently running task that has just
-// 		been deleted. */
-// 		if get_scheduler_suspended!() > 0
-// 		{
-// 			if *pxtcb == *get_tcb_from_handle!( get_current_task_handle!())
-// 			{
-// 				assert!( get_scheduler_suspended!() == 0 );
-// 				portYIELD_WITHIN_API! ();
-// 			}
-// 			else
-// 			{
-// 				mtCOVERAGE_TEST_MARKER! ();
-// 			}
-// 		}
-// }
+    let mut pxtcb = get_tcb_from_handle! (task_to_delete);
 
-// pub fn suspend_task (task_to_suspend: TaskHandle){
-//     let mut px_tcb = get_tcb_from_handle! (task_to_suspend);
-//     taskENTER_CRITICAL!();
-//     {
-//         traceTASK_SUSPEND!(&px_tcb);
-//         if list_remove (px_tcb.get_state_list_item()) == 0 {
-//             taskRESET_READY_PRIORITY! (px_tcb.get_priority());
-//         }
-//         else {
-//             mtCOVERAGE_TEST_MARKER! ();
-//         }
+		/* Force a reschedule if it is the currently running task that has just
+		been deleted. */
+		if get_scheduler_suspended!() > 0
+		{
+			if *pxtcb == *get_tcb_from_handle!( get_current_task_handle!())
+			{
+				assert!( get_scheduler_suspended!() == 0 );
+				portYIELD_WITHIN_API! ();
+			}
+			else
+			{
+				mtCOVERAGE_TEST_MARKER! ();
+			}
+		}
+}
 
-//         if get_list_item_container (& px_tcb.get_event_list_item()).is_some() {
-//             list_remove (px_tcb.get_state_list_item());
-//         }
-//         else {
-//             mtCOVERAGE_TEST_MARKER! ();
-//         }
-//         list_insert_end (&TASKS_WAITING_TERMINATION,px_tcb.get_state_list_item());
-//     }taskEXIT_CRITICAL!();
+pub fn suspend_task (task_to_suspend: TaskHandle){
+    let mut px_tcb = get_tcb_from_handle! (task_to_suspend);
+    taskENTER_CRITICAL!();
+    {
+        traceTASK_SUSPEND!(&px_tcb);
+        if list_remove (px_tcb.get_state_list_item()) == 0 {
+            taskRESET_READY_PRIORITY! (px_tcb.get_priority());
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER! ();
+        }
 
-//     if get_scheduler_running!(){
-//         taskENTER_CRITICAL!();
-//         {
-//             reset_next_task_unblock_time();
-//         }
-//         taskEXIT_CRITICAL!();
-//     }
-//     else {
-//         mtCOVERAGE_TEST_MARKER! ();
-//     }
+        if get_list_item_container (& px_tcb.get_event_list_item()).is_some() {
+            list_remove (px_tcb.get_state_list_item());
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER! ();
+        }
+        list_insert_end (&TASKS_WAITING_TERMINATION,px_tcb.get_state_list_item());
+    }taskEXIT_CRITICAL!();
 
-//     if *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
-//         if get_scheduler_running!(){
-//             assert! (get_scheduler_suspended!() != 0);
-//             portYIELD_WITHIN_API! ();
-//         }
-//         else {
-//             if current_list_length(&SUSPENDED_TASK_LIST) != (get_current_number_of_tasks!()) as usize{
-//                 task_switch_context();
-//             }
-//         }
-//     }
-//     else {
-//         mtCOVERAGE_TEST_MARKER!();
-//     }
-// }
+    if get_scheduler_running!(){
+        taskENTER_CRITICAL!();
+        {
+            reset_next_task_unblock_time();
+        }
+        taskEXIT_CRITICAL!();
+    }
+    else {
+        mtCOVERAGE_TEST_MARKER! ();
+    }
 
-// pub fn task_is_tasksuspended (xtask: &TaskHandle) -> BaseType
-// {
-// 	let mut xreturn:BaseType = 0;
-// 	let tcb = get_tcb_from_handle! (xtask);
-//     /* Accesses xPendingReadyList so must be called from a critical
-//     section. */
+    if *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
+        if get_scheduler_running!(){
+            assert! (get_scheduler_suspended!() != 0);
+            portYIELD_WITHIN_API! ();
+        }
+        else {
+            if current_list_length(&SUSPENDED_TASK_LIST) != get_current_number_of_tasks!(){
+                task_switch_context();
+            }
+        }
+    }
+    else {
+        mtCOVERAGE_TEST_MARKER!();
+    }
+}
 
-//     /* It does not make sense to check if the calling task is suspended. */
-//     //assert!( xtask );
+pub fn task_is_tasksuspended (xtask: &TaskHandle) -> BaseType
+{
+	let mut xreturn:BaseType = 0;
+	let tcb = get_tcb_from_handle! (xtask);
+    /* Accesses xPendingReadyList so must be called from a critical
+    section. */
 
-//     /* Is the task being resumed actually in the suspended list? */
-//     if list::is_contained_within ( &SUSPENDED_TASK_LIST , tcb.get_state_list_item() )
-//     {
-//         /* Has the task already been resumed from within an ISR? */
-//         if ! list::is_contained_within ( PENDING_READY_LIST , tcb.get_event_list_item() )
-//         {
-//             /* Is it in the suspended list because it is in the	Suspended
-//             state, or because is is blocked with no timeout? */
-//             if is_contained_within ( READY_TASK_LISTS , tcb.get_event_list_item() )
-//             {
-//                 xreturn = 1;
-//             }
-//             else
-//             {
-//                 mtCOVERAGE_TEST_MARKER!();
-//             }
-//         }
-//         else
-//         {
-//             mtCOVERAGE_TEST_MARKER!();
-//         }
-//     }
-//     else
-//     {
-//         mtCOVERAGE_TEST_MARKER!();
-//     }
+    /* It does not make sense to check if the calling task is suspended. */
+    //assert!( xtask );
 
-//     xreturn
-// }
+    /* Is the task being resumed actually in the suspended list? */
+    if list::is_contained_within ( &SUSPENDED_TASK_LIST , &tcb.get_state_list_item() )
+    {
+        /* Has the task already been resumed from within an ISR? */
+        if ! list::is_contained_within ( &PENDING_READY_LIST , &tcb.get_event_list_item() )
+        {
+            /* Is it in the suspended list because it is in the	Suspended
+            state, or because is is blocked with no timeout? */
+            if list::is_contained_within ( &READY_TASK_LISTS , &tcb.get_event_list_item() )
+            {
+                xreturn = 1;
+            }
+            else
+            {
+                mtCOVERAGE_TEST_MARKER!();
+            }
+        }
+        else
+        {
+            mtCOVERAGE_TEST_MARKER!();
+        }
+    }
+    else
+    {
+        mtCOVERAGE_TEST_MARKER!();
+    }
 
-// pub fn resume_task (task_to_resume: TaskHandle){
-//     let mut px_tcb = get_tcb_from_handle! (task_to_resume);
+    xreturn
+}
 
-//     if /*NULL !*px_tcb && */ *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
-//         taskENTER_CRITICAL!();
-//         {
-//             if task_is_tasksuspended (&task_to_resume) == 1 {
-//                 //trace_task_RESUME! (px_tcb);
-//                 let current_task_priority = get_current_task_handle!().get_priority();
-//                 list_remove (px_tcb.get_state_list_item());
-//                 task_to_resume.add_task_to_ready_list();
-//                 if px_tcb.get_priority() >= current_task_priority {
-//                     taskYIELD_IF_USING_PREEMPTION!();
-//                 }else {
-//                     mtCOVERAGE_TEST_MARKER! ();
-//                 }
-//             }
-//             else {
-//                 mtCOVERAGE_TEST_MARKER! ();
-//             }
-//         }
-//         taskEXIT_CRITICAL!();
-//     }
-//     else {
-//         mtCOVERAGE_TEST_MARKER!();
-//     }
-// }
+pub fn resume_task (task_to_resume: TaskHandle){
+    let mut px_tcb = get_tcb_from_handle! (task_to_resume);
+
+    if /*NULL !*px_tcb && */ *px_tcb == *get_tcb_from_handle!( get_current_task_handle!()) {
+        taskENTER_CRITICAL!();
+        {
+            if task_is_tasksuspended (&task_to_resume) == 1 {
+                //trace_task_RESUME! (px_tcb);
+                let current_task_priority = get_current_task_handle!().get_priority();
+                list_remove (px_tcb.get_state_list_item());
+                task_to_resume.add_task_to_ready_list();
+                if px_tcb.get_priority() >= current_task_priority {
+                    taskYIELD_IF_USING_PREEMPTION!();
+                }else {
+                    mtCOVERAGE_TEST_MARKER! ();
+                }
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER! ();
+            }
+        }
+        taskEXIT_CRITICAL!();
+    }
+    else {
+        mtCOVERAGE_TEST_MARKER!();
+    }
+}
