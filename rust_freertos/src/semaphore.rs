@@ -97,11 +97,7 @@ impl Semaphore {
                 traceGIVE_MUTEX_RECURSIVE!(*inner);
                 (*inner).QueueUnion_decrease();
                 if (*inner).is_QueueUnion_zero() {
-                    (*inner).queue_generic_send(
-                        None,
-                        queueMUTEX_GIVE_BLOCK_TIME,
-                        queueSEND_TO_BACK,
-                    );
+                    (*inner).queue_generic_receive(semGIVE_BLOCK_TIME, false);
                 } else {
                     mtCOVERAGE_TEST_MARKER!();
                 }
@@ -124,7 +120,7 @@ impl Semaphore {
                 (*inner).QueueUnion_increase();
                 xReturn = false;
             } else {
-                match (*inner).queue_generic_receive(ticks_to_wait, false) {
+                match (*inner).queue_generic_send(None, ticks_to_wait, queueSEND_TO_BACK) {
                     Ok(x) => {
                         (*inner).QueueUnion_increase();
                         xReturn = true;

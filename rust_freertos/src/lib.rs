@@ -65,7 +65,7 @@ mod tests {
         let task0 = move || {
             task_timemanager::task_delay(pdMS_TO_TICKS!(1));
             loop {
-                match mutex0.semaphore_down(pdMS_TO_TICKS!(10)) {
+                match mutex0.semaphore_down(pdMS_TO_TICKS!(0)) {
                     Ok(_) => {
                         for i in 1..11 {
                             trace!("Task0 owns the mutex! -- {}", i);
@@ -86,6 +86,7 @@ mod tests {
                     }
                     Err(error) => {
                         trace!("mutex0 semaphore take triggers {}", error);
+                        task_timemanager::task_delay(pdMS_TO_TICKS!(1));
                     }
                 }
             }
@@ -98,6 +99,7 @@ mod tests {
                         for i in 1..11 {
                             trace!("Task1 owns the mutex! -- {}", i);
                         }
+                        task_timemanager::task_delay(pdMS_TO_TICKS!(1));
                         trace!("Task1's priority is {}", get_current_task_priority!());
                         /*loop {
                         }*/
