@@ -727,7 +727,11 @@ where
         }
 
         if xPosition == queueSEND_TO_BACK {
-            self.pcQueue.insert(self.pcWriteTo as usize, pvItemToQueue);
+            if self.ucQueueType != QueueType::Mutex && self.ucQueueType != QueueType::RecursiveMutex {
+                self.pcQueue.insert(self.pcWriteTo as usize, pvItemToQueue);
+            }
+            else {
+            }
             self.pcWriteTo = self.pcWriteTo + 1;
 
             if self.pcWriteTo >= self.pcTail {
@@ -736,7 +740,11 @@ where
                 mtCOVERAGE_TEST_MARKER!();
             }
         } else {
-            self.pcQueue.insert(self.QueueUnion as usize, pvItemToQueue); //QueueUnion represents pcReadFrom
+            if self.ucQueueType != QueueType::Mutex && self.ucQueueType != QueueType::RecursiveMutex {
+                self.pcQueue.insert(self.QueueUnion as usize, pvItemToQueue); //QueueUnion represents pcReadFrom
+            }
+            else {
+            }
             self.QueueUnion = self.QueueUnion - 1;
             if self.QueueUnion < self.pcHead {
                 self.QueueUnion = self.pcTail - 1;
