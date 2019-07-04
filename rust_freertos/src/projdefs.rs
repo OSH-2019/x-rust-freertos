@@ -14,12 +14,13 @@ pub enum FreeRtosError {
     TaskNotFound,
     ProcessorHasShutDown,
     DeadLocked,
-    PortError
+    PortError,
 }
 
 #[macro_export]
 macro_rules! pdMS_TO_TICKS {
     ($xTimeInMs:expr) => {
-        (($xTimeInMs as crate::port::TickType * configTICK_RATE_HZ!()) / 1000 as crate::port::TickType) as crate::port::TickType
+        (($xTimeInMs as crate::port::TickType * configTICK_RATE_HZ!())
+            / 1000 as crate::port::TickType) as crate::port::TickType
     };
 }

@@ -230,7 +230,7 @@ macro_rules! portRESET_READY_PRIORITY {
  * Map to the memory management routines required for the port.
  */
 pub fn port_malloc(size: usize) -> Result<CVoidPointer, FreeRtosError> {
-    unsafe { 
+    unsafe {
         let ret_ptr = pvPortMalloc(size);
         if ret_ptr.is_null() {
             error!("Malloc returned null.");

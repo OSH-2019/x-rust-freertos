@@ -1,4 +1,4 @@
-// config.rs - Macros starting with "config" who evaluate to a numeric value. 
+// config.rs - Macros starting with "config" who evaluate to a numeric value.
 // This file is adapted from FreeRTOSConfig.h
 
 // TODO: Provide configASSERT() (or not?).
@@ -12,7 +12,7 @@ macro_rules! configTICK_RATE_HZ {
 #[macro_export]
 macro_rules! configMINIMAL_STACK_SIZE {
     () => {
-        64 
+        64
     };
 }
 
@@ -60,9 +60,7 @@ macro_rules! configTIMER_TASK_STACK_DEPTH {
 
 #[macro_export]
 macro_rules! configEXPECTED_IDLE_TIME_BEFORE_SLEEP {
-    () => (
+    () => {
         2
-    )
+    };
 }
-
-

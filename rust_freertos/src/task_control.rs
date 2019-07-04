@@ -1,16 +1,16 @@
+use crate::kernel::*;
+use crate::list;
+use crate::list::ItemLink;
+use crate::list::*;
 use crate::port::*;
 use crate::projdefs::FreeRtosError;
 use crate::task_global::*;
-use crate::list;
-use crate::list::{ItemLink};
-use crate::list::*;
 use crate::*;
-use crate::kernel::*;
 use std::boxed::FnBox;
-use std::sync::{Weak, Arc, RwLock};
 use std::mem;
+use std::sync::{Arc, RwLock, Weak};
 
-//* task states
+/* Task states returned by eTaskGetState. */
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum task_state {
@@ -58,9 +58,9 @@ pub struct task_control_block {
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notified_value: u32,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
-    notify_state  : u8,
+    notify_state: u8,
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    delay_aborted : bool,
+    delay_aborted: bool,
 }
 
 pub type TCB = task_control_block;
@@ -70,10 +70,10 @@ impl task_control_block {
         task_control_block {
             state_list_item: Default::default(),
             event_list_item: Default::default(),
-            task_priority  : 1,
-            task_stacksize : configMINIMAL_STACK_SIZE!(),
-            task_name      : String::from("Unnamed"),
-            stack_pos      : 0,
+            task_priority: 1,
+            task_stacksize: configMINIMAL_STACK_SIZE!(),
+            task_name: String::from("Unnamed"),
+            stack_pos: 0,
 
             //* nesting
             #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
@@ -92,9 +92,9 @@ impl task_control_block {
             #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
             notified_value: 0,
             #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
-            notify_state  : 0,
+            notify_state: 0,
             #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-            delay_aborted : false,
+            delay_aborted: false,
         }
     }
 
@@ -123,6 +123,55 @@ impl task_control_block {
         self
     }
 
+    /*
+     * Create a new task and add it to the list of tasks that are ready to run.
+     *
+     * Internally, within the FreeRTOS implementation, tasks use two blocks of
+     * memory.  The first block is used to hold the task's data structures.  The
+     * second block is used by the task as its stack.  If a task is created using
+     * xTaskCreate() then both blocks of memory are automatically dynamically
+     * allocated inside the xTaskCreate() function.  (see
+     * http://www.freertos.org/a00111.html).  If a task is created using
+     * xTaskCreateStatic() then the application writer must provide the required
+     * memory.  xTaskCreateStatic() therefore allows a task to be created without
+     * using any dynamic memory allocation.
+     *
+     * See xTaskCreateStatic() for a version that does not use any dynamic memory
+     * allocation.
+     *
+     * xTaskCreate() can only be used to create a task that has unrestricted
+     * access to the entire microcontroller memory map.  Systems that include MPU
+     * support can alternatively create an MPU constrained task using
+     * xTaskCreateRestricted().
+     *
+     * @param pvTaskCode Pointer to the task entry function.  Tasks
+     * must be implemented to never return (i.e. continuous loop).
+     *
+     * @param pcName A descriptive name for the task.  This is mainly used to
+     * facilitate debugging.  Max length defined by configMAX_TASK_NAME_LEN - default
+     * is 16.
+     *
+     * @param usStackDepth The size of the task stack specified as the number of
+     * variables the stack can hold - not the number of bytes.  For example, if
+     * the stack is 16 bits wide and usStackDepth is defined as 100, 200 bytes
+     * will be allocated for stack storage.
+     *
+     * @param pvParameters Pointer that will be used as the parameter for the task
+     * being created.
+     *
+     * @param uxPriority The priority at which the task should run.  Systems that
+     * include MPU support can optionally create tasks in a privileged (system)
+     * mode by setting bit portPRIVILEGE_BIT of the priority parameter.  For
+     * example, to create a privileged task at priority 2 the uxPriority parameter
+     * should be set to ( 2 | portPRIVILEGE_BIT ).
+     *
+     * @param pvCreatedTask Used to pass back a handle by which the created task
+     * can be referenced.
+     *
+     * @return pdPASS if the task was successfully created and added to a ready
+     * list, otherwise an error code defined in the file projdefs.h
+     *
+     */
     pub fn initialise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
     where
         F: FnOnce() -> () + Send + 'static,
@@ -164,10 +213,8 @@ impl task_control_block {
          * this is how freertos.rs approaches this problem, and is explained here:
          * https://stackoverflow.com/questions/32270030/how-do-i-convert-a-rust-closure-to-a-c-style-callback
          */
-        let result = port::port_initialise_stack(top_of_stack as *mut _,
-                                                 Some(run_wrapper),
-                                                 param_ptr
-        );
+        let result =
+            port::port_initialise_stack(top_of_stack as *mut _, Some(run_wrapper), param_ptr);
         match result {
             Ok(_) => {
                 trace!("Stack initialisation succeeded");
@@ -177,7 +224,7 @@ impl task_control_block {
                  */
                 mem::forget(f);
             }
-            Err(e) => return Err(e)
+            Err(e) => return Err(e),
         }
 
         /* Do a bunch of conditional initialisations. */
@@ -257,17 +304,19 @@ impl task_control_block {
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    pub fn get_delay_aborted (&self) -> bool {self.delay_aborted}
+    pub fn get_delay_aborted(&self) -> bool {
+        self.delay_aborted
+    }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    pub fn set_delay_aborted (&mut self, next_val: bool) -> bool {
+    pub fn set_delay_aborted(&mut self, next_val: bool) -> bool {
         let prev_val: bool = self.delay_aborted;
         self.delay_aborted = next_val;
         prev_val
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn get_mutex_held_count(&self) -> UBaseType{
+    pub fn get_mutex_held_count(&self) -> UBaseType {
         self.mutexes_held
     }
 
@@ -277,7 +326,7 @@ impl task_control_block {
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn get_base_priority(&self) -> UBaseType{
+    pub fn get_base_priority(&self) -> UBaseType {
         self.base_priority
     }
 }
@@ -341,7 +390,11 @@ pub fn initialize_task_list () {
 }
 */
 
-/* Since multiple `TaskHandle`s may refer to and own a same TCB at a time,
+/*
+ * Type by which tasks are referenced.  For example, a call to xTaskCreate
+ * returns (via a pointer parameter) an TaskHandle_t variable that can then
+ * be used as a parameter to vTaskDelete to delete the task.
+ * Since multiple `TaskHandle`s may refer to and own a same TCB at a time,
  * we wrapped TCB within a `tuple struct` using `Arc<RwLock<_>>`
  */
 #[derive(Clone)]
@@ -355,13 +408,13 @@ impl PartialEq for TaskHandle {
 
 impl From<Weak<RwLock<TCB>>> for TaskHandle {
     fn from(weak_link: Weak<RwLock<TCB>>) -> Self {
-        TaskHandle(weak_link
-                   .upgrade()
-                   .unwrap_or_else(|| panic!("Owner is not set"))
-                   )
+        TaskHandle(
+            weak_link
+                .upgrade()
+                .unwrap_or_else(|| panic!("Owner is not set")),
+        )
     }
 }
-
 
 impl From<TaskHandle> for Weak<RwLock<TCB>> {
     fn from(task: TaskHandle) -> Self {
@@ -437,8 +490,10 @@ impl TaskHandle {
         */
         // TODO: This line is WRONG! (just for test)
         // set_list_item_container!(unwrapped_tcb.state_list_item, list::ListName::READY_TASK_LISTS_1);
-        list::list_insert_end(&READY_TASK_LISTS[priority as usize],
-                              Arc::clone(&unwrapped_tcb.state_list_item));
+        list::list_insert_end(
+            &READY_TASK_LISTS[priority as usize],
+            Arc::clone(&unwrapped_tcb.state_list_item),
+        );
         tracePOST_MOVED_TASK_TO_READY_STATE!(&unwrapped_tcb);
         Ok(())
     }
@@ -525,17 +580,17 @@ impl TaskHandle {
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    pub fn get_delay_aborted (&self) -> bool {
+    pub fn get_delay_aborted(&self) -> bool {
         get_tcb_from_handle!(self).get_delay_aborted()
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    pub fn set_delay_aborted (&self, next_val: bool) -> bool {
+    pub fn set_delay_aborted(&self, next_val: bool) -> bool {
         get_tcb_from_handle_mut!(self).set_delay_aborted(next_val)
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn get_mutex_held_count(&self) -> UBaseType{
+    pub fn get_mutex_held_count(&self) -> UBaseType {
         get_tcb_from_handle!(self).get_mutex_held_count()
     }
 
@@ -545,7 +600,7 @@ impl TaskHandle {
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn get_base_priority(&self) -> UBaseType{
+    pub fn get_base_priority(&self) -> UBaseType {
         get_tcb_from_handle!(self).get_base_priority()
     }
 }
@@ -576,16 +631,10 @@ macro_rules! get_tcb_from_handle_mut {
     };
 }
 
-pub fn delete_tcb (tcb_to_delete :std::sync::RwLockReadGuard<'_, task_control::task_control_block>)
-{
-    /* This call is required specifically for the TriCore port.  It must be
-	above the vPortFree() calls.  The call is also used by ports/demos that
-	want to allocate and clean RAM statically. */
-
-    //port_free (*tcb_to_delete.stack_pos);
+pub fn delete_tcb(tcb_to_delete: std::sync::RwLockReadGuard<'_, task_control::task_control_block>) {
 }
 
-pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_indefinitely: bool) {
+pub fn add_current_task_to_delayed_list(ticks_to_wait: TickType, can_block_indefinitely: bool) {
     /*
      * The currently executing task is entering the Blocked state.  Add the task to
      * either the current or the overflow delayed task list.
@@ -598,8 +647,8 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
     {
         #![cfg(feature = "INCLUDE_xTaskAbortDelay")]
         /* About to enter a delayed list, so ensure the ucDelayAborted flag is
-           reset to pdFALSE so it can be detected as having been set to pdTRUE
-           when the task leaves the Blocked state. */
+        reset to pdFALSE so it can be detected as having been set to pdTRUE
+        when the task leaves the Blocked state. */
 
         unwrapped_cur.set_delay_aborted(false);
 
@@ -609,12 +658,12 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
     trace!("Abort succeeded");
 
     /* Remove the task from the ready list before adding it to the blocked list
-       as the same list item is used for both lists. */
+    as the same list item is used for both lists. */
     if list::list_remove(unwrapped_cur.get_state_list_item()) == 0 {
         trace!("Returned 0");
         /* The current task must be in a ready list, so there is no need to
-           check, and the port reset macro can be called directly. */
-        portRESET_READY_PRIORITY! ( unwrapped_cur.get_priority () , get_top_ready_priority!() );
+        check, and the port reset macro can be called directly. */
+        portRESET_READY_PRIORITY!(unwrapped_cur.get_priority(), get_top_ready_priority!());
     } else {
         trace!("Returned not 0");
         mtCOVERAGE_TEST_MARKER!();
@@ -625,14 +674,14 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
         #![cfg(feature = "INCLUDE_vTaskSuspend")]
         if ticks_to_wait == portMAX_DELAY && can_block_indefinitely {
             /* Add the task to the suspended task list instead of a delayed task
-               list to ensure it is not woken by a timing event.  It will block
-               indefinitely. */
+            list to ensure it is not woken by a timing event.  It will block
+            indefinitely. */
             let cur_state_list_item = unwrapped_cur.get_state_list_item();
             list::list_insert_end(&SUSPENDED_TASK_LIST, cur_state_list_item);
         } else {
             /* Calculate the time at which the task should be woken if the event
-               does not occur.  This may overflow but this doesn't matter, the
-               kernel will manage it correctly. */
+            does not occur.  This may overflow but this doesn't matter, the
+            kernel will manage it correctly. */
             let time_to_wake = get_tick_count!() + ticks_to_wait;
 
             /* The list item will be inserted in wake time order. */
@@ -641,18 +690,18 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
 
             if time_to_wake < get_tick_count!() {
                 /* Wake time has overflowed.  Place this item in the overflow
-                   list. */
+                list. */
                 list::list_insert(&OVERFLOW_DELAYED_TASK_LIST, cur_state_list_item);
             } else {
                 /* The wake time has not overflowed, so the current block list
-                   is used. */
+                is used. */
                 list::list_insert(&DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item());
 
                 /* If the task entering the blocked state was placed at the
-                   head of the list of blocked tasks then xNextTaskUnblockTime
-                   needs to be updated too. */
+                head of the list of blocked tasks then xNextTaskUnblockTime
+                needs to be updated too. */
                 if time_to_wake < get_next_task_unblock_time!() {
-                    set_next_task_unblock_time!( time_to_wake );
+                    set_next_task_unblock_time!(time_to_wake);
                 } else {
                     mtCOVERAGE_TEST_MARKER!();
                 }
@@ -663,33 +712,27 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
     {
         #![cfg(not(feature = "INCLUDE_vTaskSuspend"))]
         /* Calculate the time at which the task should be woken if the event
-           does not occur.  This may overflow but this doesn't matter, the kernel
-           will manage it correctly. */
+        does not occur.  This may overflow but this doesn't matter, the kernel
+        will manage it correctly. */
         let time_to_wake = get_tick_count!() + ticks_to_wait;
 
         let cur_state_list_item = unwrapped_cur.get_state_list_item();
         /* The list item will be inserted in wake time order. */
         list::set_list_item_value(&cur_state_list_item, time_to_wake);
 
-        if time_to_wake < get_tick_count!()
-        {
+        if time_to_wake < get_tick_count!() {
             /* Wake time has overflowed.  Place this item in the overflow list. */
             list::list_insert(&OVERFLOW_DELAYED_TASK_LIST, cur_state_list_item);
-        }
-        else
-        {
+        } else {
             /* The wake time has not overflowed, so the current block list is used. */
             list::list_insert(&DELAYED_TASK_LIST, unwrapped_cur.get_state_list_item());
 
             /* If the task entering the blocked state was placed at the head of the
-               list of blocked tasks then xNextTaskUnblockTime needs to be updated
-               too. */
-            if time_to_wake < get_next_task_unblock_time!()
-            {
-                set_next_task_unblock_time!( time_to_wake );
-            }
-            else
-            {
+            list of blocked tasks then xNextTaskUnblockTime needs to be updated
+            too. */
+            if time_to_wake < get_next_task_unblock_time!() {
+                set_next_task_unblock_time!(time_to_wake);
+            } else {
                 mtCOVERAGE_TEST_MARKER!();
             }
         }
@@ -701,186 +744,232 @@ pub fn add_current_task_to_delayed_list (ticks_to_wait: TickType, can_block_inde
     trace!("Place succeeded");
 }
 
-
-
-pub fn reset_next_task_unblock_time () {
+pub fn reset_next_task_unblock_time() {
     if list_is_empty(&DELAYED_TASK_LIST) {
-		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
-		the maximum possible value so it is	extremely unlikely that the
-		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
-		there is an item in the delayed list. */
+        /* The new current delayed list is empty.  Set xNextTaskUnblockTime to
+        the maximum possible value so it is	extremely unlikely that the
+        if( xTickCount >= xNextTaskUnblockTime ) test will pass until
+        there is an item in the delayed list. */
         set_next_task_unblock_time!(portMAX_DELAY);
-    }
-    else {
-		/* The new current delayed list is not empty, get the value of
-		the item at the head of the delayed list.  This is the time at
-		which the task at the head of the delayed list should be removed
-		from the Blocked state. */
+    } else {
+        /* The new current delayed list is not empty, get the value of
+        the item at the head of the delayed list.  This is the time at
+        which the task at the head of the delayed list should be removed
+        from the Blocked state. */
         let mut temp = get_owner_of_head_entry(&DELAYED_TASK_LIST);
         set_next_task_unblock_time!(get_list_item_value(&temp.get_state_list_item()));
     }
 }
+
+#[macro_export]
+macro_rules! get_handle_from_option {
+    ($option: expr) => {
+        match $option {
+            Some(handle) => handle,
+            None => get_current_task_handle!(),
+        }
+    };
+}
+
 /*
-pub fn task_delete (task_to_delete: TaskHandle)
+* task. h
+* <pre>void vTaskDelete( TaskHandle_t xTask );</pre>
+*
+* INCLUDE_vTaskDelete must be defined as 1 for this function to be available.
+* See the configuration section for more information.
+*
+* Remove a task from the RTOS real time kernel's management.  The task being
+* deleted will be removed from all ready, blocked, suspended and event lists.
+*
+* NOTE:  The idle task is responsible for freeing the kernel allocated
+* memory from tasks that have been deleted.  It is therefore important that
+* the idle task is not starved of microcontroller processing time if your
+* application makes any calls to vTaskDelete ().  Memory allocated by the
+* task code is not automatically freed, and should be freed before the task
+* is deleted.
+*
+* See the demo application file death.c for sample code that utilises
+* vTaskDelete ().
+*
+* @param xTask The handle of the task to be deleted.  Passing NULL will
+* cause the calling task to be deleted.
+*
+* Example usage:
+  <pre>
+void vOtherFunction( void )
 {
+TaskHandle_t xHandle;
+
+    // Create the task, storing the handle.
+    xTaskCreate( vTaskCode, "NAME", STACK_SIZE, NULL, tskIDLE_PRIORITY, &xHandle );
+
+    // Use the handle to delete the task.
+    vTaskDelete( xHandle );
+}
+  </pre>
+* \defgroup vTaskDelete vTaskDelete
+* \ingroup Tasks
+*/
+#[cfg(feature = "INCLUDE_vTaskDelete")]
+pub fn task_delete(task_to_delete: Option<TaskHandle>) {
+    /* If null is passed in here then it is the calling task that is
+    being deleted. */
+    let pxtcb = get_handle_from_option!(task_to_delete);
+
     taskENTER_CRITICAL!();
     {
-        /* If null is passed in here then it is the calling task that is
-		being deleted. */
-        let pxtcb = get_tcb_from_handle! (task_to_delete);
-
         /* Remove task from the ready list. */
-        if list_remove! (pxtcb.get_state_list_item()) == 0 {
+        if list::list_remove(pxtcb.get_state_list_item()) == 0 {
             taskRESET_READY_PRIORITY!(pxtcb.get_priority());
-        }
-        else {
+        } else {
             mtCOVERAGE_TEST_MARKER!();
         }
 
         /* Is the task waiting on an event also? */
-		if get_list_item_container! (pxtcb.get_event_list_item ()).is_some() {
-            list_remove! (pxtcb.get_event_list_item());
-        }else {
+        if list::get_list_item_container(&pxtcb.get_event_list_item()).is_some() {
+            list::list_remove(pxtcb.get_event_list_item());
+        } else {
             mtCOVERAGE_TEST_MARKER!();
         }
-
 
         /* Increment the uxTaskNumber also so kernel aware debuggers can
         detect that the task lists need re-generating.  This is done before
         portPRE_TASK_DELETE_HOOK() as in the Windows port that macro will
         not return. */
+        set_task_number!(get_task_number!() + 1);
 
-		set_task_number!(get_task_number!() + 1);
-
-        if *pxtcb == *get_tcb_from_handle! (get_current_task_handle!())
-		{
+        if pxtcb == get_current_task_handle!() {
             /* A task is deleting itself.  This cannot complete within the
             task itself, as a context switch to another task is required.
             Place the task in the termination list.  The idle task will
             check the termination list and free up any memory allocated by
             the scheduler for the TCB and stack of the deleted task. */
-            list_insert_end! ( get_list!(TASKS_WAITING_TERMINATION), pxtcb.get_state_list_item()  );
+            list::list_insert_end(&TASKS_WAITING_TERMINATION, pxtcb.get_state_list_item());
 
             /* Increment the ucTasksDeleted variable so the idle task knows
             there is a task that has been deleted and that it should therefore
             check the xTasksWaitingTermination list. */
-            unsafe{
-                DELETED_TASKS_WAITING_CLEAN_UP = DELETED_TASKS_WAITING_CLEAN_UP + 1;
-            }
+            set_deleted_tasks_waiting_clean_up!(get_deleted_tasks_waiting_clean_up!() + 1);
+
             /* The pre-delete hook is primarily for the Windows simulator,
             in which Windows specific clean up operations are performed,
             after which it is not possible to yield away from this task -
             hence xYieldPending is used to latch that a context switch is
             required. */
-            portPRE_TASK_DELETE_HOOK!( pxtcb, get_yield_pending!() );
+            portPRE_TASK_DELETE_HOOK!(pxtcb, get_yield_pending!());
+        } else {
+            set_current_number_of_tasks!(get_current_number_of_tasks!() - 1);
+
+            let stack_pos = get_tcb_from_handle!(pxtcb).stack_pos;
+            /* This call is required specifically for the TriCore port.  It must be
+            above the vPortFree() calls.  The call is also used by ports/demos that
+            want to allocate and clean RAM statically. */
+            port::port_free(stack_pos as *mut _);
+
+            /* Reset the next expected unblock time in case it referred to
+            the task that has just been deleted. */
+            reset_next_task_unblock_time();
         }
-        else{
-                set_current_number_of_tasks! (get_current_number_of_tasks!() - 1);
-
-				delete_tcb ( pxtcb );
-
-				/* Reset the next expected unblock time in case it referred to
-				the task that has just been deleted. */
-				reset_next_task_unblock_time ();
-		}
         // FIXME
-		//traceTASK_DELETE!(task_to_delete);
+        //traceTASK_DELETE!(task_to_delete);
     }
-	taskEXIT_CRITICAL!();
+    taskEXIT_CRITICAL!();
 
-    let mut pxtcb = get_tcb_from_handle! (task_to_delete);
-
-		/* Force a reschedule if it is the currently running task that has just
-		been deleted. */
-		if get_scheduler_suspended!() > 0
-		{
-			if *pxtcb == *get_tcb_from_handle!( get_current_task_handle!())
-			{
-				assert!( get_scheduler_suspended!() == 0 );
-				portYIELD_WITHIN_API! ();
-			}
-			else
-			{
-				mtCOVERAGE_TEST_MARKER! ();
-			}
-		}
+    /* Force a reschedule if it is the currently running task that has just
+    been deleted. */
+    if get_scheduler_suspended!() > 0 {
+        if pxtcb == get_current_task_handle!() {
+            assert!(get_scheduler_suspended!() == 0);
+            portYIELD_WITHIN_API!();
+        } else {
+            mtCOVERAGE_TEST_MARKER!();
+        }
+    }
 }
-*/
+
+/*
+ * INCLUDE_vTaskSuspend must be defined as 1 for this function to be available.
+ * See the configuration section for more information.
+ *
+ * Suspend any task.  When suspended a task will never get any microcontroller
+ * processing time, no matter what its priority.
+ *
+ * Calls to vTaskSuspend are not accumulative -
+ * i.e. calling vTaskSuspend () twice on the same task still only requires one
+ * call to vTaskResume () to ready the suspended task.
+ *
+ * @param xTaskToSuspend Handle to the task being suspended.  Passing a NULL
+ * handle will cause the calling task to be suspended.
+ */
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
-pub fn suspend_task (task_to_suspend: TaskHandle){
+pub fn suspend_task(task_to_suspend: TaskHandle) {
     trace!("suspend_task called!");
-    /* origin: If null is passed in here then it is the running task that is
-			being suspended. In our implement, you can just pass the TaskHandle of the current task*/
+    /*
+     * origin: If null is passed in here then it is the running task that is
+     * being suspended. In our implement, you can just pass the TaskHandle of the current task
+     */
     let mut unwrapped_tcb = get_tcb_from_handle!(task_to_suspend);
     taskENTER_CRITICAL!();
     {
-
         traceTASK_SUSPEND!(&unwrapped_tcb);
 
         /* Remove task from the ready/delayed list and place in the
-			suspended list. */
+        suspended list. */
         if list_remove(unwrapped_tcb.get_state_list_item()) == 0 {
             taskRESET_READY_PRIORITY!(unwrapped_tcb.get_priority());
-        }
-        else {
-            mtCOVERAGE_TEST_MARKER! ();
+        } else {
+            mtCOVERAGE_TEST_MARKER!();
         }
 
         /* Is the task waiting on an event also? */
         if get_list_item_container(&unwrapped_tcb.get_event_list_item()).is_some() {
             list_remove(unwrapped_tcb.get_event_list_item());
-        }
-        else {
+        } else {
             mtCOVERAGE_TEST_MARKER!();
         }
         list_insert_end(&SUSPENDED_TASK_LIST, unwrapped_tcb.get_state_list_item());
-    }taskEXIT_CRITICAL!();
+    }
+    taskEXIT_CRITICAL!();
 
-    if get_scheduler_running!(){
+    if get_scheduler_running!() {
         /* Reset the next expected unblock time in case it referred to the
-			task that is now in the Suspended state. */
+        task that is now in the Suspended state. */
         taskENTER_CRITICAL!();
         {
             reset_next_task_unblock_time();
         }
         taskEXIT_CRITICAL!();
-    }
-    else {
-        mtCOVERAGE_TEST_MARKER! ();
+    } else {
+        mtCOVERAGE_TEST_MARKER!();
     }
 
     if task_to_suspend == get_current_task_handle!() {
-        if get_scheduler_running!(){
+        if get_scheduler_running!() {
             /* The current task has just been suspended. */
-            assert! (get_scheduler_suspended!() == 0);
-            portYIELD_WITHIN_API! ();
-        }
-        else {
+            assert!(get_scheduler_suspended!() == 0);
+            portYIELD_WITHIN_API!();
+        } else {
             /* The scheduler is not running, but the task that was pointed
-				to by pxCurrentTCB has just been suspended and pxCurrentTCB
-				must be adjusted to point to a different task. */
-            unsafe {
-                if current_list_length(&SUSPENDED_TASK_LIST) != CURRENT_NUMBER_OF_TASKS {
-                    task_switch_context();
-                }
+            to by pxCurrentTCB has just been suspended and pxCurrentTCB
+            must be adjusted to point to a different task. */
+            if current_list_length(&SUSPENDED_TASK_LIST) != get_current_number_of_tasks!() {
+                task_switch_context();
             }
             //TODO: comprehend the implement of cuurrent_tcb
             /* But is the Source code, if the length == current number, it means no other tasks are ready, so set pxCurrentTCB back to
-					NULL so when the next task is created pxCurrentTCB will
-					be set to point to it no matter what its relative priority
-					is. */
+            NULL so when the next task is created pxCurrentTCB will
+            be set to point to it no matter what its relative priority
+            is. */
         }
-    }
-    else {
+    } else {
         mtCOVERAGE_TEST_MARKER!();
     }
 }
 
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
-pub fn task_is_tasksuspended (xtask: &TaskHandle) -> bool
-{   
-	let mut xreturn:bool = false;
-	let tcb = get_tcb_from_handle!(xtask);
+pub fn task_is_tasksuspended(xtask: &TaskHandle) -> bool {
+    let mut xreturn: bool = false;
+    let tcb = get_tcb_from_handle!(xtask);
     /* Accesses xPendingReadyList so must be called from a critical
     section. */
 
@@ -888,37 +977,43 @@ pub fn task_is_tasksuspended (xtask: &TaskHandle) -> bool
     //assert!( xtask );
 
     /* Is the task being resumed actually in the suspended list? */
-    if is_contained_within(&SUSPENDED_TASK_LIST, &tcb.get_state_list_item())
-    {
+    if is_contained_within(&SUSPENDED_TASK_LIST, &tcb.get_state_list_item()) {
         /* Has the task already been resumed from within an ISR? */
-        if !is_contained_within(&PENDING_READY_LIST, &tcb.get_event_list_item())
-        {
+        if !is_contained_within(&PENDING_READY_LIST, &tcb.get_event_list_item()) {
             /* Is it in the suspended list because it is in the	Suspended
             state, or because is is blocked with no timeout? */
-            if get_list_item_container(&tcb.get_event_list_item()).is_none()
-            {
+            if get_list_item_container(&tcb.get_event_list_item()).is_none() {
                 xreturn = true;
-            }
-            else
-            {
+            } else {
                 mtCOVERAGE_TEST_MARKER!();
             }
-        }
-        else
-        {
+        } else {
             mtCOVERAGE_TEST_MARKER!();
         }
-    }
-    else
-    {
+    } else {
         mtCOVERAGE_TEST_MARKER!();
     }
 
     xreturn
 }
 
+/*
+ * task. h
+ * <pre>void vTaskResume( TaskHandle_t xTaskToResume );</pre>
+ *
+ * INCLUDE_vTaskSuspend must be defined as 1 for this function to be available.
+ * See the configuration section for more information.
+ *
+ * Resumes a suspended task.
+ *
+ * A task that has been suspended by one or more calls to vTaskSuspend ()
+ * will be made available for running again by a single call to
+ * vTaskResume ().
+ *
+ * @param xTaskToResume Handle to the task being readied.
+ */
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
-pub fn resume_task (task_to_resume: TaskHandle){
+pub fn resume_task(task_to_resume: TaskHandle) {
     trace!("resume task called!");
     let mut unwrapped_tcb = get_tcb_from_handle!(task_to_resume);
 
@@ -929,29 +1024,26 @@ pub fn resume_task (task_to_resume: TaskHandle){
                 traceTASK_RESUME!(&unwrapped_tcb);
 
                 /* As we are in a critical section we can access the ready
-					lists even if the scheduler is suspended. */
+                lists even if the scheduler is suspended. */
                 list_remove(unwrapped_tcb.get_state_list_item());
                 task_to_resume.add_task_to_ready_list();
-                
+
                 let current_task_priority = get_current_task_handle!().get_priority();
                 /* We may have just resumed a higher priority task. */
                 if unwrapped_tcb.get_priority() >= current_task_priority {
                     /* This yield may not cause the task just resumed to run,
-						but will leave the lists in the correct state for the
-						next yield. */
+                    but will leave the lists in the correct state for the
+                    next yield. */
                     taskYIELD_IF_USING_PREEMPTION!();
-                }else {
+                } else {
                     mtCOVERAGE_TEST_MARKER!();
                 }
-            }
-            else {
+            } else {
                 mtCOVERAGE_TEST_MARKER!();
             }
         }
         taskEXIT_CRITICAL!();
-    }
-    else {
+    } else {
         mtCOVERAGE_TEST_MARKER!();
     }
 }
-

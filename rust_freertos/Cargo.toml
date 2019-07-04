@@ -41,10 +41,10 @@ default = [
 	# "INCLUDE_xTaskGetIdleTaskHandle",
 	"INCLUDE_xTaskGetCurrentTaskHandle",
 	"INCLUDE_xTaskGetSchedulerState",
-	# "INCLUDE_vTaskDelay",
+	"INCLUDE_vTaskDelay",
 	# "INCLUDE_vTaskDelayUntil",
  	"INCLUDE_vTaskSuspend",
-	# "INCLUDE_vTaskDelete",
+	"INCLUDE_vTaskDelete",
 	"INCLUDE_uxTaskPriorityGet",
 	"INCLUDE_vTaskPrioritySet"
 ]

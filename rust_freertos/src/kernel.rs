@@ -1,34 +1,34 @@
 // kernel.rs, FreeRTOS scheduler control APIs.
 // This file is created by Fan Jinhao.
 // Functions defined in this file are explained in Chapter 9 and 10.
+use crate::list;
 use crate::port::UBaseType;
 use crate::projdefs::pdFALSE;
 use crate::task_control::{TaskHandle, TCB};
 use crate::task_global::*;
-use crate::list;
 use crate::*; // TODO: Is this line necessary?
-// use crate::task_control::TCB;
+              // use crate::task_control::TCB;
 
-/* Definitions returned by xTaskGetSchedulerState(). 
+/* Definitions returned by xTaskGetSchedulerState().
  * The originial definitons are C constants, we changed them to enums.
  */
 pub enum SchedulerState {
     NotStarted,
     Suspended,
-    Running
+    Running,
 }
 
 /// # Description:
 /// Macro for forcing a context switch.
 ///
 /// * Implemented by: Fan Jinhao.
-/// * C implementation: 
+/// * C implementation:
 ///
-/// # Arguments 
-/// 
+/// # Arguments
+///
 ///
 /// # Return
-/// 
+///
 /// Nothing
 #[macro_export]
 macro_rules! taskYIELD {
@@ -48,17 +48,17 @@ macro_rules! taskYIELD_IF_USING_PREEMPTION {
 /// # Description:
 /// Macro to mark the start of a critical code region.  Preemptive context
 /// switches cannot occur when in a critical region.
-/// 
+///
 /// NOTE: This may alter the stack (depending on the portable implementation)
 /// so must be used with care!
 /// * Implemented by: Fan Jinhao.
-/// * C implementation: 
+/// * C implementation:
 ///
-/// # Arguments 
-/// 
+/// # Arguments
+///
 ///
 /// # Return
-/// 
+///
 /// Nothing
 #[macro_export]
 macro_rules! taskENTER_CRITICAL {
@@ -77,17 +77,17 @@ macro_rules! taskENTER_CRITICAL_FROM_ISR {
 /// # Description:
 /// Macro to mark the end of a critical code region.  Preemptive context
 /// switches cannot occur when in a critical region.
-/// 
+///
 /// NOTE: This may alter the stack (depending on the portable implementation)
 /// so must be used with care!
 /// * Implemented by: Fan Jinhao.
-/// * C implementation: 
+/// * C implementation:
 ///
-/// # Arguments 
-/// 
+/// # Arguments
+///
 ///
 /// # Return
-/// 
+///
 /// Nothing
 #[macro_export]
 macro_rules! taskEXIT_CRITICAL {
@@ -356,13 +356,13 @@ pub fn task_end_scheduler() {
 /// is suspended.
 ///
 /// * Implemented by: Fan Jinhao.
-/// * C implementation: 
+/// * C implementation:
 ///
-/// # Arguments 
-/// 
+/// # Arguments
+///
 ///
 /// # Return
-/// 
+///
 /// Nothing
 pub fn task_suspend_all() {
     /* A critical section is not required as the variable is of type
@@ -381,13 +381,13 @@ pub fn task_suspend_all() {
 /// xTaskResumeAll() only resumes the scheduler.  It does not unsuspend tasks
 /// that were previously suspended by a call to vTaskSuspend().
 /// * Implemented by: Fan Jinhao.
-/// * C implementation: 
+/// * C implementation:
 ///
-/// # Arguments 
-/// 
+/// # Arguments
+///
 ///
 /// # Return
-/// 
+///
 /// If resuming the scheduler caused a context switch then true is
 /// returned, otherwise false is returned.
 pub fn task_resume_all() -> bool {
@@ -496,7 +496,9 @@ fn reset_next_task_unblock_time() {
         which the task at the head of the delayed list should be removed
         from the Blocked state. */
         let task_handle = list::get_owner_of_head_entry(&DELAYED_TASK_LIST);
-        set_next_task_unblock_time!(list::get_list_item_value(&task_handle.get_state_list_item()));
+        set_next_task_unblock_time!(list::get_list_item_value(
+            &task_handle.get_state_list_item()
+        ));
     }
 }
 
@@ -597,8 +599,8 @@ pub fn task_switch_context() {
 }
 
 /* If configUSE_PORT_OPTIMISED_TASK_SELECTION is 0 then task selection is
-   performed in a generic way that is not optimised to any particular
-   microcontroller architecture. */
+performed in a generic way that is not optimised to any particular
+microcontroller architecture. */
 #[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
 fn task_select_highest_priority_task() {
     let mut top_priority: UBaseType = get_top_ready_priority!();
@@ -786,41 +788,40 @@ pub fn task_increment_tick() -> bool {
     switch_required
 }
 
-#[cfg(any(feature = "INCLUDE_xTaskGetSchedulerState", feature = "configUSE_TIMERS"))]
+#[cfg(any(
+    feature = "INCLUDE_xTaskGetSchedulerState",
+    feature = "configUSE_TIMERS"
+))]
 pub fn task_get_scheduler_state() -> SchedulerState {
     // These enums are defined at the top of this file.
     if !get_scheduler_running!() {
         SchedulerState::NotStarted
-    }
-    else {
+    } else {
         if get_scheduler_suspended!() == pdFALSE as UBaseType {
             SchedulerState::Running
-        }
-        else {
+        } else {
             SchedulerState::Suspended
         }
     }
 }
 
 /* Define away taskRESET_READY_PRIORITY() and portRESET_READY_PRIORITY() as
-   they are only required when a port optimised method of task selection is
-   being used. */
+they are only required when a port optimised method of task selection is
+being used. */
 #[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
 #[macro_export]
 macro_rules! taskRESET_READY_PRIORITY {
-    ($uxPriority: expr) => (
-        
-    )
+    ($uxPriority: expr) => {};
 }
 
 /* uxTopReadyPriority holds the priority of the highest priority ready
-   state task. */
+state task. */
 #[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
 #[macro_export]
 macro_rules! taskRECORD_READY_PRIORITY {
-    ($uxPriority: expr) => (
+    ($uxPriority: expr) => {
         if $uxPriority > get_top_ready_priority!() {
             set_top_ready_priority!($uxPriority);
         }
-    )
+    };
 }

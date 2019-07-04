@@ -96,10 +96,11 @@ task that attempted the read. */
 #[macro_export]
 macro_rules! traceBLOCKING_ON_QUEUE_RECEIVE {
     ($pxQueue: expr) => {
-        trace!("Blocking task {} because it cannot read from {}.",
-               get_current_task_handle!().get_name(),
-               $pxQueue.get_queue_number()
-               );
+        trace!(
+            "Blocking task {} because it cannot read from {}.",
+            get_current_task_handle!().get_name(),
+            $pxQueue.get_queue_number()
+        );
     };
 }
 
@@ -110,10 +111,11 @@ task that attempted the write. */
 #[macro_export]
 macro_rules! traceBLOCKING_ON_QUEUE_SEND {
     ($pxQueue: expr) => {
-        trace!("Blocking task {} because it cannot write to {}.",
-               get_current_task_handle!().get_name(),
-               $pxQueue.get_queue_number()
-               );
+        trace!(
+            "Blocking task {} because it cannot write to {}.",
+            get_current_task_handle!().get_name(),
+            $pxQueue.get_queue_number()
+        );
     };
 }
 

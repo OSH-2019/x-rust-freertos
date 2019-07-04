@@ -1,8 +1,8 @@
-use std::sync::{Arc, RwLock, Weak};
 use std::fmt;
+use std::sync::{Arc, RwLock, Weak};
 
-use crate::task_control::{TCB, TaskHandle};
-use crate::port::{TickType, UBaseType, portMAX_DELAY};
+use crate::port::{portMAX_DELAY, TickType, UBaseType};
+use crate::task_control::{TaskHandle, TCB};
 
 impl fmt::Debug for ListItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -14,18 +14,18 @@ impl fmt::Debug for ListItem {
  * Definition of the only type of object that a list can contain.
  */
 pub struct ListItem {
-    /* The value being listed.  In most cases this is used to sort the list in descending order. */   
+    /* The value being listed.  In most cases this is used to sort the list in descending order. */
     item_value: TickType,
-    /* Pointer to the next ListItem_t in the list. */   
+    /* Pointer to the next ListItem_t in the list. */
     next: WeakItemLink,
-    /* Pointer to the previous ListItem_t in the list. */   
+    /* Pointer to the previous ListItem_t in the list. */
     prev: WeakItemLink,
-    /* Pointer to the object (normally a TCB) that contains the list item.  
-     * There is therefore a two way link between the object containing the list item 
-     * and the list item itself. */   
+    /* Pointer to the object (normally a TCB) that contains the list item.
+     * There is therefore a two way link between the object containing the list item
+     * and the list item itself. */
     owner: Weak<RwLock<TCB>>,
-    /* Pointer to the list in which this list item is placed (if any). */   
-    container: Weak<RwLock<List>>
+    /* Pointer to the list in which this list item is placed (if any). */
+    container: Weak<RwLock<List>>,
 }
 
 pub type ItemLink = Arc<RwLock<ListItem>>;
@@ -37,7 +37,7 @@ impl Default for ListItem {
     fn default() -> Self {
         ListItem {
             /* The list end value is the highest possible value in the list to
-               ensure it remains at the end of the list. */
+            ensure it remains at the end of the list. */
             item_value: portMAX_DELAY,
             next: Default::default(),
             owner: Default::default(),
@@ -48,7 +48,7 @@ impl Default for ListItem {
 }
 
 impl ListItem {
-    pub fn item_value(mut self, item_value: TickType) -> Self{
+    pub fn item_value(mut self, item_value: TickType) -> Self {
         self.item_value = item_value;
         self
     }
@@ -64,8 +64,11 @@ impl ListItem {
 
     fn remove(&mut self, link: WeakItemLink) -> UBaseType {
         /* The list item knows which list it is in.  Obtain the list from the list
-           item. */
-        let list = self.container.upgrade().unwrap_or_else(|| panic!("Container not set"));
+        item. */
+        let list = self
+            .container
+            .upgrade()
+            .unwrap_or_else(|| panic!("Container not set"));
         let ret_val = list.write().unwrap().remove_item(&self, link);
         set_list_item_next(&self.prev, Weak::clone(&self.next));
         set_list_item_prev(&self.next, Weak::clone(&self.prev));
@@ -80,52 +83,60 @@ impl ListItem {
 #[derive(Clone)]
 pub struct List {
     number_of_items: UBaseType,
-    /* Used to walk through the list.  
-     * Points to the last item returned by a call to listGET_OWNER_OF_NEXT_ENTRY (). */   
+    /* Used to walk through the list.
+     * Points to the last item returned by a call to listGET_OWNER_OF_NEXT_ENTRY (). */
     index: WeakItemLink,
-    /* List item that contains the maximum possible item value meaning 
-     * it is always at the end of the list and is therefore used as a marker. */   
+    /* List item that contains the maximum possible item value meaning
+     * it is always at the end of the list and is therefore used as a marker. */
     list_end: ItemLink,
 }
 
 impl Default for List {
     fn default() -> Self {
-	/* The list structure contains a list item which is used to mark the
-	end of the list.  To initialise the list the list end is inserted
-	as the only list entry. */
+        /* The list structure contains a list item which is used to mark the
+        end of the list.  To initialise the list the list end is inserted
+        as the only list entry. */
         let list_end: ItemLink = Arc::new(RwLock::new(ListItem::default()));
 
-	/* The list end next and previous pointers point to itself so we know
-	when the list is empty. */
+        /* The list end next and previous pointers point to itself so we know
+        when the list is empty. */
         list_end.write().unwrap().next = Arc::downgrade(&list_end);
         list_end.write().unwrap().prev = Arc::downgrade(&list_end);
 
         List {
             index: Arc::downgrade(&list_end),
             list_end: list_end,
-            number_of_items: 0
+            number_of_items: 0,
         }
     }
 }
 
 fn set_list_item_next(item: &WeakItemLink, next: WeakItemLink) {
-    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let owned_item = item
+        .upgrade()
+        .unwrap_or_else(|| panic!("List item is None"));
     (*owned_item.write().unwrap()).next = next;
 }
 
 fn set_list_item_prev(item: &WeakItemLink, prev: WeakItemLink) {
-    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let owned_item = item
+        .upgrade()
+        .unwrap_or_else(|| panic!("List item is None"));
     (*owned_item.write().unwrap()).prev = prev;
 }
 
 fn get_list_item_next(item: &WeakItemLink) -> WeakItemLink {
-    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let owned_item = item
+        .upgrade()
+        .unwrap_or_else(|| panic!("List item is None"));
     let next = Weak::clone(&(*owned_item.read().unwrap()).next);
     next
 }
 
 fn get_list_item_prev(item: &WeakItemLink) -> WeakItemLink {
-    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let owned_item = item
+        .upgrade()
+        .unwrap_or_else(|| panic!("List item is None"));
     let prev = Weak::clone(&(*owned_item.read().unwrap()).prev);
     prev
 }
@@ -148,13 +159,17 @@ pub fn set_list_item_value(item: &ItemLink, item_value: TickType) {
 }
 
 fn get_weak_item_value(item: &WeakItemLink) -> TickType {
-    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let owned_item = item
+        .upgrade()
+        .unwrap_or_else(|| panic!("List item is None"));
     let value = owned_item.read().unwrap().item_value;
     value
 }
 
 fn set_weak_item_value(item: &WeakItemLink, item_value: TickType) {
-    let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
+    let owned_item = item
+        .upgrade()
+        .unwrap_or_else(|| panic!("List item is None"));
     owned_item.write().unwrap().item_value = item_value;
 }
 
@@ -261,7 +276,7 @@ pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
  */
 pub fn list_insert(list: &ListLink, item_link: ItemLink) {
     /* Remember which list the item is in.  This allows fast removal of the
-       item later. */
+    item later. */
     item_link.write().unwrap().set_container(&list);
     println!("Set conatiner");
     list.write().unwrap().insert(Arc::downgrade(&item_link))
@@ -285,8 +300,8 @@ pub fn list_insert(list: &ListLink, item_link: ItemLink) {
  */
 pub fn list_insert_end(list: &ListLink, item_link: ItemLink) {
     /* Insert a new list item into pxList, but rather than sort the list,
-       makes the new list item the last item to be removed by a call to
-       listGET_OWNER_OF_NEXT_ENTRY(). */
+    makes the new list item the last item to be removed by a call to
+    listGET_OWNER_OF_NEXT_ENTRY(). */
 
     /* Remember which list the item is in. */
     item_link.write().unwrap().set_container(&list);
@@ -305,7 +320,10 @@ pub fn list_insert_end(list: &ListLink, item_link: ItemLink) {
  * been removed.
  */
 pub fn list_remove(item_link: ItemLink) -> UBaseType {
-    item_link.write().unwrap().remove(Arc::downgrade(&item_link))
+    item_link
+        .write()
+        .unwrap()
+        .remove(Arc::downgrade(&item_link))
 }
 
 impl List {
@@ -314,43 +332,43 @@ impl List {
         let value_of_insertion = get_weak_item_value(&item_link);
         /* Insert the new list item into the list, sorted in xItemValue order.
 
-           If the list already contains a list item with the same item value then the
-           new list item should be placed after it.  This ensures that TCB's which are
-           stored in ready lists (all of which have the same xItemValue value) get a
-           share of the CPU.  However, if the xItemValue is the same as the back marker
-           the iteration loop below will not end.  Therefore the value is checked
-           first, and the algorithm slightly modified if necessary. */
+        If the list already contains a list item with the same item value then the
+        new list item should be placed after it.  This ensures that TCB's which are
+        stored in ready lists (all of which have the same xItemValue value) get a
+        share of the CPU.  However, if the xItemValue is the same as the back marker
+        the iteration loop below will not end.  Therefore the value is checked
+        first, and the algorithm slightly modified if necessary. */
         let item_to_insert = if value_of_insertion == portMAX_DELAY {
             get_list_item_prev(&Arc::downgrade(&self.list_end))
         } else {
             /* *** NOTE ***********************************************************
-               If you find your application is crashing here then likely causes are
-               listed below.  In addition see http://www.freertos.org/FAQHelp.html for
-               more tips, and ensure configASSERT() is defined!
-               http://www.freertos.org/a00110.html#configASSERT
+              If you find your application is crashing here then likely causes are
+              listed below.  In addition see http://www.freertos.org/FAQHelp.html for
+              more tips, and ensure configASSERT() is defined!
+              http://www.freertos.org/a00110.html#configASSERT
 
-               1) Stack overflow -
-               see http://www.freertos.org/Stacks-and-stack-overflow-checking.html
-               2) Incorrect interrupt priority assignment, especially on Cortex-M
-               parts where numerically high priority values denote low actual
-               interrupt priorities, which can seem counter intuitive.  See
-               http://www.freertos.org/RTOS-Cortex-M3-M4.html and the definition
-               of configMAX_SYSCALL_INTERRUPT_PRIORITY on
-               http://www.freertos.org/a00110.html
-               3) Calling an API function from within a critical section or when
-               the scheduler is suspended, or calling an API function that does
-               not end in "FromISR" from an interrupt.
-               4) Using a queue or semaphore before it has been initialised or
-               before the scheduler has been started (are interrupts firing
-               before vTaskStartScheduler() has been called?).
-             **********************************************************************/
+              1) Stack overflow -
+              see http://www.freertos.org/Stacks-and-stack-overflow-checking.html
+              2) Incorrect interrupt priority assignment, especially on Cortex-M
+              parts where numerically high priority values denote low actual
+              interrupt priorities, which can seem counter intuitive.  See
+              http://www.freertos.org/RTOS-Cortex-M3-M4.html and the definition
+              of configMAX_SYSCALL_INTERRUPT_PRIORITY on
+              http://www.freertos.org/a00110.html
+              3) Calling an API function from within a critical section or when
+              the scheduler is suspended, or calling an API function that does
+              not end in "FromISR" from an interrupt.
+              4) Using a queue or semaphore before it has been initialised or
+              before the scheduler has been started (are interrupts firing
+              before vTaskStartScheduler() has been called?).
+            **********************************************************************/
             let mut iterator = Arc::downgrade(&self.list_end);
             loop {
                 /* There is nothing to do here, just iterating to the wanted
-                   insertion position. */
+                insertion position. */
                 let next = get_list_item_next(&iterator);
                 if get_weak_item_value(&next) > value_of_insertion {
-                    break iterator
+                    break iterator;
                 }
                 iterator = next;
             }
@@ -378,7 +396,7 @@ impl List {
         self.number_of_items += 1;
     }
 
-    fn remove_item(&mut self, item: &ListItem, link: WeakItemLink) -> UBaseType{
+    fn remove_item(&mut self, item: &ListItem, link: WeakItemLink) -> UBaseType {
         // TODO: Find a more effiecient
         if Weak::ptr_eq(&link, &self.index) {
             self.index = Weak::clone(&item.prev);
@@ -406,14 +424,19 @@ impl List {
 
     fn get_owner_of_next_entry(&mut self) -> Weak<RwLock<TCB>> {
         self.increment_index();
-        let owned_index = self.index.upgrade().unwrap_or_else(|| panic!("List item is None"));
+        let owned_index = self
+            .index
+            .upgrade()
+            .unwrap_or_else(|| panic!("List item is None"));
         let owner = Weak::clone(&owned_index.read().unwrap().owner);
         owner
     }
 
     fn get_owner_of_head_entry(&self) -> Weak<RwLock<TCB>> {
         let list_end = get_list_item_next(&Arc::downgrade(&self.list_end));
-        let owned_index = list_end.upgrade().unwrap_or_else(|| panic!("List item is None"));
+        let owned_index = list_end
+            .upgrade()
+            .unwrap_or_else(|| panic!("List item is None"));
         let owner = Weak::clone(&owned_index.read().unwrap().owner);
         owner
     }
