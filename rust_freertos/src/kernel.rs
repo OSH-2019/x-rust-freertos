@@ -720,8 +720,9 @@ pub fn task_increment_tick() -> bool {
 
                     /* Is the task waiting on an event also?  If so remove
                     it from the event list. */
-                    list::list_remove(event_list_item.clone());
-
+                    if list::get_list_item_container(&event_list_item).is_some() {
+                        list::list_remove(event_list_item.clone());
+                    }
                     /* Place the unblocked task into the appropriate ready
                     list. */
                     task_handle.add_task_to_ready_list().unwrap();
