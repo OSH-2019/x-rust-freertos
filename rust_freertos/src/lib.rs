@@ -63,7 +63,7 @@ mod tests {
         let mutex1 = Arc::clone(&mutex0);
 
         let task0 = move || {
-            task_timemanager::task_delay(pdMS_TO_TICKS!(1));
+            task_timemanager::task_delay(pdMS_TO_TICKS!(10));
             loop {
                 match mutex0.semaphore_down(pdMS_TO_TICKS!(0)) {
                     Ok(_) => {
@@ -86,7 +86,6 @@ mod tests {
                     }
                     Err(error) => {
                         trace!("mutex0 semaphore take triggers {}", error);
-                        task_timemanager::task_delay(pdMS_TO_TICKS!(1));
                     }
                 }
             }
