@@ -332,9 +332,12 @@ impl task_control_block {
         self.mutexes_held = new_count;
     }
 
-    #[cfg(feature = "configUSE_MUTEXES")]
     pub fn get_base_priority(&self) -> UBaseType {
         self.base_priority
+    }
+
+    pub fn set_base_priority(&mut self, new_val: UBaseType) {
+        self.base_priority = new_val
     }
 }
 
@@ -609,9 +612,12 @@ impl TaskHandle {
         get_tcb_from_handle_mut!(self).set_mutex_held_count(new_count)
     }
 
-    #[cfg(feature = "configUSE_MUTEXES")]
     pub fn get_base_priority(&self) -> UBaseType {
         get_tcb_from_handle!(self).get_base_priority()
+    }
+
+    pub fn set_base_priority(&self, new_val: UBaseType) {
+        get_tcb_from_handle_mut!(self).set_base_priority(new_val)
     }
 }
 
