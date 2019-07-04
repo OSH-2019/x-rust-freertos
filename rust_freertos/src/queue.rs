@@ -252,6 +252,20 @@ where
                     taskEXIT_CRITICAL!();
                     return Ok(()); //return pdPASS
                 } else {
+                    {
+                        #![cfg(feature = "configUSE_MUTEXES")]
+                        if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex {
+                            taskENTER_CRITICAL!();
+                            {
+                                let task_handle = self.transed_task_handle_for_mutex();
+                                task_queue::task_priority_inherit(task_handle);
+                            }
+                            taskEXIT_CRITICAL!();
+                        }
+                        else {
+                            mtCOVERAGE_TEST_MARKER!();
+                        }
+                    }
                     if xTicksToWait == 0 as TickType {
                         /* The queue was full and no block time is specified (or
                         the block time has expired) so leave now. */
@@ -283,20 +297,6 @@ where
             if !task_queue::task_check_for_timeout(&mut xTimeOut, &mut xTicksToWait) {
                 if self.is_queue_full() {
                     traceBLOCKING_ON_QUEUE_SEND!(&self);
-                    {
-                        #![cfg(feature = "configUSE_MUTEXES")]
-                        if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex {
-                            taskENTER_CRITICAL!();
-                            {
-                                let task_handle = self.transed_task_handle_for_mutex();
-                                task_queue::task_priority_inherit(task_handle);
-                            }
-                            taskEXIT_CRITICAL!();
-                        }
-                        else {
-                            mtCOVERAGE_TEST_MARKER!();
-                        }
-                    }
                     trace!("queue_generic_send place on event list");
                     task_queue::task_place_on_event_list(&self.xTasksWaitingToSend, xTicksToWait);
 
