@@ -170,10 +170,12 @@ pub fn task_priority_inherit(mutex_holder: Option<TaskHandle>) {
     /* NOTE by Fan Jinhao: Maybe mutex_holder should be `&Option<TaskHandle>`.
      * But I'll leave it for now.
      */
-
+    trace!("Enter function 'task_priority_inherit'");
     /* If the mutex was given back by an interrupt while the queue was
     locked then the mutex holder might now be NULL. */
-    if let Some(task) = mutex_holder {
+    if mutex_holder.is_some() {
+        trace!("Mutex holder exists!");
+        let task = mutex_holder.unwrap();
         /* If the holder of the mutex has a priority below the priority of
         the task attempting to obtain the mutex then it will temporarily
         inherit the priority of the task attempting to obtain the mutex. */
@@ -184,6 +186,7 @@ pub fn task_priority_inherit(mutex_holder: Option<TaskHandle>) {
             /* Adjust the mutex holder state to account for its new
             priority.  Only reset the event list item value if the value is
             not being used for anything else. */
+            trace!("change priority!");
             let event_list_item = task.get_event_list_item();
             if (list::get_list_item_value(&event_list_item) & taskEVENT_LIST_ITEM_VALUE_IN_USE) == 0
             {
@@ -224,7 +227,7 @@ pub fn task_priority_disinherit(mutex_holder: Option<TaskHandle>) -> bool {
      * But I'll leave it for now.
      */
     let mut ret_val: bool = false;
-
+    trace!("Enter function 'task_priority_disinherit'");
     if let Some(task) = mutex_holder {
         /* A task can only have an inherited priority if it holds the mutex.
         If the mutex is held by a task then it cannot be given from an
