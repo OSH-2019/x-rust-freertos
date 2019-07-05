@@ -1,8 +1,0 @@
-[package]
-name = "get"
-version = "0.1.0"
-authors = ["Fandahao <fandahao17@mail.ustc.edu.cn>"]
-edition = "2018"
-
-[dependencies]
-lazy_static = "1.3.0"
