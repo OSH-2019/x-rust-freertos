@@ -1,35 +1,24 @@
 # Rust-FreeRTOS
 
-[第七周安排和代码风格](./weeks/week7.md)
+This is our final project for [Operating Systems (H) 2019 Spring](https://osh-2019.github.io) in [USTC](http://ustc.edu.cn).
 
-## 学期时间安排
-* 第一二周：提交分组名单与初拟题目
-* 第三周：第一次作业（作业+实验0）
-* 第二周与第三周：确认选题，开始调研
-* 第四周与第五周：正式提交项目选题，提交调研报告（即总体设计报告第一部分)
-  1. *调研报告：项目背景、立项依据、前瞻性/重要性分析、相关工作（科研和工业界）(十五页）*
-* 第五周：第二次作业（作业+实验1）
-* 第五周及第六周：设计报告第二部分：可行性报告
-  1. *可行性报告：可行性分析，包括理论依据、技术依据、创新点（10页)*
-  2. *概要设计报告*
-* 第七周：第三次作业（作业+实验2)
-* **第八周：中期汇报**
-* 第九周：前三次实验检查
-* 第11周：第四次作业（作业+实验3）
-* 第16周：期末考试
-* 第17及18周：项目检查与实验3检查
+Our team members:
 
----
-## Rust
-我们使用的Rustc版本是：
-```
-    rustc 1.33.0 (2aa4c46cf 2019-02-28)
-```
+* Fan Jinhao ([fandahao17](https://github.com/fandahao17))
+* Zuo Shun ([zsStrike](https://github.com/zsStrike))
+* Ning Yuting ([nnnyt](https://github.com/nnnyt))
+* Lei Siqi ([Roosevelt93](https://github.com/Roosevelt93))
+* Huang Yeqi ([Chivier](https://github.com/Chivier))
+* Zhang Fengming ([fming-Z](https://github.com/fming-Z))
 
-Rust的学习资源：
+## Our ambition
 
-1. [官方文档](https://doc.rust-lang.org/book/)
-2. [Rust语言中文版(基于Rust 1.2.0版本)](http://wiki.jikexueyuan.com/project/rust/)
-3. [Rust Primer（中文）](https://rustcc.gitbooks.io/rustprimer/content/)
-4. [*Rustling* at Github](https://github.com/rust-lang/rustlings/)
+Improve the safety of FreeRTOS while maintaining its efficiency with the help of Rust programming language.
 
+## We have already implemented…
+
+* A unified **FFI** allowing the OS to seamlessly communicate with the C code in portable layer.
+* A **doubly-linked list** using smart pointers. (It's really hard in Rust)
+* A fully-functional **task scheduler** based on task priority.
+* A fixed-length **queue**, with **semaphores and mutexes** built upon it.
+* A set of **optionally-compiled functionalities** to help you DIY the kernel.
