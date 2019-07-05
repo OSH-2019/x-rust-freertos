@@ -114,12 +114,19 @@ impl Semaphore {
         unsafe {
             let inner = self.0.get();
             traceTAKE_MUTEX_RECURSIVE!(*inner);
-            if (*inner).transed_task_handle_for_mutex().unwrap().clone()
-                == get_current_task_handle!()
+            trace!("Ready to get recursive mutex holder");
+            let mutex_holder = (*inner).transed_task_handle_for_mutex();
+            trace!("Get recursive mutex holder successfully");
+            if mutex_holder.is_some()
             {
-                (*inner).QueueUnion_increase();
-                xReturn = false;
-            } else {
+                if mutex_holder.unwrap().clone() == get_current_task_handle!() {
+                    trace!("Not First Time get this mutex");
+                    (*inner).QueueUnion_increase();
+                    xReturn = false;
+                }
+            } 
+            // else {
+                trace!("First Time get this mutex");
                 match (*inner).queue_generic_send(None, ticks_to_wait, queueSEND_TO_BACK) {
                     Ok(x) => {
                         (*inner).QueueUnion_increase();
@@ -130,8 +137,15 @@ impl Semaphore {
                         xReturn = false;
                     }
                 }
-            }
+            // }
         }
         return xReturn;
+    }
+
+    pub fn get_recursive_count(&self) -> UBaseType {
+        unsafe {
+            let inner = self.0.get();
+            (*inner).get_recursive_count()
+        }
     }
 }

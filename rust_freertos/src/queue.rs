@@ -824,6 +824,10 @@ where
         }
     }
 
+    pub fn get_recursive_count(&self) -> UBaseType {
+        self.QueueUnion
+    }
+
     /* `new` has two arguments now:length, QueueType.
      * Remember to add QueueType when using it.
      */
@@ -850,17 +854,23 @@ where
         /* use unsafe to get transed_task_handle for mutex
          * inplemented by: Ning Yuting
          */
-        let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
-        let untransed_task_handle = Box::new(untransed_task_handle);
-        let mut task_handle: Option<task_control::TaskHandle>;
-        unsafe {
-            let transed_task_handle = std::mem::transmute::<
-                Box<T>,
-                Box<Option<task_control::TaskHandle>>,
-            >(untransed_task_handle);
-            task_handle = *transed_task_handle
+        if self.pcQueue.get(0).cloned().is_some() {
+            let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
+            trace!("successfully get the task handle");
+            let untransed_task_handle = Box::new(untransed_task_handle);
+            let mut task_handle: Option<task_control::TaskHandle>;
+            unsafe {
+                let transed_task_handle = std::mem::transmute::<
+                    Box<T>,
+                    Box<Option<task_control::TaskHandle>>,
+                >(untransed_task_handle);
+                task_handle = *transed_task_handle
+            }
+            task_handle
         }
-        task_handle
+        else {
+            None
+        }
     }
 }
 
