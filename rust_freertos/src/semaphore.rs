@@ -88,7 +88,7 @@ impl Semaphore {
         )))
     }
 
-    pub fn give_recursive(&self) -> bool {
+    pub fn up_recursive(&self) -> bool {
         unsafe {
             let inner = self.0.get();
             if (*inner).transed_task_handle_for_mutex().unwrap().clone()
@@ -109,7 +109,7 @@ impl Semaphore {
         }
     }
 
-    pub fn take_recursive(&self, ticks_to_wait: TickType) -> bool {
+    pub fn down_recursive(&self, ticks_to_wait: TickType) -> bool {
         let mut xReturn: bool = false;
         unsafe {
             let inner = self.0.get();

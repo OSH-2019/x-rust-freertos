@@ -54,6 +54,15 @@ mod tests {
     */
     use std::sync::Arc;
     #[test]
+    fn test_recursive_mutex() {
+        use semaphore::Semaphore;
+        use simplelog::*;
+
+        let _ = TermLogger::init(LevelFilter::Trace, Config::default());
+        let recursive_mutex = Semaphore::create_recursive_mutex();
+    }
+/*
+    #[test]
     fn test_mutex() {
         use semaphore::Semaphore;
         use simplelog::*;
@@ -63,7 +72,7 @@ mod tests {
         let mutex1 = Arc::clone(&mutex0);
 
         let task0 = move || {
-            task_timemanager::task_delay(pdMS_TO_TICKS!(10));
+            task_timemanager::task_delay(pdMS_TO_TICKS!(1));
             loop {
                 match mutex0.semaphore_down(pdMS_TO_TICKS!(0)) {
                     Ok(_) => {
@@ -86,6 +95,8 @@ mod tests {
                     }
                     Err(error) => {
                         trace!("mutex0 semaphore take triggers {}", error);
+                        task_timemanager::task_delay(pdMS_TO_TICKS!(1));
+                        trace!("mutex0 delay in Err over!");
                     }
                 }
             }
@@ -93,7 +104,7 @@ mod tests {
 
         let task1 = move || {
             loop {
-                match mutex1.semaphore_down(pdMS_TO_TICKS!(10)) {
+                match mutex1.semaphore_down(pdMS_TO_TICKS!(0)) {
                     Ok(_) => {
                         for i in 1..11 {
                             trace!("Task1 owns the mutex! -- {}", i);
@@ -105,6 +116,7 @@ mod tests {
                         match mutex1.semaphore_up() {
                             Ok(_) => {
                                 trace!("Task1 dropped the mutex!");
+                                task_timemanager::task_delay(pdMS_TO_TICKS!(1));
                                 //     kernel::task_end_scheduler();
                             }
                             Err(error) => {
@@ -129,9 +141,14 @@ mod tests {
             .priority(3)
             .initialise(task1);
 
+        let Task12 = task_control::TCB::new()
+            .name("Task2")
+            .priority(3)
+            .initialise(|| loop{});
+
         kernel::task_start_scheduler();
     }
-
+*/
     /*
         #[test]
         fn test_counting_semaphore() {
