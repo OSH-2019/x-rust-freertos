@@ -78,7 +78,15 @@ macro_rules! set_tick_count {
 
 ### 硬件接口——Port模块
 
-TODO：樊金昊写
+Port模块是与体系结构相关的，每一个体系结构都有自己的一套port实现，FreeRTOS 8中就提供了面向以下体系结构和编译器的port模块：
+
+![Screen Shot 2019-07-06 at 10.54.34 AM](/Users/fandahao1/Documents/19Spring/OS/x-rust-freertos/docs/concluding.assets/Screen Shot 2019-07-06 at 10.54.34 AM.png)
+
+这意味着，我们是不可能把每一个port都用Rust改写一遍的。但是，所有的port函数都提供了统一的API接口，所以我们决定利用Rust封装这些API接口。有了这些封装，**我们的代码理论上可以在任何FreeRTOS和LLVM支持的平台上运行**。
+
+因为不同体系结构和编译器上Rust和C语言的接口是不同的，所以以上封装是**由程序自动进行的**，我们使用了[Bindgen](https://github.com/rust-lang/rust-bindgen)工具来生成C代码对应的Rust函数，并利用[CC](https://docs.rs/cc)库来编译C代码，并和Rust程序链接起来，以上过程均在[build.rs](https://github.com/OSH-2019/x-rust-freertos/blob/master/rust_freertos/build.rs)中完成。
+
+因为Bindgen生成的Rust函数是`unsafe`函数，所以我们又在[port.rs](https://github.com/OSH-2019/x-rust-freertos/blob/master/rust_freertos/src/port.rs)中对这些函数进行了一层safe封装，这是Rust中的通行做法；此外，对于C语言中调用的Rust函数，我们也利用Rust的[**FFI**](https://github.com/OSH-2019/x-rust-freertos/blob/master/rust_freertos/src/ffi.rs)为他们生成了对应的C函数。这样，**port层的C代码和Rust代码就可以互相调用了**。
 
 ### 基本数据结构——链表
 
