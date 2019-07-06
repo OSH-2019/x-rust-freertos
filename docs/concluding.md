@@ -490,9 +490,169 @@ pub fn add_current_task_to_delayed_list(ticks_to_wait: TickType, can_block_indef
 
 TODO：张俸铭写，这一部分代码还有编译错误
 
-### 队列与信号量
+### 
 
-TODO：宁雨亭和雷神写，可以多写点。
+### Queue 队列
+
+在没有操作系统的时候，两个应用程序进行消息传递一般是使用全局变量的方式；但是如果在使用操作系统的应用中用全局变量来传递消息，则会涉及资源管理的问题。FreeRTOS对此提供了一个叫"队列"的机制来完成任务与任务、任务与中断之间的消息传递。
+
+#### 数据结构
+
+在Rust中，我们使用和C语言中类似的数据结构，但为了让Queue可以在不同线程中共享，我们为其实现interior mutability。
+
+- C语言版本：
+
+  ```c
+  typedef struct QueueDefinition
+  {
+  	int8_t *pcHead;					
+  	int8_t *pcTail;					
+  	int8_t *pcWriteTo;				
+  
+  	union							
+  	{
+  		int8_t *pcReadFrom;			
+  		UBaseType_t uxRecursiveCallCount;
+  	} u;
+  
+  	List_t xTasksWaitingToSend;		
+  	List_t xTasksWaitingToReceive;	
+  
+  	volatile UBaseType_t uxMessagesWaiting;
+  	UBaseType_t uxLength;			
+  	UBaseType_t uxItemSize;			
+  
+  	volatile int8_t cRxLock;		
+  	volatile int8_t cTxLock;		
+  
+  	#if( ( configSUPPORT_STATIC_ALLOCATION == 1 ) && ( configSUPPORT_DYNAMIC_ALLOCATION == 1 ) )
+  		uint8_t ucStaticallyAllocated;	
+  	#endif
+  
+  	#if ( configUSE_QUEUE_SETS == 1 )
+  		struct QueueDefinition *pxQueueSetContainer;
+  	#endif
+  
+  	#if ( configUSE_TRACE_FACILITY == 1 )
+  		UBaseType_t uxQueueNumber;
+  		uint8_t ucQueueType;
+  	#endif
+  
+  } xQUEUE;
+  
+  typedef xQUEUE Queue_t;
+  ```
+
+- Rust语言版本：
+
+  - QueueDefinition
+
+    ```rust
+    #[derive(Default)]
+    pub struct QueueDefinition<T>
+    where
+        T: Default + Clone,
+    {
+        pcQueue: VecDeque<T>,
+    
+        pcHead: UBaseType,
+        pcTail: UBaseType,
+        pcWriteTo: UBaseType,
+    
+        /*pcReadFrom & uxRecuriveCallCount*/
+        QueueUnion: UBaseType,
+    
+        xTasksWaitingToSend: ListLink,
+        xTasksWaitingToReceive: ListLink,
+    
+        uxMessagesWaiting: UBaseType,
+        uxLength: UBaseType,
+        cRxLock: i8,
+        cTxLock: i8,
+    
+        #[cfg(all(
+            feature = "configSUPPORT_STATIC_ALLOCATION",
+            feature = "configSUPPORT_DYNAMIC_ALLOCATION"
+        ))]
+        ucStaticallyAllocated: u8,
+    
+        #[cfg(feature = "configUSE_QUEUE_SETS")]
+        pxQueueSetContainer: Option<Box<QueueDefinition>>,
+    
+        #[cfg(feature = "configUSE_TRACE_FACILITY")]
+        uxQueueNumber: UBaseType,
+        //#[cfg(feature = "configUSE_TRACE_FACILITY")]
+        ucQueueType: QueueType,
+    }
+    ```
+
+    所作修改：
+
+    在Rust中，我们使用`VecDeque`类型存储队列内容，`pcHead`、`pcTail`、`pcWriteTo`依然指向相应位置，但其类型为`UBaseType`。
+
+    Rust语言中，用作队列时的`pcReadFrom`和用作递归互斥量时的`uxRecursiveCallCount`均为`UBaseType`类型，因此无需使用union，将其合并成一个变量`QueueUnion`，在不同情况下使用即可。
+
+    在Rust中将消息类型设为泛型T，无需手动设定`uxItemSize`	，只需传入消息类型即可。
+
+    
+
+  - Queue
+
+    ```rust
+    pub struct Queue<T>(UnsafeCell<QueueDefinition<T>>)
+    where
+        T: Default + Clone;
+    unsafe impl<T: Default + Clone> Send for QueueIM<T> {}
+    unsafe impl<T: Default + Clone> Sync for QueueIM<T> {}
+    ```
+
+    由于我们不能让两个任务共享对Queue的mut引用，这显然是违背Rust的所有权的。然而`send`和`receive`方法都需要对Queue进行mut引用。
+
+    为了避免这个问题，我们需要把这些方法改为immutable引用，并为队列实现interior mutability。实现`send`和`sync`是为了让Queue可以在不同线程中共享。
+
+    例如为Queue实现interior mutability的`send`方法：
+
+    ```rust
+    pub fn send(&self, pvItemToQueue: T, xTicksToWait: TickType) -> Result<(),QueueError> {
+    	unsafe {
+    		let inner = self.0.get();
+    		(*inner).queue_generic_send(pvItemToQueue, xTicksToWait, queueSEND_TO_BACK)
+    		}
+    }
+    ```
+
+    尽管这里使用了许多`unsafe`代码，但因为我们的QueueDefinition中的`receive`和`send`方法内实现了同步阻塞机制，所以不会造成数据竞争，我们的代码还是安全的。通过interior mutability的方式，就可以让Queue作为一个immutable的引用在不用线程间愉快地共享了。
+
+
+
+#### 实现方式
+
+用作队列时，大部分实现逻辑都与C语言中逻辑相同。
+
+在C语言实现中，`queue.h`多为宏，实为调用`queue.c`中的函数。在Rust语言实现中，为`QueueDefinition`实现的方法为`queue.c`中的函数，如`xQueueGenericSend()`实现为`QueueDefinition`的方法
+
+```rust
+pub fn queue_generic_send(
+  &mut self,
+  pvItemToQueue:T,
+  xTicksToWait:TickType,
+  xCopyPosition:BaseType
+) -> Result<(),QueueError>
+```
+
+，为`Queue`实现的方法为`queue.h`中的宏，如`xQueueSend()`实现为`Queue`的方法
+
+```rust
+pub fn send(&self, pvItemToQueue:T,xTicksToWait:TickType) -> Result<(),QueueError>
+```
+
+在Rust中返回值与C语言中有所不同，例如`receive`方法中使用`Result<T,QueueError>`类型作为返回值，若成功从Queue中接收到一个消息，则通过`Ok(T)`返回，若失败则返回相应的`Err(QueueError)`。
+
+
+
+### Semaphore 信号量
+
+
 
 ## 测试
 
