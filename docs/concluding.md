@@ -94,7 +94,63 @@ TODO：左顺写
 
 ### TCB和TaskHandle结构体
 
-TODO：樊金昊写
+TCB，即任务控制块，是任务调度的基本单元，TaskHandle是任务句柄，用户通过其实现对任务的各种操作，因为TCB和TaskHandle涉及大量指针操作，所以在这一部分我们花费了大量时间，对原有的结构做出了很多修改。
+
+#### 利用Callback机制调用任务函数
+
+这样，C语言代码中实际调用的函数是：
+
+```rust
+/* Task call wrapper function. */
+extern "C" fn run_wrapper(func_to_run: CVoidPointer) {
+    unsafe {
+        let func_to_run = Box::from_raw(func_to_run as *mut Box<FnBox() + 'static>);
+        func_to_run();
+    }
+}
+```
+
+此外，还必须要在任务堆栈初始化成功后手动`forget`即将被运行的函数，以免Rust的内存管理机制在初始化函数执行结束后将其free掉：
+
+```rust
+        match result {
+            Ok(_) => {
+                /* We MUST forget `f`, otherwise it will be freed at the end of this function.
+                 * But we need to call `f` later in `run_wrapper`, which will lead to
+                 * some unexpected behavior.
+                 */
+                mem::forget(f);
+            }
+            Err(e) => return Err(e),
+        }
+```
+
+#### TaskHandle类型
+
+在原本的C代码中，TaskHandle是一个指针（实际上是一个指向TCB的指针）：
+
+```c
+typedef void * TaskHandle_t;
+```
+
+事实上，FreeRTOS利用`void *`实现了类似多态的类型转换，这显然是不安全的，所以Rust不允许这样的类型转换。因为可能会有多个`TaskHandle`同时指向并有权修改同一个TCB，我们采用智能指针对其进行封装：
+
+```rust
+#[derive(Clone)]
+pub struct TaskHandle(Arc<RwLock<TCB>>);
+```
+
+这一定义与链表中的`owner`域定义类似，所有与任务相关的函数，都是以TaskHandle为参数的，这使得Task的使用很灵活。
+
+#### DRY (Don't repeat yourself) 
+
+由上一部分可以看出，TaskHandle、List、ListItem的定义都采用了多层只能指针的封装，他们的定义比较复杂。事实上，由于涉及到多次对智能指针的操作，他们的使用也非常复杂。例如，下面是一个判断两个TaskHandle是否指向同一TCB的函数：
+
+```rust
+
+```
+
+
 
 ### 任务控制函数
 
