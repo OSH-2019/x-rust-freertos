@@ -10,20 +10,31 @@ unsafe impl Send for Semaphore {}
 unsafe impl Sync for Semaphore {}
 
 impl Semaphore {
+    /// # Descrpition
+    /// Create a new mutex type semaphore instance.
+    ///
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.c 504-515
+    ///
+    /// # Arguments:
+    /// Nothing
+    ///
+    /// # Return:
+    /// The created mutex.
     pub fn new_mutex() -> Self {
-        let mut mutex = Semaphore(UnsafeCell::new(QueueDefinition::new(1, QueueType::Mutex)));
-        //        mutex.initialise_mutex();
-        mutex
+        Semaphore(UnsafeCell::new(QueueDefinition::new(1, QueueType::Mutex)))
     }
 
-    pub fn initialise_mutex(&self) {
-        //traceCREATE_MUTEX!(self);
-        unsafe {
-            let inner = self.0.get();
-            (*inner).queue_generic_send(None, 0 as TickType, queueSEND_TO_BACK);
-        }
-    }
-
+    /// # Description
+    /// Get the mutex holder.
+    ///
+    /// * Implemented by:Lei Siqi
+    ///
+    /// # Arguments:
+    /// Nothing
+    ///
+    /// # Return:
+    /// `Option<task_control::TaskHandle>` - the holder of the mutex
     #[cfg(all(
         feature = "configUSE_MUTEXES",
         feature = "INCLUDE_xSemaphoreGetMutexHolder"
@@ -41,17 +52,39 @@ impl Semaphore {
         mutex_holder
     }
 
+    /// # Description
+    /// Release a semaphore.
+    ///
+    /// * Implemented by:Ning Yuting & Lei Siqi
+    /// * C implementation:semphr.h 489 
+    ///
+    /// # Arguments:
+    /// Nothing
+    /// 
+    /// # Return:
+    /// Ok(T) if the semaphore was released, otherwise QueueError::QueueEmpty.
     pub fn semaphore_up(&self) -> Result<Option<TaskHandle>, QueueError> {
         unsafe {
-            trace!("Semaphore take runs!");
+            trace!("Semaphore up runs!");
             let inner = self.0.get();
-            trace!("Semaphore take get finished!");
+            trace!("Semaphore up get finished!");
             (*inner).queue_generic_receive(semGIVE_BLOCK_TIME, false)
-            //trace!("Semaphore take finish!");
         }
     }
 
-    //if you successfully call this function, you own the semaphore
+    /// # Description
+    /// Obtain a semaphore.
+    ///
+    /// * Implemented by:Ning Yuting & Lei Siqi
+    /// * C implementation:semphr.h 331
+    ///
+    /// # Arguments:
+    /// `xBlockTime` - The time in ticks to wait for the semaphore to become available.
+    /// A block time of zero can be used to poll the semaphore.
+    /// A block time of portMAX_DELAY can be used to block indefinitely.
+    ///
+    /// # Return:
+    /// Ok() if the semaphore was obtained, otherwise errQUEUE_FULL.
     pub fn semaphore_down(&self, xBlockTime: TickType) -> Result<(), QueueError> {
         unsafe {
             let inner = self.0.get();
@@ -59,6 +92,17 @@ impl Semaphore {
         }
     }
 
+    /// # Description
+    /// Create a binary semaphore.
+    ///
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:semphr.h 135-144
+    ///
+    /// # Arguments:
+    /// Nothing
+    ///
+    /// # Return:
+    /// The created binary semaphore.
     pub fn create_binary() -> Self {
         Semaphore(UnsafeCell::new(QueueDefinition::new(
             1,
@@ -66,6 +110,18 @@ impl Semaphore {
         )))
     }
 
+    /// # Description
+    /// Create a counting semaphore.
+    ///
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:semphr.h 1039-1041
+    ///
+    /// # Arguments:
+    /// `max_count` - The maximum count value that can be reached. When the semaphore reaches 
+    /// this value it can no longer be 'given'.
+    ///
+    /// # Return
+    /// The created counting semaphore.
     pub fn create_counting(max_count: UBaseType /*,initial_count:UBaseType*/) -> Self {
         let mut counting_semphr = Semaphore(UnsafeCell::new(QueueDefinition::new(
             max_count,
@@ -74,13 +130,22 @@ impl Semaphore {
         unsafe {
             let inner = counting_semphr.0.get();
             (*inner).initialise_count(0);
-            //            (*inner).initialise_count(initial_count);
         }
         //traceCREATE_COUNTING_SEMAPHORE!();
         counting_semphr
     }
 
-    //#[cfg(feature = "configUSE_RECURSIVE_MUTEXES")]
+    /// # Description
+    /// Created a recursive mutex.
+    ///
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:semphr.h 886-888
+    ///
+    /// # Argument
+    /// Nothing
+    ///
+    /// # Return
+    /// The created recursive mutex.
     pub fn create_recursive_mutex() -> Self {
         Semaphore(UnsafeCell::new(QueueDefinition::new(
             1,
@@ -88,6 +153,17 @@ impl Semaphore {
         )))
     }
 
+    /// # Description
+    /// Release a recursive mutex.
+    ///
+    /// * Implemented by:Ning Yuting
+    /// * C implementation:queue.c 570-622
+    ///
+    /// # Arguments:
+    /// Nothing
+    /// 
+    /// # Return
+    /// `bool` - true if the recursive mutex was released.
     pub fn up_recursive(&self) -> bool {
         unsafe {
             let inner = self.0.get();
@@ -109,6 +185,18 @@ impl Semaphore {
         }
     }
 
+    /// # Description
+    /// Obtain a recursive mutex.
+    ///
+    /// * Implemented by:Ning Yuting & Lei Siqi
+    /// * C implementation:queue.c 625-664
+    ///
+    /// # Arguments:
+    /// `ticks_to_wait` - The time in ticks to wait for the semaphore to become available.
+    /// A block time of zero can be used to poll the semaphore.
+    ///
+    /// # Return:
+    /// `bool` - true if the recursive mutex was obtained.
     pub fn down_recursive(&self, ticks_to_wait: TickType) -> bool {
         let mut xReturn: bool = false;
         unsafe {
@@ -142,6 +230,16 @@ impl Semaphore {
         return xReturn;
     }
 
+    /// # Description
+    /// Get the recursive count of a recursive mutex.
+    ///
+    /// * Implemented by:Lei Siqi
+    ///
+    /// # Arguments:
+    /// Nothing
+    ///
+    /// # Return:
+    /// `UBaseType` - the recursive count of the recursive mutex.
     pub fn get_recursive_count(&self) -> UBaseType {
         unsafe {
             let inner = self.0.get();
