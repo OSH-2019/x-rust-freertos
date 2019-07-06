@@ -142,7 +142,7 @@ pub struct TaskHandle(Arc<RwLock<TCB>>);
 
 这一定义与链表中的`owner`域定义类似，所有与任务相关的函数，都是以TaskHandle为参数的，这使得Task的使用很灵活。
 
-#### DRY (Don't repeat yourself) 
+#### DRY (Don't repeat yourself)
 
 由上一部分可以看出，TaskHandle、List、ListItem的定义都采用了多层只能指针的封装，他们的定义比较复杂。事实上，由于涉及到多次对智能指针的操作，他们的使用也非常复杂。例如，下面是一个判断两个TaskHandle是否指向同一TCB的函数：
 
@@ -154,7 +154,176 @@ pub struct TaskHandle(Arc<RwLock<TCB>>);
 
 ### 任务控制函数
 
-TODO：挂起、恢复、delay等，黄业琦写（这一部分代码似乎还有编译问题）
+
+
+### 任务控制函数
+
+
+
+#### 任务创建
+
+```rust
+pub fn initialise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
+    where
+        F: FnOnce() -> () + Send + 'static,
+```
+
+我们将任务创建和任务信息初始化的函数合一处理。
+
+首先为任务申请空间，栈空间我们采用字对齐处理，实现如下。
+
+```rust
+let px_stack = port::port_malloc(stacksize_as_bytes)?;
+```
+
+之后标记栈空间信息。
+
+```rust
+let mut top_of_stack = self.stack_pos + self.task_stacksize as StackType - 1;
+top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as StackType;
+```
+
+申请空间如果失败，则会返回`Err`信息，我们不作处理；如果申请成功，我们则会装入TCB的相关信息和数据。例如：任务名称，任务函数信息，任务函数参数信息，任务优先级等等……
+
+除了这些信息，还有两个任务相关的列表项要被初始化，`state_list_item`以及`event_list_item`用于任务队列调度。
+
+最后我们将初始化完成的任务放置在就绪队列`ready_list`中。
+
+```rust
+handle.add_new_task_to_ready_list()?;
+```
+
+就此，任务穿件过程完毕。
+
+详见`task_control L182-L279`
+
+
+
+#### 添加任务至就绪列表
+
+之前再创建任务的时候也有使用过，我们创建的任务需要加入就绪列表中。
+
+```rust
+fn add_new_task_to_ready_list(&self) -> Result<(), FreeRtosError>
+```
+
+在这个过程中，为了保证正确性，我们先进入临界区，使用我们已经编写好的`taskENTER_CRITICAL!()`和`taskEXIT_CRITICAL!()`API。
+
+我们添加新任务同时，我们将一些辅助维护的全局变量也加以维护。
+
+例如：`current_number_of_tasks`
+
+之后调用`list API`完成添加。
+
+详见`task_control L527-L571`。
+
+
+
+#### 任务删除
+
+```rust
+pub fn task_delete(task_to_delete: Option<TaskHandle>)
+```
+
+首先先使用`get_handle_from_option`转换数据类型，方便之后处理。
+
+与之前添加任务一样，删除任务时，我们也需要进入临界区进行操作。
+
+进入临界区之后步骤如下：
+
+1. 将任务从就序列表中删除，如果成功删除，则重置优先级
+
+2. 判断任务是否在等待事件，如果是，则删除任务对应的`event_list_item`
+
+3. 如果删除的任务是正在运行的任务，则需要多执行一次任务切换过程
+
+
+由于删除任务我们需要删除任务控制块以及任务堆栈所占用的空间，但是任务正在运行的话，显然任务控制块和任务堆栈不能直接释放，我们需要设置标记，将任务移动到`task_waiting_termination`列表。之后在一一释放内存。
+
+详见`task_control L815-L889`。
+
+
+
+#### 任务挂起
+
+```rust
+pub fn suspend_task(task_to_suspend: TaskHandle)
+```
+
+同样，先转换变量类型，再进入临界区。
+
+步骤如下：
+
+1. 将任务从就序列表或者延迟列表中移除
+2. 判断任务是否在等待事件，如果是，则删除任务对应的`event_list_item`
+
+至此可以离开临界区，因为之后添加任务至挂起列表操作是不需要再临界取中执行的。
+
+接着，我们计算还要多长时间执行下一个任务，也就是任务的解锁时间，防止有任务参考了刚才被挂起的任务，我们使用`reset_next_task_unblock_time()`函数进行处理。
+
+还存在一个特例——需要挂起的任务是正在执行的任务。如果这种情况发生，我们需要特殊处理，再任务调度器没有异常的情况下，我们调用函数`portYIELD_WITHIN_API!()`进行强制切换。切换完之后还不算结束，因为我们的全局变量`current_tcb`指向我们正在执行的任务，当他被挂起之后，我们需要再找一个其他的任务放在里面。
+
+假如没有其他被挂起的任务，我们调用`task_switch_context()`获取下一个要执行的任务。
+
+详见`task_control L913-L975`。
+
+
+
+#### 任务恢复
+
+```rust
+pub fn resume_task(task_to_resume: TaskHandle)
+```
+
+首先我们有两种情况比较特殊，不能恢复：
+
+1. 要我们恢复的任务为NULL
+2. 要恢复的就是当前正在执行的任务
+
+如果不是这两中情况，则可以进入临界区进行操作：
+
+1. 先判定任务是否已经被挂起，调用函数`task_is_tasksuspended()`
+2. 将要恢复的任务从挂起列表中移除
+3. 将要恢复的任务放进就序列表中
+4. 如果要恢复的任务优先级高于当前正在执行的任务，调用`taskYIELD_IF_USING_PREEMPTION!()`进行任务切换
+
+详见`task_control L1031-L1065`。
+
+
+
+#### 任务挂起判定
+
+```rust
+pub fn task_is_tasksuspended(xtask: &TaskHandle) -> bool
+```
+
+简单地说，是利用`list API`对于挂起列表进行查询。
+
+详见`task_control L977-L1006`。
+
+
+
+#### 任务延迟函数
+
+```rust
+pub fn task_delay(ticks_to_delay: TickType)
+```
+
+参数为我们需要延迟的节拍数，延迟节拍数小于0时，相当于直接执行了`port_YIELD`进行任务切换。
+
+如果延迟节拍数大于0，我们先挂起任务调度器，利用函数`add_current_task_to_delayed_list()`将我们要延迟的任务移动到`delay_list`中，之后再恢复任务调度器。如果此时任务调度器没有调度任务，我们手动调用`portYIELD_WITHIN_API!()`进行调度。
+
+详见`task_timemanager L55-L77`。
+
+
+
+#### 将任务添加至延迟队列中
+
+```rust
+pub fn add_current_task_to_delayed_list(ticks_to_wait: TickType, can_block_indefinitely: bool)
+```
+
+详见`task_control L650-L750`。
 
 ### 任务API函数
 
