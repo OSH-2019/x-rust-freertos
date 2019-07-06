@@ -60,10 +60,21 @@ macro_rules! set_tick_count {
 在上一部分中，我们已经展示了`trace!`函数的使用，在我们的实现中，我们广泛地使用了日志函数，以下是我们某次测试中的一段日志：
 
 ```
-
+13:15:11 [TRACE] rust_freertos::task_control: [src/task_control.rs:127] Initialising Task: main, stack size: 512 bytes
+13:15:11 [TRACE] rust_freertos::ffi: [src/ffi.rs:40] vTaskSuspendAll() called from ffi!
+13:15:11 [TRACE] rust_freertos::kernel: [src/kernel.rs:400] SCHEDULER_SUSPENDED was set to 1
+13:15:11 [TRACE] rust_freertos::ffi: [src/ffi.rs:46] xTaskResumeAll() called from ffi!
+13:15:11 [TRACE] rust_freertos::kernel: [src/kernel.rs:471] SCHEDULER_SUSPENDED was set to 0
+13:15:11 [INFO] task_resume_all() returned false
+13:15:11 [TRACE] rust_freertos::task_control: [src/task_control.rs:141] stack_pos for task main is 140500632868624
+13:15:11 [TRACE] rust_freertos::task_control: [src/task_control.rs:152] Function ptr of main is at 7FC8DA5016F0
+13:15:11 [TRACE] rust_freertos::ffi: [src/ffi.rs:40] vTaskSuspendAll() called from ffi!
+13:15:11 [TRACE] rust_freertos::kernel: [src/kernel.rs:400] SCHEDULER_SUSPENDED was set to 1
+13:15:11 [TRACE] rust_freertos::ffi: [src/ffi.rs:46] xTaskResumeAll() called from ffi!
+13:15:11 [TRACE] rust_freertos::kernel: [src/kernel.rs:471] SCHEDULER_SUSPENDED was set to 0
 ```
 
-
+这段日志显示了任务创建的过程。可见，日志让我们的代码执行过程变得可视化。在我们的调试过程中，日志的作用至关重要。
 
 ### 硬件接口——Port模块
 
