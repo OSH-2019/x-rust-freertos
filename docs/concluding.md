@@ -488,12 +488,12 @@ pub fn add_current_task_to_delayed_list(ticks_to_wait: TickType, can_block_indef
 
 ### 任务API函数
 
-##### Task_API模块用途
+#### Task_API模块用途
 - 该模块中主要实现几个任务相关的API函数，它们的作用主要是便于用户在执行过程中与操作系统进行交互，其中包括获取当前任务的状态信息（主要是基于taskTCB），并能够赋予使用者以一定的接口来改变任务属性（），其中尤其重要的是task_priority_set()函数，它使用户能够手动更新任务的优先级，从而按照用户预期的方式进行任务调度。
 
 - 我们综合考虑到函数的重要性和使用频率，利用Rust实现了API的其中一部分常用函数。
 
-##### Rust实现
+#### Rust实现
 - **实现函数**
 **pub fn task_priority_get(xTask: Option<TaskHandle>) -> UBaseType**
 **pub fn task_priority_set(xTask: Option<TaskHandle>, uxNewPriority: UBaseType)**
@@ -506,6 +506,7 @@ pub fn task_get_stack_high_water_mark(xtask:Option<&TaskHandle>) -> UBaseType
 
 - **技术点**
 在Rust改写过程中，一个比较麻烦的问题是如何实现原函数中TaskHandle的访问。由于Rust对变量的所有权和生命期规定非常严格，因而使用以全局变量为参数的函数的方式会导致混乱。因此我们决定采用灵活的宏定义方式来实现，免除了参数生命期结束的困扰。
+
 如下面的获取任务tcb函数：
 
 ```rust
