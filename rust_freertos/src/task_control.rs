@@ -124,7 +124,6 @@ impl task_control_block {
 
     /// * Descrpition:
     /// 
-    /// 
     ///  Internally, within the FreeRTOS implementation, tasks use two blocks of
     ///  memory.  The first block is used to hold the task's data structures.  The
     ///  second block is used by the task as its stack.  If a task is created using
@@ -994,10 +993,6 @@ pub fn task_is_tasksuspended(xtask: &TaskHandle) -> bool {
     xreturn
 }
 
-/// 
-///  task. h
-///  <pre>void vTaskResume( TaskHandle_t xTaskToResume );</pre>
-/// 
 ///  INCLUDE_vTaskSuspend must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
 /// 
@@ -1020,7 +1015,6 @@ pub fn resume_task(task_to_resume: TaskHandle) {
     trace!("resume task called!");
     let mut unwrapped_tcb = get_tcb_from_handle!(task_to_resume);
 
-    if task_to_resume != get_current_task_handle!() {
     if task_to_resume != get_current_task_handle!() {
         taskENTER_CRITICAL!();
         {

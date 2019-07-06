@@ -1049,18 +1049,10 @@
 <span id="1049">1049</span>
 <span id="1050">1050</span>
 <span id="1051">1051</span>
-<span id="1052">1052</span>
-<span id="1053">1053</span>
-<span id="1054">1054</span>
-<span id="1055">1055</span>
-<span id="1056">1056</span>
-<span id="1057">1057</span>
-<span id="1058">1058</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">kernel</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">list</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">list</span>::<span class="ident">ItemLink</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">list</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">list</span>::<span class="ident">ItemLink</span>; <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">list</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">port</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">projdefs</span>::<span class="ident">FreeRtosError</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">task_global</span>::<span class="kw-2">*</span>;
@@ -1184,8 +1176,6 @@
 
     <span class="doccomment">/// * Descrpition:</span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">///  Create a new task and add it to the list of tasks that are ready to run.</span>
-    <span class="doccomment">/// </span>
     <span class="doccomment">///  Internally, within the FreeRTOS implementation, tasks use two blocks of</span>
     <span class="doccomment">///  memory.  The first block is used to hold the task&#39;s data structures.  The</span>
     <span class="doccomment">///  second block is used by the task as its stack.  If a task is created using</span>
@@ -1233,7 +1223,7 @@
     <span class="doccomment">///  can be referenced.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// * Return:</span>
+    <span class="doccomment">/// # Return:</span>
     <span class="doccomment">///  @return pdPASS if the task was successfully created and added to a ready</span>
     <span class="doccomment">///  list, otherwise an error code defined in the file projdefs.h</span>
     <span class="doccomment">/// </span>
@@ -1391,9 +1381,12 @@
         <span class="self">self</span>.<span class="ident">mutexes_held</span> <span class="op">=</span> <span class="ident">new_count</span>;
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;configUSE_MUTEXES&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_base_priority</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">UBaseType</span> {
         <span class="self">self</span>.<span class="ident">base_priority</span>
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_base_priority</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">new_val</span>: <span class="ident">UBaseType</span>) {
+        <span class="self">self</span>.<span class="ident">base_priority</span> <span class="op">=</span> <span class="ident">new_val</span>
     }
 }
 
@@ -1456,8 +1449,6 @@ pub fn initialize_task_list () {
 }
 */</span>
 
-<span class="doccomment">/// * Descrpition:</span>
-<span class="doccomment">/// </span>
 <span class="doccomment">///  Type by which tasks are referenced.  For example, a call to xTaskCreate</span>
 <span class="doccomment">///  returns (via a pointer parameter) an TaskHandle_t variable that can then</span>
 <span class="doccomment">///  be used as a parameter to vTaskDelete to delete the task.</span>
@@ -1496,7 +1487,6 @@ pub fn initialize_task_list () {
         <span class="ident">TaskHandle</span>(<span class="ident">arc</span>)
     }
 
-    <span class="doccomment">/// # Description:</span>
     <span class="doccomment">/// Construct a TaskHandle with a TCB. */</span>
     <span class="doccomment">/// * Implemented by: Fan Jinhao.</span>
     <span class="doccomment">/// * C implementation:</span>
@@ -1528,7 +1518,6 @@ pub fn initialize_task_list () {
         <span class="macro">get_tcb_from_handle_mut</span><span class="macro">!</span>(<span class="self">self</span>).<span class="ident">set_priority</span>(<span class="ident">new_priority</span>);
     }
 
-    <span class="doccomment">/// # Description:</span>
     <span class="doccomment">/// Place the task represented by pxTCB into the appropriate ready list for</span>
     <span class="doccomment">/// the task.  It is inserted at the end of the list.</span>
     <span class="doccomment">///</span>
@@ -1567,7 +1556,6 @@ pub fn initialize_task_list () {
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// # Description:</span>
     <span class="doccomment">/// Called after a new task has been created and initialised to place the task</span>
     <span class="doccomment">/// under the control of the scheduler.</span>
     <span class="doccomment">///</span>
@@ -1668,9 +1656,12 @@ pub fn initialize_task_list () {
         <span class="macro">get_tcb_from_handle_mut</span><span class="macro">!</span>(<span class="self">self</span>).<span class="ident">set_mutex_held_count</span>(<span class="ident">new_count</span>)
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;configUSE_MUTEXES&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_base_priority</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">UBaseType</span> {
         <span class="macro">get_tcb_from_handle</span><span class="macro">!</span>(<span class="self">self</span>).<span class="ident">get_base_priority</span>()
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_base_priority</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">new_val</span>: <span class="ident">UBaseType</span>) {
+        <span class="macro">get_tcb_from_handle_mut</span><span class="macro">!</span>(<span class="self">self</span>).<span class="ident">set_base_priority</span>(<span class="ident">new_val</span>)
     }
 }
 
@@ -1837,8 +1828,6 @@ pub fn initialize_task_list () {
     };
 }
 
-<span class="doccomment">/// * Descrpition:</span>
-<span class="doccomment">/// </span>
 <span class="doccomment">///  INCLUDE_vTaskDelete must be defined as 1 for this function to be available.</span>
 <span class="doccomment">///  See the configuration section for more information.</span>
 <span class="doccomment">/// </span>
@@ -1859,10 +1848,10 @@ pub fn initialize_task_list () {
 <span class="doccomment">/// * Implemented by: Huang Yeqi</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// # Arguments:</span>
-<span class="doccomment">///  @param xTask The handle of the task to be deleted.  Passing NULL will</span>
+<span class="doccomment">///  `task_to_delete` The handle of the task to be deleted.  Passing NULL will</span>
 <span class="doccomment">///  cause the calling task to be deleted.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// * Return:</span>
+<span class="doccomment">/// # Return:</span>
 <span class="doccomment">/// </span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;INCLUDE_vTaskDelete&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">task_delete</span>(<span class="ident">task_to_delete</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TaskHandle</span><span class="op">&gt;</span>) {
@@ -1941,8 +1930,6 @@ pub fn initialize_task_list () {
     }
 }
 
-<span class="doccomment">/// * Descrpition:</span>
-<span class="doccomment">/// </span>
 <span class="doccomment">///  INCLUDE_vTaskSuspend must be defined as 1 for this function to be available.</span>
 <span class="doccomment">///  See the configuration section for more information.</span>
 <span class="doccomment">/// </span>
@@ -1960,7 +1947,7 @@ pub fn initialize_task_list () {
 <span class="doccomment">///  @param xTaskToSuspend Handle to the task being suspended.  Passing a NULL</span>
 <span class="doccomment">///  handle will cause the calling task to be suspended.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// * Return:</span>
+<span class="doccomment">/// # Return:</span>
 <span class="doccomment">/// </span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;INCLUDE_vTaskSuspend&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">suspend_task</span>(<span class="ident">task_to_suspend</span>: <span class="ident">TaskHandle</span>) {
@@ -2058,7 +2045,6 @@ pub fn initialize_task_list () {
     <span class="ident">xreturn</span>
 }
 
-<span class="doccomment">/// * Descrpition:</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">///  task. h</span>
 <span class="doccomment">///  &lt;pre&gt;void vTaskResume( TaskHandle_t xTaskToResume );&lt;/pre&gt;</span>
@@ -2078,7 +2064,7 @@ pub fn initialize_task_list () {
 <span class="doccomment">/// # Arguments:</span>
 <span class="doccomment">///  @param xTaskToResume Handle to the task being readied.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// * Return:</span>
+<span class="doccomment">/// # Return:</span>
 <span class="doccomment">/// </span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;INCLUDE_vTaskSuspend&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">resume_task</span>(<span class="ident">task_to_resume</span>: <span class="ident">TaskHandle</span>) {

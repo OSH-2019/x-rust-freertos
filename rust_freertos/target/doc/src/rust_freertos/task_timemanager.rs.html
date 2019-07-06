@@ -58,23 +58,6 @@
 <span id="58">58</span>
 <span id="59">59</span>
 <span id="60">60</span>
-<span id="61">61</span>
-<span id="62">62</span>
-<span id="63">63</span>
-<span id="64">64</span>
-<span id="65">65</span>
-<span id="66">66</span>
-<span id="67">67</span>
-<span id="68">68</span>
-<span id="69">69</span>
-<span id="70">70</span>
-<span id="71">71</span>
-<span id="72">72</span>
-<span id="73">73</span>
-<span id="74">74</span>
-<span id="75">75</span>
-<span id="76">76</span>
-<span id="77">77</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">kernel</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">list</span>::<span class="kw-2">*</span>;
@@ -84,52 +67,35 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ffi</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="kw-2">*</span>;
 
-<span class="comment">/*
-* task. h
-* &lt;pre&gt;void vTaskDelay( const TickType_t xTicksToDelay );&lt;/pre&gt;
-*
-* Delay a task for a given number of ticks.  The actual time that the
-* task remains blocked depends on the tick rate.  The constant
-* portTICK_PERIOD_MS can be used to calculate real time from the tick
-* rate - with the resolution of one tick period.
-*
-* INCLUDE_vTaskDelay must be defined as 1 for this function to be available.
-* See the configuration section for more information.
-*
-*
-* vTaskDelay() specifies a time at which the task wishes to unblock relative to
-* the time at which vTaskDelay() is called.  For example, specifying a block
-* period of 100 ticks will cause the task to unblock 100 ticks after
-* vTaskDelay() is called.  vTaskDelay() does not therefore provide a good method
-* of controlling the frequency of a periodic task as the path taken through the
-* code, as well as other task and interrupt activity, will effect the frequency
-* at which vTaskDelay() gets called and therefore the time at which the task
-* next executes.  See vTaskDelayUntil() for an alternative API function designed
-* to facilitate fixed frequency execution.  It does this by specifying an
-* absolute time (rather than a relative time) at which the calling task should
-* unblock.
-*
-* @param xTicksToDelay The amount of time, in tick periods, that
-* the calling task should block.
-*
-* Example usage:
+<span class="doccomment">///  Delay a task for a given number of ticks.  The actual time that the</span>
+<span class="doccomment">///  task remains blocked depends on the tick rate.  The constant</span>
+<span class="doccomment">///  portTICK_PERIOD_MS can be used to calculate real time from the tick</span>
+<span class="doccomment">///  rate - with the resolution of one tick period.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">///  INCLUDE_vTaskDelay must be defined as 1 for this function to be available.</span>
+<span class="doccomment">///  See the configuration section for more information.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// </span>
+<span class="doccomment">///  vTaskDelay() specifies a time at which the task wishes to unblock relative to</span>
+<span class="doccomment">///  the time at which vTaskDelay() is called.  For example, specifying a block</span>
+<span class="doccomment">///  period of 100 ticks will cause the task to unblock 100 ticks after</span>
+<span class="doccomment">///  vTaskDelay() is called.  vTaskDelay() does not therefore provide a good method</span>
+<span class="doccomment">///  of controlling the frequency of a periodic task as the path taken through the</span>
+<span class="doccomment">///  code, as well as other task and interrupt activity, will effect the frequency</span>
+<span class="doccomment">///  at which vTaskDelay() gets called and therefore the time at which the task</span>
+<span class="doccomment">///  next executes.  See vTaskDelayUntil() for an alternative API function designed</span>
+<span class="doccomment">///  to facilitate fixed frequency execution.  It does this by specifying an</span>
+<span class="doccomment">///  absolute time (rather than a relative time) at which the calling task should</span>
+<span class="doccomment">///  unblock.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// * Implemented by: Fan Jinhao</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// # Arguments:</span>
+<span class="doccomment">///  `ticks_to_delay` The amount of time, in tick periods, that the calling task should block.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// * Return:</span>
+<span class="doccomment">/// </span>
 
-void vTaskFunction( void * pvParameters )
-{
-// Block for 500ms.
-const TickType_t xDelay = 500 / portTICK_PERIOD_MS;
-
-    for( ;; )
-    {
-        // Simply toggle the LED every 500ms, blocking between each toggle.
-        vToggleLED();
-        vTaskDelay( xDelay );
-    }
-}
-
-* \defgroup vTaskDelay vTaskDelay
-* \ingroup TaskCtrl
-*/</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">task_delay</span>(<span class="ident">ticks_to_delay</span>: <span class="ident">TickType</span>) {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">already_yielded</span> <span class="op">=</span> <span class="bool-val">false</span>;
 

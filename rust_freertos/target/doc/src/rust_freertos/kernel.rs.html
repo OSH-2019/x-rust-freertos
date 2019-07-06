@@ -814,18 +814,6 @@
 <span id="814">814</span>
 <span id="815">815</span>
 <span id="816">816</span>
-<span id="817">817</span>
-<span id="818">818</span>
-<span id="819">819</span>
-<span id="820">820</span>
-<span id="821">821</span>
-<span id="822">822</span>
-<span id="823">823</span>
-<span id="824">824</span>
-<span id="825">825</span>
-<span id="826">826</span>
-<span id="827">827</span>
-<span id="828">828</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// kernel.rs, FreeRTOS scheduler control APIs.</span>
 <span class="comment">// This file is created by Fan Jinhao.</span>
@@ -847,7 +835,6 @@
     <span class="ident">Running</span>,
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// Macro for forcing a context switch.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// * Implemented by: Fan Jinhao.</span>
@@ -874,7 +861,6 @@
     };
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// Macro to mark the start of a critical code region.  Preemptive context</span>
 <span class="doccomment">/// switches cannot occur when in a critical region.</span>
 <span class="doccomment">///</span>
@@ -903,7 +889,6 @@
     };
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// Macro to mark the end of a critical code region.  Preemptive context</span>
 <span class="doccomment">/// switches cannot occur when in a critical region.</span>
 <span class="doccomment">///</span>
@@ -932,7 +917,6 @@
     };
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// Macro to disable all maskable interrupts.</span>
 <span class="doccomment">/// * Implemented by: Fan Jinhao.</span>
 <span class="doccomment">/// * C implementation: task.h</span>
@@ -950,7 +934,6 @@
     };
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// Macro to enable microcontroller interrupts.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// * Implemented by: Fan Jinhao.</span>
@@ -969,7 +952,6 @@
     };
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Starts the real time kernel tick processing.  After calling the kernel</span>
 <span class="doccomment">/// has control over which tasks are executed and when.</span>
@@ -996,7 +978,6 @@
     <span class="ident">initialize_scheduler</span>();
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// The fist part of task_start_scheduler(), creates the idle task.</span>
 <span class="doccomment">/// Will panic if task creation fails.</span>
 <span class="doccomment">/// * Implemented by: Fan Jinhao.</span>
@@ -1072,7 +1053,6 @@
     <span class="comment">// TODO: Wait for task_delete.</span>
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// The second (optional) part of task_start_scheduler(),</span>
 <span class="doccomment">/// creates the timer task. Will panic if task creation fails.</span>
 <span class="doccomment">/// * Implemented by: Fan Jinhao.</span>
@@ -1090,7 +1070,6 @@
     <span class="comment">// On fail, panic!(&quot;No enough heap space to allocate timer task.&quot;);</span>
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// The third part of task_step_scheduler, do some initialziation</span>
 <span class="doccomment">/// and call port_start_scheduler() to set up the timer tick.</span>
 <span class="doccomment">///</span>
@@ -1133,7 +1112,6 @@
     }
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// NOTE:  At the time of writing only the x86 real mode port, which runs on a PC</span>
 <span class="doccomment">/// in place of DOS, implements this function.</span>
 <span class="doccomment">///</span>
@@ -1172,7 +1150,6 @@
     <span class="ident">port</span>::<span class="ident">port_end_scheduler</span>();
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// Suspends the scheduler without disabling interrupts.  Context switches will</span>
 <span class="doccomment">/// not occur while the scheduler is suspended.</span>
 <span class="doccomment">///</span>
@@ -1203,7 +1180,6 @@
     <span class="macro">set_scheduler_suspended</span><span class="macro">!</span>(<span class="macro">get_scheduler_suspended</span><span class="macro">!</span>() <span class="op">+</span> <span class="number">1</span>);
 }
 
-<span class="doccomment">/// # Description:</span>
 <span class="doccomment">/// Resumes scheduler activity after it was suspended by a call to</span>
 <span class="doccomment">/// vTaskSuspendAll().</span>
 <span class="doccomment">///</span>
