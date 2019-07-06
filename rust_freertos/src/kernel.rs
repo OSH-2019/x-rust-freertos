@@ -18,7 +18,6 @@ pub enum SchedulerState {
     Running,
 }
 
-/// # Description:
 /// Macro for forcing a context switch.
 ///
 /// * Implemented by: Fan Jinhao.
@@ -45,7 +44,6 @@ macro_rules! taskYIELD_IF_USING_PREEMPTION {
     };
 }
 
-/// # Description:
 /// Macro to mark the start of a critical code region.  Preemptive context
 /// switches cannot occur when in a critical region.
 ///
@@ -74,7 +72,6 @@ macro_rules! taskENTER_CRITICAL_FROM_ISR {
     };
 }
 
-/// # Description:
 /// Macro to mark the end of a critical code region.  Preemptive context
 /// switches cannot occur when in a critical region.
 ///
@@ -103,7 +100,6 @@ macro_rules! taskEXIT_CRITICAL_FROM_ISR {
     };
 }
 
-/// # Description:
 /// Macro to disable all maskable interrupts.
 /// * Implemented by: Fan Jinhao.
 /// * C implementation: task.h
@@ -121,7 +117,6 @@ macro_rules! taskDISABLE_INTERRUPTS {
     };
 }
 
-/// # Description:
 /// Macro to enable microcontroller interrupts.
 ///
 /// * Implemented by: Fan Jinhao.
@@ -140,7 +135,6 @@ macro_rules! taskENABLE_INTERRUPTS {
     };
 }
 
-/// # Description:
 ///
 /// Starts the real time kernel tick processing.  After calling the kernel
 /// has control over which tasks are executed and when.
@@ -167,7 +161,6 @@ pub fn task_start_scheduler() {
     initialize_scheduler();
 }
 
-/// # Description:
 /// The fist part of task_start_scheduler(), creates the idle task.
 /// Will panic if task creation fails.
 /// * Implemented by: Fan Jinhao.
@@ -243,7 +236,6 @@ fn check_tasks_waiting_termination() {
     // TODO: Wait for task_delete.
 }
 
-/// # Description:
 /// The second (optional) part of task_start_scheduler(),
 /// creates the timer task. Will panic if task creation fails.
 /// * Implemented by: Fan Jinhao.
@@ -261,7 +253,6 @@ fn create_timer_task() {
     // On fail, panic!("No enough heap space to allocate timer task.");
 }
 
-/// # Description:
 /// The third part of task_step_scheduler, do some initialziation
 /// and call port_start_scheduler() to set up the timer tick.
 ///
@@ -304,7 +295,6 @@ fn initialize_scheduler() {
     }
 }
 
-/// # Description:
 /// NOTE:  At the time of writing only the x86 real mode port, which runs on a PC
 /// in place of DOS, implements this function.
 ///
@@ -343,7 +333,6 @@ pub fn task_end_scheduler() {
     port::port_end_scheduler();
 }
 
-/// # Description:
 /// Suspends the scheduler without disabling interrupts.  Context switches will
 /// not occur while the scheduler is suspended.
 ///
@@ -374,7 +363,6 @@ pub fn task_suspend_all() {
     set_scheduler_suspended!(get_scheduler_suspended!() + 1);
 }
 
-/// # Description:
 /// Resumes scheduler activity after it was suspended by a call to
 /// vTaskSuspendAll().
 ///

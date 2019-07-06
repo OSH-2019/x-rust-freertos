@@ -4,15 +4,19 @@
 
 改写不是抄写。在项目开展的过程中，我们按照FreeRTOS的程序逻辑，针对Rust语言的特点做出了很多富有创造力的设计，我们将在以下部分进行介绍。
 
-最终，我们成功实现了开题时提出的目标，完成了对FreeRTOS中所有的内核模块——**移植（`port`）**模块、**链表**（`list`）模块、**任务调度**（`task`）模块和**队列与信号量**（`queue`）模块——的改写；为了更好地发挥多人协作的作用，我们将以上模块进一步细分，形成了十余个轻量的子模块；截至我们开始撰写结题报告时，我们的总代码量（不包括底层的C语言代码）已经达到了**6000行以上**，git仓库的commits数量**200多次**，小组的每个成员都贡献了大量的代码；此外，我们希望这个项目更加专业，并且能够真正被他人使用，所以我们提供了详细的[文档]()和各个功能的[示例代码]()。
+最终，我们成功实现了开题时提出的目标，完成了对FreeRTOS中所有的内核模块——**移植（`port`）**模块、**链表**（`list`）模块、**任务调度**（`task`）模块和**队列与信号量**（`queue`）模块——的改写；为了更好地发挥多人协作的作用，我们将以上模块进一步细分，形成了十余个轻量的子模块；截至我们开始撰写结题报告时，我们的总代码量（不包括底层的C语言代码）已经达到了**6000行以上**，git仓库的commits数量**250多次**，小组的每个成员都贡献了大量的代码；此外，我们希望这个项目更加专业，并且能够真正被他人使用，所以我们提供了详细的[文档]()和各个功能的[示例代码](https://github.com/OSH-2019/x-rust-freertos/tree/master/rust_freertos/examples)。
 
 在本报告中，我们首先将对Rust-FreeRTOS项目进行简要介绍，然后重点介绍我们的项目设计，最终介绍我们的测试结果。
 
 我们的小组成员：**樊金昊 左顺 宁雨亭 黄业琦 张俸铭 雷思琦**
 
-## 项目背景
+[TOC]
 
-TODO：简要总结开题报告和可行性报告
+## 项目背景
+- Rust语言能够提供极高的代码安全性，能够在编译阶段就规避悬垂引用等危险行为，同时在保证数据正确性的情况下实现高效的无锁并发。    
+- RTOS对程序的响应速度要求、安全性要求很高（如车载电脑，容错率低），因此从代码本身完整性和数据竞争上的安全性优化是比较理想的方式。
+- FreeRTOS原操作系统使用C语言编写，而Rust中有Option、Trait、macro等机制，对应能够实现C语言中的指针和数据结构，并在程序编译阶段有更好的安全性表现。因此用Rust实现FreeRTOS是可行且适宜的方案。
+- 利用Rust进行RTOS的开发，能够在提高性能和安全性的同时不添加额外的资源开销、保持轻量化。
 
 ## 项目设计
 
@@ -497,12 +501,12 @@ pub fn add_current_task_to_delayed_list(ticks_to_wait: TickType, can_block_indef
 - **实现函数**
 **pub fn task_priority_get(xTask: Option<TaskHandle>) -> UBaseType**   
 **pub fn task_priority_set(xTask: Option<TaskHandle>, uxNewPriority: UBaseType)**   
-pub fn task_get_handle(pcNameToQuery:&char) -> &TaskHandle
-pub fn task_get_system_state(pxTaskStatusArray:&TaskStatus , uxArraySize:UBaseType , pulTotalRunTime:u32) -> UBaseType
-pub fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetFreeStackSpace:BaseType, eState:TaskState)
-pub fn task_get_application_task_tag(xTask:TaskHandle) -> UBaseType
-pub fn task_get_idle_task_handle() -> &TaskHandle
-pub fn task_get_stack_high_water_mark(xtask:Option<&TaskHandle>) -> UBaseType
+pub fn task_get_handle(pcNameToQuery:&char) -> &TaskHandle   
+pub fn task_get_system_state(pxTaskStatusArray:&TaskStatus , uxArraySize:UBaseType , pulTotalRunTime:u32) -> UBaseType   
+pub fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetFreeStackSpace:BaseType, eState:TaskState)   
+pub fn task_get_application_task_tag(xTask:TaskHandle) -> UBaseType   
+pub fn task_get_idle_task_handle() -> &TaskHandle   
+pub fn task_get_stack_high_water_mark(xtask:Option<&TaskHandle>) -> UBaseType   
 
 - **技术点**
 在Rust改写过程中，一个比较麻烦的问题是如何实现原函数中TaskHandle的访问。由于Rust对变量的所有权和生命期规定非常严格，因而使用以全局变量为参数的函数的方式会导致混乱。因此我们决定采用灵活的宏定义方式来实现，免除了参数生命期结束的困扰。   
@@ -518,8 +522,6 @@ macro_rules! get_tcb_from_handle_inAPI {
     };
 }
 ```
-
-### 
 
 ### Queue 队列
 
@@ -697,4 +699,18 @@ TODO：现在task和queue的基本功能已经测试过，主要还需测试以�
 
 ## 总结与不足
 
-TODO：最后再写
+#### 总结
+
+在没有Rust经验也缺乏操作系统知识的情况下，我们最终用250多次commit完成了6000多行代码，几乎实现了FreeRTOS的所有功能，在我们自己看来，Rust-FreeRTOS项目是很成功的。我们认为成功的原因主要是：
+
+1. 我们整个项目进展比较早。我们确立选题、Rust学习、开始编码都比较早，同时我们每周二、周日碰面两次，这使我们整个项目推进较快。
+2. 我们结合对FreeRTOS的模块化设计，进行了明确的分工，并且从未改变，每个人各得其所。
+3. 我们的设计是自底向上的，下层的基础模块为上层提供了良好的封装，使得可以迅速编写出大量的上层代码。
+
+#### 我们的不足
+
+不论是在设计上还是工程的实施上，我们都犯了很多错误，其中有些错误直到最终也没有进行修正：
+
+1. 我们没有消灭所有的全局变量。这不是Rust鼓励的实现方式，事实上，这给我们的编程带来了很大的困难。
+2. 我们使用了`std`库，但是没有自己实现它，但是一个真正的操作系统是要自己实现`std`库。
+3. 一个可能的不足：我们在代码中使用了过多的智能指针（`Arc` \ `Weak` \ `RwLock`），它们基于操作系统的信号量机制，容易造成死锁（我们在调试的过程中就多次出现死锁）

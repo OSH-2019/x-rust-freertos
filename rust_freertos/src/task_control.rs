@@ -1,7 +1,6 @@
 use crate::kernel::*;
 use crate::list;
-use crate::list::ItemLink;
-use crate::list::*;
+use crate::list::ItemLink; use crate::list::*;
 use crate::port::*;
 use crate::projdefs::FreeRtosError;
 use crate::task_global::*;
@@ -125,8 +124,6 @@ impl task_control_block {
 
     /// * Descrpition:
     /// 
-    ///  Create a new task and add it to the list of tasks that are ready to run.
-    /// 
     ///  Internally, within the FreeRTOS implementation, tasks use two blocks of
     ///  memory.  The first block is used to hold the task's data structures.  The
     ///  second block is used by the task as its stack.  If a task is created using
@@ -174,7 +171,7 @@ impl task_control_block {
     ///  can be referenced.
     /// 
     /// 
-    /// * Return:
+    /// # Return:
     ///  @return pdPASS if the task was successfully created and added to a ready
     ///  list, otherwise an error code defined in the file projdefs.h
     /// 
@@ -400,8 +397,6 @@ pub fn initialize_task_list () {
 }
 */
 
-/// * Descrpition:
-/// 
 ///  Type by which tasks are referenced.  For example, a call to xTaskCreate
 ///  returns (via a pointer parameter) an TaskHandle_t variable that can then
 ///  be used as a parameter to vTaskDelete to delete the task.
@@ -440,7 +435,6 @@ impl TaskHandle {
         TaskHandle(arc)
     }
 
-    /// # Description:
     /// Construct a TaskHandle with a TCB. */
     /// * Implemented by: Fan Jinhao.
     /// * C implementation:
@@ -472,7 +466,6 @@ impl TaskHandle {
         get_tcb_from_handle_mut!(self).set_priority(new_priority);
     }
 
-    /// # Description:
     /// Place the task represented by pxTCB into the appropriate ready list for
     /// the task.  It is inserted at the end of the list.
     ///
@@ -511,7 +504,6 @@ impl TaskHandle {
         Ok(())
     }
 
-    /// # Description:
     /// Called after a new task has been created and initialised to place the task
     /// under the control of the scheduler.
     ///
@@ -784,8 +776,6 @@ macro_rules! get_handle_from_option {
     };
 }
 
-/// * Descrpition:
-/// 
 ///  INCLUDE_vTaskDelete must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
 /// 
@@ -806,10 +796,10 @@ macro_rules! get_handle_from_option {
 /// * Implemented by: Huang Yeqi
 /// 
 /// # Arguments:
-///  @param xTask The handle of the task to be deleted.  Passing NULL will
+///  `task_to_delete` The handle of the task to be deleted.  Passing NULL will
 ///  cause the calling task to be deleted.
 /// 
-/// * Return:
+/// # Return:
 /// 
 #[cfg(feature = "INCLUDE_vTaskDelete")]
 pub fn task_delete(task_to_delete: Option<TaskHandle>) {
@@ -888,8 +878,6 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
     }
 }
 
-/// * Descrpition:
-/// 
 ///  INCLUDE_vTaskSuspend must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
 /// 
@@ -907,7 +895,7 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
 ///  @param xTaskToSuspend Handle to the task being suspended.  Passing a NULL
 ///  handle will cause the calling task to be suspended.
 /// 
-/// * Return:
+/// # Return:
 /// 
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn suspend_task(task_to_suspend: TaskHandle) {
@@ -1005,11 +993,6 @@ pub fn task_is_tasksuspended(xtask: &TaskHandle) -> bool {
     xreturn
 }
 
-/// * Descrpition:
-/// 
-///  task. h
-///  <pre>void vTaskResume( TaskHandle_t xTaskToResume );</pre>
-/// 
 ///  INCLUDE_vTaskSuspend must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
 /// 
@@ -1025,7 +1008,7 @@ pub fn task_is_tasksuspended(xtask: &TaskHandle) -> bool {
 /// # Arguments:
 ///  @param xTaskToResume Handle to the task being readied.
 /// 
-/// * Return:
+/// # Return:
 /// 
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn resume_task(task_to_resume: TaskHandle) {

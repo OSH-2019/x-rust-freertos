@@ -861,6 +861,38 @@
 <span id="861">861</span>
 <span id="862">862</span>
 <span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
+<span id="877">877</span>
+<span id="878">878</span>
+<span id="879">879</span>
+<span id="880">880</span>
+<span id="881">881</span>
+<span id="882">882</span>
+<span id="883">883</span>
+<span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
+<span id="887">887</span>
+<span id="888">888</span>
+<span id="889">889</span>
+<span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
+<span id="894">894</span>
+<span id="895">895</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">VecDeque</span>;
 <span class="comment">//use crate::list::*;</span>
@@ -1116,6 +1148,20 @@ impl Default for QueueUnion{
                     <span class="macro">taskEXIT_CRITICAL</span><span class="macro">!</span>();
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(()); <span class="comment">//return pdPASS</span>
                 } <span class="kw">else</span> {
+                    {
+                        <span class="attribute">#![<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;configUSE_MUTEXES&quot;</span>)]</span>
+                        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ucQueueType</span> <span class="op">==</span> <span class="ident">QueueType</span>::<span class="ident">Mutex</span> <span class="op">||</span> <span class="self">self</span>.<span class="ident">ucQueueType</span> <span class="op">==</span> <span class="ident">QueueType</span>::<span class="ident">RecursiveMutex</span> {
+                            <span class="macro">taskENTER_CRITICAL</span><span class="macro">!</span>();
+                            {
+                                <span class="kw">let</span> <span class="ident">task_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">transed_task_handle_for_mutex</span>();
+                                <span class="ident">task_queue</span>::<span class="ident">task_priority_inherit</span>(<span class="ident">task_handle</span>);
+                            }
+                            <span class="macro">taskEXIT_CRITICAL</span><span class="macro">!</span>();
+                        }
+                        <span class="kw">else</span> {
+                            <span class="macro">mtCOVERAGE_TEST_MARKER</span><span class="macro">!</span>();
+                        }
+                    }
                     <span class="kw">if</span> <span class="ident">xTicksToWait</span> <span class="op">==</span> <span class="number">0</span> <span class="kw">as</span> <span class="ident">TickType</span> {
                         <span class="comment">/* The queue was full and no block time is specified (or
                         the block time has expired) so leave now. */</span>
@@ -1491,22 +1537,22 @@ impl Default for QueueUnion{
             <span class="kw">if</span> <span class="ident">task_queue</span>::<span class="ident">task_check_for_timeout</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">xTimeOut</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">xTicksToWait</span>) <span class="op">==</span> <span class="bool-val">false</span> {
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_queue_empty</span>() <span class="op">!=</span> <span class="bool-val">false</span> {
                     <span class="macro">traceBLOCKING_ON_QUEUE_RECEIVE</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="self">self</span>);
-                    {
-                        <span class="attribute">#![<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;configUSE_MUTEXES&quot;</span>)]</span>
-                        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ucQueueType</span> <span class="op">==</span> <span class="ident">QueueType</span>::<span class="ident">Mutex</span>
-                            <span class="op">||</span> <span class="self">self</span>.<span class="ident">ucQueueType</span> <span class="op">==</span> <span class="ident">QueueType</span>::<span class="ident">RecursiveMutex</span>
+                    <span class="comment">/*{
+                        #![cfg(feature = &quot;configUSE_MUTEXES&quot;)]
+                        if self.ucQueueType == QueueType::Mutex
+                            || self.ucQueueType == QueueType::RecursiveMutex
                         {
-                            <span class="comment">/* actually uxQueueType == pcHead */</span>
-                            <span class="macro">taskENTER_CRITICAL</span><span class="macro">!</span>();
+                            /* actually uxQueueType == pcHead */
+                            taskENTER_CRITICAL!();
                             {
-                                <span class="kw">let</span> <span class="ident">task_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">transed_task_handle_for_mutex</span>();
-                                <span class="ident">task_queue</span>::<span class="ident">task_priority_inherit</span>(<span class="ident">task_handle</span>);
+                                let task_handle = self.transed_task_handle_for_mutex();
+                                task_queue::task_priority_inherit(task_handle);
                             }
-                            <span class="macro">taskEXIT_CRITICAL</span><span class="macro">!</span>();
-                        } <span class="kw">else</span> {
-                            <span class="macro">mtCOVERAGE_TEST_MARKER</span><span class="macro">!</span>();
+                            taskEXIT_CRITICAL!();
+                        } else {
+                            mtCOVERAGE_TEST_MARKER!();
                         }
-                    }
+                    }*/</span>
                     <span class="ident">task_queue</span>::<span class="ident">task_place_on_event_list</span>(
                         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">xTasksWaitingToReceive</span>,
                         <span class="ident">xTicksToWait</span>,
@@ -1577,7 +1623,11 @@ impl Default for QueueUnion{
         }
 
         <span class="kw">if</span> <span class="ident">xPosition</span> <span class="op">==</span> <span class="ident">queueSEND_TO_BACK</span> {
-            <span class="self">self</span>.<span class="ident">pcQueue</span>.<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">pcWriteTo</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">pvItemToQueue</span>);
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ucQueueType</span> <span class="op">!=</span> <span class="ident">QueueType</span>::<span class="ident">Mutex</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">ucQueueType</span> <span class="op">!=</span> <span class="ident">QueueType</span>::<span class="ident">RecursiveMutex</span> {
+                <span class="self">self</span>.<span class="ident">pcQueue</span>.<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">pcWriteTo</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">pvItemToQueue</span>);
+            }
+            <span class="kw">else</span> {
+            }
             <span class="self">self</span>.<span class="ident">pcWriteTo</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pcWriteTo</span> <span class="op">+</span> <span class="number">1</span>;
 
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pcWriteTo</span> <span class="op">&gt;=</span> <span class="self">self</span>.<span class="ident">pcTail</span> {
@@ -1586,7 +1636,11 @@ impl Default for QueueUnion{
                 <span class="macro">mtCOVERAGE_TEST_MARKER</span><span class="macro">!</span>();
             }
         } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">pcQueue</span>.<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">QueueUnion</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">pvItemToQueue</span>); <span class="comment">//QueueUnion represents pcReadFrom</span>
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ucQueueType</span> <span class="op">!=</span> <span class="ident">QueueType</span>::<span class="ident">Mutex</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">ucQueueType</span> <span class="op">!=</span> <span class="ident">QueueType</span>::<span class="ident">RecursiveMutex</span> {
+                <span class="self">self</span>.<span class="ident">pcQueue</span>.<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">QueueUnion</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">pvItemToQueue</span>); <span class="comment">//QueueUnion represents pcReadFrom</span>
+            }
+            <span class="kw">else</span> {
+            }
             <span class="self">self</span>.<span class="ident">QueueUnion</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">QueueUnion</span> <span class="op">-</span> <span class="number">1</span>;
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">QueueUnion</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">pcHead</span> {
                 <span class="self">self</span>.<span class="ident">QueueUnion</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pcTail</span> <span class="op">-</span> <span class="number">1</span>;
@@ -1666,6 +1720,10 @@ impl Default for QueueUnion{
         }
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_recursive_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">UBaseType</span> {
+        <span class="self">self</span>.<span class="ident">QueueUnion</span>
+    }
+
     <span class="comment">/* `new` has two arguments now:length, QueueType.
      * Remember to add QueueType when using it.
      */</span>
@@ -1692,17 +1750,23 @@ impl Default for QueueUnion{
         <span class="comment">/* use unsafe to get transed_task_handle for mutex
          * inplemented by: Ning Yuting
          */</span>
-        <span class="kw">let</span> <span class="ident">untransed_task_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pcQueue</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">cloned</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">untransed_task_handle</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">untransed_task_handle</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task_handle</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">task_control</span>::<span class="ident">TaskHandle</span><span class="op">&gt;</span>;
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">transed_task_handle</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>::<span class="op">&lt;</span>
-                <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-                <span class="ident">Box</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">task_control</span>::<span class="ident">TaskHandle</span><span class="op">&gt;&gt;</span>,
-            <span class="op">&gt;</span>(<span class="ident">untransed_task_handle</span>);
-            <span class="ident">task_handle</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">transed_task_handle</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pcQueue</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">cloned</span>().<span class="ident">is_some</span>() {
+            <span class="kw">let</span> <span class="ident">untransed_task_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pcQueue</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">cloned</span>().<span class="ident">unwrap</span>();
+            <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;successfully get the task handle&quot;</span>);
+            <span class="kw">let</span> <span class="ident">untransed_task_handle</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">untransed_task_handle</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task_handle</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">task_control</span>::<span class="ident">TaskHandle</span><span class="op">&gt;</span>;
+            <span class="kw">unsafe</span> {
+                <span class="kw">let</span> <span class="ident">transed_task_handle</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>::<span class="op">&lt;</span>
+                    <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+                    <span class="ident">Box</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">task_control</span>::<span class="ident">TaskHandle</span><span class="op">&gt;&gt;</span>,
+                <span class="op">&gt;</span>(<span class="ident">untransed_task_handle</span>);
+                <span class="ident">task_handle</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">transed_task_handle</span>
+            }
+            <span class="ident">task_handle</span>
         }
-        <span class="ident">task_handle</span>
+        <span class="kw">else</span> {
+            <span class="prelude-val">None</span>
+        }
     }
 }
 
