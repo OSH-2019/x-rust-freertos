@@ -497,12 +497,12 @@ pub fn add_current_task_to_delayed_list(ticks_to_wait: TickType, can_block_indef
 - **实现函数**
 **pub fn task_priority_get(xTask: Option<TaskHandle>) -> UBaseType**   
 **pub fn task_priority_set(xTask: Option<TaskHandle>, uxNewPriority: UBaseType)**   
-pub fn task_get_handle(pcNameToQuery:&char) -> &TaskHandle
-pub fn task_get_system_state(pxTaskStatusArray:&TaskStatus , uxArraySize:UBaseType , pulTotalRunTime:u32) -> UBaseType
-pub fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetFreeStackSpace:BaseType, eState:TaskState)
-pub fn task_get_application_task_tag(xTask:TaskHandle) -> UBaseType
-pub fn task_get_idle_task_handle() -> &TaskHandle
-pub fn task_get_stack_high_water_mark(xtask:Option<&TaskHandle>) -> UBaseType
+pub fn task_get_handle(pcNameToQuery:&char) -> &TaskHandle   
+pub fn task_get_system_state(pxTaskStatusArray:&TaskStatus , uxArraySize:UBaseType , pulTotalRunTime:u32) -> UBaseType   
+pub fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetFreeStackSpace:BaseType, eState:TaskState)   
+pub fn task_get_application_task_tag(xTask:TaskHandle) -> UBaseType   
+pub fn task_get_idle_task_handle() -> &TaskHandle   
+pub fn task_get_stack_high_water_mark(xtask:Option<&TaskHandle>) -> UBaseType   
 
 - **技术点**
 在Rust改写过程中，一个比较麻烦的问题是如何实现原函数中TaskHandle的访问。由于Rust对变量的所有权和生命期规定非常严格，因而使用以全局变量为参数的函数的方式会导致混乱。因此我们决定采用灵活的宏定义方式来实现，免除了参数生命期结束的困扰。   
