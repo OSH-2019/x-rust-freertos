@@ -80,7 +80,7 @@ macro_rules! set_tick_count {
 
 Port模块是与体系结构相关的，每一个体系结构都有自己的一套port实现，FreeRTOS 8中就提供了面向以下体系结构和编译器的port模块：
 
-![Screen Shot 2019-07-06 at 10.54.34 AM](concluding.assets/Screen Shot 2019-07-06 at 10.54.34 AM.png)
+![ports](concluding.assets/ports.png)
 
 这意味着，我们是不可能把每一个port都用Rust改写一遍的。但是，所有的port函数都提供了统一的API接口，所以我们决定利用Rust封装这些API接口。有了这些封装，**我们的代码理论上可以在任何FreeRTOS和LLVM支持的平台上运行**。
 
@@ -320,12 +320,6 @@ impl PartialEq for TaskHandle {
 可见，智能指针的操作会让代码变得冗长、可读性降低，若涉及多个智能指针操作，则可读性更差，而且这些操作大多是重复的。与此类似的，还有获取当前执行的任务等，
 
 ### 任务控制函数
-
-
-
-### 任务控制函数
-
-
 
 #### 任务创建
 

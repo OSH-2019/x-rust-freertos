@@ -1,0 +1,14 @@
+var ALIASES = {};
+ALIASES["byteorder"] = {};
+ALIASES["cfg_if"] = {};
+ALIASES["chrono"] = {};
+ALIASES["dirs"] = {};
+ALIASES["lazy_static"] = {};
+ALIASES["libc"] = {};
+ALIASES["log"] = {};
+ALIASES["num_integer"] = {};
+ALIASES["num_traits"] = {};
+ALIASES["rust_freertos"] = {};
+ALIASES["simplelog"] = {};
+ALIASES["term"] = {};
+ALIASES["time"] = {};

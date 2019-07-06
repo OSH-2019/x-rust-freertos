@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["task_state",""],["updated_top_priority",""]],"fn":[["add_current_task_to_delayed_list",""],["reset_next_task_unblock_time",""],["resume_task",""],["suspend_task",""],["task_delete",""],["task_is_tasksuspended",""]],"struct":[["TaskHandle",""],["task_control_block",""]],"type":[["TCB",""],["Task",""]]});
