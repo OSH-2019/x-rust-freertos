@@ -97,15 +97,57 @@ impl task_control_block {
         }
     }
 
+    /// * Descrpition:
+    /// Reset the name of a TCB.
+    ///
+    /// * Implemented by: Fan Jinhao
+    ///
+    /// # Arguments:
+    ///  `name` A descriptive name for the task.  This is mainly used to
+    ///  facilitate debugging.  Max length defined by configMAX_TASK_NAME_LEN - default
+    ///  is 16.
+    ///
+    /// # Return:
+    /// Return a TCB with new name.
+
     pub fn name(mut self, name: &str) -> Self {
         self.task_name = name.to_owned().to_string();
         self
     }
 
+    /// * Descrpition:
+    /// Reset the stacksize of a TCB.
+    ///
+    /// * Implemented by: Fan Jinhao
+    ///
+    /// # Arguments:
+    ///  `stacksize` The size of the task stack specified as the number of
+    ///  variables the stack can hold - not the number of bytes.  For example, if
+    ///  the stack is 16 bits wide and usStackDepth is defined as 100, 200 bytes
+    ///  will be allocated for stack storage.
+    ///
+    /// # Return:
+    /// Return a TCB with new stacksize.
+
     pub fn stacksize(mut self, stacksize: UBaseType) -> Self {
         self.task_stacksize = stacksize;
         self
     }
+
+    /// * Descrpition:
+    /// Reset the name of a priority.
+    ///
+    /// * Implemented by: Fan Jinhao
+    ///
+    /// # Arguments:
+    ///  `priority` The priority at which the task should run.  Systems that
+    ///  include MPU support can optionally create tasks in a privileged (system)
+    ///  mode by setting bit portPRIVILEGE_BIT of the priority parameter.  For
+    ///  example, to create a privileged task at priority 2 the uxPriority parameter
+    ///  should be set to ( 2 | portPRIVILEGE_BIT ).
+    ///
+    /// # Return:
+    /// Return a TCB with new priority.
 
     pub fn priority(mut self, priority: UBaseType) -> Self {
         if priority >= configMAX_PRIORITIES!() {
@@ -123,7 +165,7 @@ impl task_control_block {
     }
 
     /// * Descrpition:
-    /// 
+    ///
     ///  Internally, within the FreeRTOS implementation, tasks use two blocks of
     ///  memory.  The first block is used to hold the task's data structures.  The
     ///  second block is used by the task as its stack.  If a task is created using
@@ -133,49 +175,26 @@ impl task_control_block {
     ///  xTaskCreateStatic() then the application writer must provide the required
     ///  memory.  xTaskCreateStatic() therefore allows a task to be created without
     ///  using any dynamic memory allocation.
-    /// 
+    ///
     ///  See xTaskCreateStatic() for a version that does not use any dynamic memory
     ///  allocation.
-    /// 
+    ///
     ///  xTaskCreate() can only be used to create a task that has unrestricted
     ///  access to the entire microcontroller memory map.  Systems that include MPU
     ///  support can alternatively create an MPU constrained task using
     ///  xTaskCreateRestricted().
-    /// 
-    /// 
+    ///
     /// * Implemented by: Fan Jinhao
-    /// 
+    ///
     /// # Arguments:
-    ///  @param pvTaskCode Pointer to the task entry function.  Tasks
+    ///  `func` Pointer to the task entry function.  Tasks
     ///  must be implemented to never return (i.e. continuous loop).
-    /// 
-    ///  @param pcName A descriptive name for the task.  This is mainly used to
-    ///  facilitate debugging.  Max length defined by configMAX_TASK_NAME_LEN - default
-    ///  is 16.
-    /// 
-    ///  @param usStackDepth The size of the task stack specified as the number of
-    ///  variables the stack can hold - not the number of bytes.  For example, if
-    ///  the stack is 16 bits wide and usStackDepth is defined as 100, 200 bytes
-    ///  will be allocated for stack storage.
-    /// 
-    ///  @param pvParameters Pointer that will be used as the parameter for the task
-    ///  being created.
-    /// 
-    ///  @param uxPriority The priority at which the task should run.  Systems that
-    ///  include MPU support can optionally create tasks in a privileged (system)
-    ///  mode by setting bit portPRIVILEGE_BIT of the priority parameter.  For
-    ///  example, to create a privileged task at priority 2 the uxPriority parameter
-    ///  should be set to ( 2 | portPRIVILEGE_BIT ).
-    /// 
-    ///  @param pvCreatedTask Used to pass back a handle by which the created task
-    ///  can be referenced.
-    /// 
-    /// 
+    ///
     /// # Return:
-    ///  @return pdPASS if the task was successfully created and added to a ready
+    ///  `pdPASS` if the task was successfully created and added to a ready
     ///  list, otherwise an error code defined in the file projdefs.h
-    /// 
-    /// 
+    ///
+    ///
     pub fn initialise<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
     where
         F: FnOnce() -> () + Send + 'static,
@@ -402,9 +421,9 @@ pub fn initialize_task_list () {
 ///  be used as a parameter to vTaskDelete to delete the task.
 ///  Since multiple `TaskHandle`s may refer to and own a same TCB at a time,
 ///  we wrapped TCB within a `tuple struct` using `Arc<RwLock<_>>`
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 #[derive(Clone)]
 pub struct TaskHandle(Arc<RwLock<TCB>>);
 
@@ -778,29 +797,29 @@ macro_rules! get_handle_from_option {
 
 ///  INCLUDE_vTaskDelete must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
-/// 
+///
 ///  Remove a task from the RTOS real time kernel's management.  The task being
 ///  deleted will be removed from all ready, blocked, suspended and event lists.
-/// 
+///
 ///  NOTE:  The idle task is responsible for freeing the kernel allocated
 ///  memory from tasks that have been deleted.  It is therefore important that
 ///  the idle task is not starved of microcontroller processing time if your
 ///  application makes any calls to vTaskDelete ().  Memory allocated by the
 ///  task code is not automatically freed, and should be freed before the task
 ///  is deleted.
-/// 
+///
 ///  See the demo application file death.c for sample code that utilises
 ///  vTaskDelete ().
-/// 
-/// 
+///
+///
 /// * Implemented by: Huang Yeqi
-/// 
+///
 /// # Arguments:
 ///  `task_to_delete` The handle of the task to be deleted.  Passing NULL will
 ///  cause the calling task to be deleted.
-/// 
+///
 /// # Return:
-/// 
+///
 #[cfg(feature = "INCLUDE_vTaskDelete")]
 pub fn task_delete(task_to_delete: Option<TaskHandle>) {
     /* If null is passed in here then it is the calling task that is
@@ -880,23 +899,23 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
 
 ///  INCLUDE_vTaskSuspend must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
-/// 
+///
 ///  Suspend any task.  When suspended a task will never get any microcontroller
 ///  processing time, no matter what its priority.
-/// 
+///
 ///  Calls to vTaskSuspend are not accumulative -
 ///  i.e. calling vTaskSuspend () twice on the same task still only requires one
 ///  call to vTaskResume () to ready the suspended task.
-/// 
-/// 
+///
+///
 /// * Implemented by: Huang Yeqi
-/// 
+///
 /// # Arguments:
-///  @param xTaskToSuspend Handle to the task being suspended.  Passing a NULL
+///  `task_to_suspend` Handle to the task being suspended.  Passing a NULL
 ///  handle will cause the calling task to be suspended.
-/// 
+///
 /// # Return:
-/// 
+///
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn suspend_task(task_to_suspend: TaskHandle) {
     trace!("suspend_task called!");
@@ -995,21 +1014,21 @@ pub fn task_is_tasksuspended(xtask: &TaskHandle) -> bool {
 
 ///  INCLUDE_vTaskSuspend must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
-/// 
+///
 ///  Resumes a suspended task.
-/// 
+///
 ///  A task that has been suspended by one or more calls to vTaskSuspend ()
 ///  will be made available for running again by a single call to
 ///  vTaskResume ().
-/// 
-/// 
+///
+///
 /// * Implemented by: Huang Yeqi
-/// 
+///
 /// # Arguments:
-///  @param xTaskToResume Handle to the task being readied.
-/// 
+///  `task_to_resume` Handle to the task being readied.
+///
 /// # Return:
-/// 
+///
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn resume_task(task_to_resume: TaskHandle) {
     trace!("resume task called!");

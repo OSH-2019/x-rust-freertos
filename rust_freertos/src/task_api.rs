@@ -21,20 +21,20 @@ macro_rules! get_tcb_from_handle_inAPI {
 
 ///  INCLUDE_uxTaskPriorityGet must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
-/// 
+///
 ///  Obtain the priority of any task.
-/// 
-/// 
+///
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-///  @param xTask Handle of the task to be queried.  Passing a NULL
+///  `xTask` Handle of the task to be queried.  Passing a NULL
 ///  handle results in the priority of the calling task being returned.
-/// 
-/// 
+///
+///
 /// * Return:
-///  @return The priority of xTask.
-/// 
+///  The priority of xTask.
+///
 pub fn task_priority_get(xTask: Option<TaskHandle>) -> UBaseType {
     let mut uxReturn: UBaseType = 0;
     taskENTER_CRITICAL!();
@@ -48,24 +48,24 @@ pub fn task_priority_get(xTask: Option<TaskHandle>) -> UBaseType {
 
 ///  INCLUDE_vTaskPrioritySet must be defined as 1 for this function to be available.
 ///  See the configuration section for more information.
-/// 
+///
 ///  Set the priority of any task.
-/// 
+///
 ///  A context switch will occur before the function returns if the priority
 ///  being set is higher than the currently executing task.
-/// 
-/// 
+///
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-///  @param xTask Handle to the task for which the priority is being set.
+///  `xTask` Handle to the task for which the priority is being set.
 ///  Passing a NULL handle results in the priority of the calling task being set.
-/// 
-///  @param uxNewPriority The priority to which the task will be set.
-/// 
-/// 
+///
+///  `uxNewPriority` The priority to which the task will be set.
+///
+///
 /// * Return:
-/// 
+///
 pub fn task_priority_set(xTask: Option<TaskHandle>, uxNewPriority: UBaseType) {
     let mut uxNewPriority = uxNewPriority;
     let mut xYieldRequired: bool = false;
