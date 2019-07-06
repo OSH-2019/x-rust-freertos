@@ -12,7 +12,7 @@ impl fmt::Debug for ListItem {
 
 /// * Descrpition:
 ///  Definition of the only type of object that a list can contain.
-/// 
+///
 /// * Implemented by: Fan Jinhao
 ///
 pub struct ListItem {
@@ -81,9 +81,9 @@ impl ListItem {
 
 /// * Descrpition:
 ///  Definition of the type of queue used by the scheduler.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 #[derive(Clone)]
 pub struct List {
     number_of_items: UBaseType,
@@ -149,13 +149,13 @@ fn get_list_item_prev(item: &WeakItemLink) -> WeakItemLink {
 ///  Access macro to retrieve the value of the list item.  The value can
 ///  represent anything - for example the priority of a task, or the time at
 ///  which a task should be unblocked.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-/// 
+///
 /// * Return:
-/// 
+///
 pub fn get_list_item_value(item: &ItemLink) -> TickType {
     item.read().unwrap().item_value
 }
@@ -163,13 +163,13 @@ pub fn get_list_item_value(item: &ItemLink) -> TickType {
 /// * Descrpition:
 ///  Access macro to set the value of the list item.  In most cases the value is
 ///  used to sort the list in descending order.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-/// 
+///
 /// * Return:
-/// 
+///
 pub fn set_list_item_value(item: &ItemLink, item_value: TickType) {
     item.write().unwrap().item_value = item_value;
 }
@@ -191,15 +191,15 @@ fn set_weak_item_value(item: &WeakItemLink, item_value: TickType) {
 
 /// * Descrpition:
 ///  Return the list a list item is contained within (referenced from).
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-///  @param pxListItem The list item being queried.
-/// 
+///  `item` The list item being queried.
+///
 /// * Return:
-///  @return A pointer to the List_t object that references the pxListItem
-/// 
+///  A pointer to the List_t object that references the pxListItem
+///
 pub fn get_list_item_container(item: &ItemLink) -> Option<ListLink> {
     //let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
     let container = Weak::clone(&item.read().unwrap().container);
@@ -209,26 +209,26 @@ pub fn get_list_item_container(item: &ItemLink) -> Option<ListLink> {
 /// * Descrpition:
 ///  Access macro to determine if a list contains any items.  The macro will
 ///  only have the value true if the list is empty.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-/// 
+///
 /// * Return:
-/// 
+///
 pub fn list_is_empty(list: &ListLink) -> bool {
     list.read().unwrap().is_empty()
 }
 
 /// * Descrpition:
 ///  Access macro to return the number of items in the list.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-/// 
+///
 /// * Return:
-/// 
+///
 pub fn current_list_length(list: &ListLink) -> UBaseType {
     list.read().unwrap().get_length()
 }
@@ -236,13 +236,13 @@ pub fn current_list_length(list: &ListLink) -> UBaseType {
 /// * Descrpition:
 ///  Access function to get the owner of a list item.  The owner of a list item
 ///  is the object (usually a TCB) that contains the list item.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-/// 
+///
 /// * Return:
-/// 
+///
 pub fn get_list_item_owner(item_link: &ItemLink) -> TaskHandle {
     let owner = Weak::clone(&item_link.read().unwrap().owner);
     owner.into()
@@ -251,40 +251,40 @@ pub fn get_list_item_owner(item_link: &ItemLink) -> TaskHandle {
 /// * Descrpition:
 ///  Access function to set the owner of a list item.  The owner of a list item
 ///  is the object (usually a TCB) that contains the list item.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-/// 
+///
 /// * Return:
-/// 
+///
 pub fn set_list_item_owner(item_link: &ItemLink, owner: TaskHandle) {
     item_link.write().unwrap().owner = owner.into()
 }
 
 /// * Descrpition:
 ///  Access function to obtain the owner of the next entry in a list.
-/// 
+///
 ///  The list member pxIndex is used to walk through a list.  Calling
 ///  listGET_OWNER_OF_NEXT_ENTRY increments pxIndex to the next item in the list
 ///  and returns that entry's pxOwner parameter.  Using multiple calls to this
 ///  function it is therefore possible to move through every item contained in
 ///  a list.
-/// 
+///
 ///  The pxOwner parameter of a list item is a pointer to the object that owns
 ///  the list item.  In the scheduler this is normally a task control block.
 ///  The pxOwner parameter effectively creates a two way link between the list
 ///  item and its owner.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-///  @param list The list from which the owner of the next item is to be
+///  `list` The list from which the owner of the next item is to be
 ///  returned.
-/// 
+///
 /// * Return:
-/// @return The owner of next entry in list.
-/// 
+/// The owner of next entry in list.
+///
 pub fn get_owner_of_next_entry(list: &ListLink) -> TaskHandle {
     let task = list.write().unwrap().get_owner_of_next_entry();
     task.into()
@@ -293,21 +293,21 @@ pub fn get_owner_of_next_entry(list: &ListLink) -> TaskHandle {
 /// * Descrpition:
 ///  Access function to obtain the owner of the first entry in a list.  Lists
 ///  are normally sorted in ascending item value order.
-/// 
+///
 ///  This function returns the pxOwner member of the first item in the list.
 ///  The pxOwner parameter of a list item is a pointer to the object that owns
 ///  the list item.  In the scheduler this is normally a task control block.
 ///  The pxOwner parameter effectively creates a two way link between the list
 ///  item and its owner.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-///  @param list The list from which the owner of the head item is to be
+///  `list` The list from which the owner of the head item is to be
 ///  returned.
-/// 
+///
 /// * Return:
-/// 
+///
 pub fn get_owner_of_head_entry(list: &ListLink) -> TaskHandle {
     let task = list.read().unwrap().get_owner_of_head_entry();
     task.into()
@@ -317,13 +317,13 @@ pub fn get_owner_of_head_entry(list: &ListLink) -> TaskHandle {
 ///  Check to see if a list item is within a list.  The list item maintains a
 ///  "container" pointer that points to the list it is in.  All this macro does
 ///  is check to see if the container and the list match.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-/// 
+///
 /// * Return:
-/// 
+///
 pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
     match get_list_item_container(&item_link) {
         Some(container) => Arc::ptr_eq(list, &container),
@@ -334,16 +334,16 @@ pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
 /// * Descrpition:
 ///  Insert a list item into a list.  The item will be inserted into the list in
 ///  a position determined by its item value (descending item value order).
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-///  @param list The list into which the item is to be inserted.
-/// 
-///  @param item_link The item that is to be placed in the list.
-/// 
+///  `list` The list into which the item is to be inserted.
+///
+///  `item_link` The item that is to be placed in the list.
+///
 /// * Return:
-/// 
+///
 pub fn list_insert(list: &ListLink, item_link: ItemLink) {
     /* Remember which list the item is in.  This allows fast removal of the
     item later. */
@@ -356,23 +356,23 @@ pub fn list_insert(list: &ListLink, item_link: ItemLink) {
 ///  Insert a list item into a list.  The item will be inserted in a position
 ///  such that it will be the last item within the list returned by multiple
 ///  calls to listGET_OWNER_OF_NEXT_ENTRY.
-/// 
+///
 ///  The list member pxIndex is used to walk through a list.  Calling
 ///  listGET_OWNER_OF_NEXT_ENTRY increments pxIndex to the next item in the list.
 ///  Placing an item in a list using vListInsertEnd effectively places the item
 ///  in the list position pointed to by pxIndex.  This means that every other
 ///  item within the list will be returned by listGET_OWNER_OF_NEXT_ENTRY before
 ///  the pxIndex parameter again points to the item being inserted.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-///  @param list The list into which the item is to be inserted.
-/// 
-///  @param item_link The list item to be inserted into the list.
-/// 
+///  `list` The list into which the item is to be inserted.
+///
+///  `item_link` The list item to be inserted into the list.
+///
 /// * Return:
-/// 
+///
 pub fn list_insert_end(list: &ListLink, item_link: ItemLink) {
     /* Insert a new list item into pxList, but rather than sort the list,
     makes the new list item the last item to be removed by a call to
@@ -387,17 +387,17 @@ pub fn list_insert_end(list: &ListLink, item_link: ItemLink) {
 /// * Descrpition:
 ///  Remove an item from a list.  The list item has a pointer to the list that
 ///  it is in, so only the list item need be passed into the function.
-/// 
+///
 /// * Implemented by: Fan Jinhao
-/// 
+///
 /// # Arguments:
-///  @param item_link The item to be removed.  The item will remove itself from
+///  `item_link` The item to be removed.  The item will remove itself from
 ///  the list pointed to by it's pxContainer parameter.
-/// 
+///
 /// * Return:
-///  @return The number of items that remain in the list after the list item has
+///  The number of items that remain in the list after the list item has
 ///  been removed.
-/// 
+///
 pub fn list_remove(item_link: ItemLink) -> UBaseType {
     item_link
         .write()
