@@ -18,7 +18,52 @@ TODO：简要总结开题报告和可行性报告
 
 ### 总体设计概览
 
-TODO：樊金昊来写，大家补充
+#### 细致的模块化设计
+
+原本的FreeRTOS实现中，task模块仅位于`tasks.c`中，queue模块也全部在`queue.c`中实现，这样尽管使代码更加紧凑，但却使代码的可读性大大下降。同时，这也不利于我们小组中多人合作编写代码。
+
+为了使项目结构更加清晰，同时达到每人独立编写一个模块的效果，我们根据功能，对task和queue模块进行了进一步的模块化设计，`task`被分为`kernel`、`task_api`、`task_control`、`task_global`、`task_queue`和`task_timemanager`这六个模块，`queue`也被分为`queue`、`queue_api`、`semaphore`这三个模块。
+
+#### 基于Cargo feature的内核裁剪功能
+
+FreeRTOS中提供了二十余个用于裁剪内核的宏，例如`IncludeTaskDelete`等，我们[利用Cargo的feature功能]，成功实现了FreeRTOS中所有的条件编译，具体技术细节在我们之前写过的[这篇文章](https://github.com/OSH-2019/x-rust-freertos/tree/task/cfg)中，在此不再赘述。条件编译的配置在[Cargo.toml](https://github.com/OSH-2019/x-rust-freertos/blob/880890850098e52a90c335f8e3eb67dfbf38645b/rust_freertos/Cargo.toml#L17)中。
+
+#### 全局变量的处理
+
+FreeRTOS中，处于不同状态的任务队列、内核运行状态等数据都是以全局变量的形式存储的，但是Rust不鼓励使用全局变量，因为它可能造成数据竞争。因为Rust不支持结构体作为全局变量，所以我们使用了[lazy_static](https://docs.rs/lazy_static)包来封装任务链表。此外，我们使用全局mutable变量来存储系统状态，并创建`getter`和`setter`，用`unsafe`统一对其进行访问，例如：
+
+```rust
+pub static mut TICK_COUNT: TickType = 0;
+
+#[macro_export]
+macro_rules! get_tick_count {
+    () => {
+        unsafe { crate::task_global::TICK_COUNT }
+    };
+}
+
+#[macro_export]
+macro_rules! set_tick_count {
+    ($next_tick_count: expr) => {
+        unsafe {
+            trace!("TICK_COUNT was set to {}", $next_tick_count);
+            crate::task_global::TICK_COUNT = $next_tick_count;
+        }
+    };
+}
+```
+
+因为操作系统状态变量只会被内核函数访问，所以此处不会发生数据竞争，可以放心使用`unsafe`。
+
+#### 完善的日志
+
+在上一部分中，我们已经展示了`trace!`函数的使用，在我们的实现中，我们广泛地使用了日志函数，以下是我们某次测试中的一段日志：
+
+```
+
+```
+
+
 
 ### 硬件接口——Port模块
 
