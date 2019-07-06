@@ -1,27 +1,16 @@
 use std::collections::VecDeque;
-//use crate::list::*;
 use crate::port::*;
-//use crate::trace::*;
-//use std::rc::Rc;
-//use std::cell::{RefCell, Ref, RefMut};
 use crate::list::*;
 use crate::queue_h::*;
 use crate::*;
-//use crate::projdefs::*;
 use crate::task_queue::*;
-//use volatile::Volatile;
-//
+
 pub const queueQUEUE_IS_MUTEX: UBaseType = 0;
 pub const queueUNLOCKED: i8 = -1;
 pub const queueLOCKED_UNMODIFIED: i8 = 0;
 pub const queueSEMAPHORE_QUEUE_ITEM_LENGTH: UBaseType = 0;
 pub const queueMUTEX_GIVE_BLOCK_TIME: TickType = 0;
-/*
-pub enum QueueUnion {
-    pcReadFrom(UBaseType),
-    uxRecuriveCallCount(UBaseType),
-}
-*/
+
 #[derive(Default)]
 pub struct QueueDefinition<T>
 where
@@ -41,7 +30,6 @@ where
 
     uxMessagesWaiting: UBaseType,
     uxLength: UBaseType,
-    //uxItemSize: UBaseType,  //这玩意还有必要吗
     cRxLock: i8,
     cTxLock: i8,
 
@@ -60,25 +48,22 @@ where
     ucQueueType: QueueType,
 }
 
-//type xQueue<T> = QueueDefinition<T>;
-//pub type Queue<T> = QueueDefinition<T>;
-/*
-impl Default for QueueUnion{
-    fn default() -> Self {QueueUnion::pcReadFrom(0)}
-}
-*/
 impl<T> QueueDefinition<T>
 where
     T: Default + Clone,
 {
     /// # Description
-    /// *
+    /// Create a new queue.
+    ///
     /// * Implemented by:Lei Siqi
-    /// * * Modifiled by: Ning Yuting
+    /// * Modifiled by: Ning Yuting
+    /// * C implementation:queue.c 384-429
     /// # Argument
+    /// `uxQueueLength` - the length of the queue
+    /// `ucQueueType` - the type of the queue
     ///
     /// # Return
-    ///
+    /// The created queue.
     #[cfg(feature = "configSUPPORT_DYNAMIC_ALLOCATION")]
     pub fn queue_generic_create(uxQueueLength: UBaseType, ucQueueType: QueueType) -> Self {
         let mut queue: QueueDefinition<T> = Default::default();
@@ -99,10 +84,7 @@ where
         self.uxLength = uxQueueLength;
         self.queue_generic_reset(true);
 
-        //{
-        // #![cfg(feature = "configUSE_TRACE_FACILITY")]
         self.ucQueueType = ucQueueType;
-        //}
 
         {
             #![cfg(feature = "configUSE_QUEUE_SETS")]
@@ -113,13 +95,16 @@ where
     }
 
     /// # Description
-    /// * reset the queue
+    /// Reset the queue.
+    ///
     /// * Implemented by:Ning Yuting
     /// * C implementation:queue.c 279-329
+    /// 
     /// # Argument
     /// * `xNewQueue` - whether the queue is a new queue
+    /// 
     /// # Return
-    /// * bool
+    /// `Result<(),QueueError>` - Ok() if the queue was successfully reseted.
     pub fn queue_generic_reset(&mut self, xNewQueue: bool) -> Result<(), QueueError> {
         //xNewQueue源码中为BaseType，改为bool
         //返回值原为BaseType，改为result
@@ -153,13 +138,18 @@ where
     }
 
     /// # Description
+    /// Post a item to the queue.
     ///
     /// * Implemented by:Lei Siqi
     /// * Modifiled by: Ning Yuting
+    /// * C implementation: 723-918
+    ///
     /// # Argument
+    /// `pvItemToQueue` - the item that is to be placed to the queue.
+    /// `xCopyPosition` - the position that the item is to be placed to.
     ///
     /// # Return
-    ///
+    /// Ok() if the item is successfully posted, otherwise Err(QueueError::QueueEmpty).
     pub fn queue_generic_send(
         &mut self,
         pvItemToQueue: T,
@@ -167,8 +157,6 @@ where
         xCopyPosition: BaseType,
     ) -> Result<(), QueueError> {
         let mut xEntryTimeSet: bool = false;
-        //let mut xYieldRequired: bool = true;
-        /*use default to solve the error:unitialized xTimeOut*/
         let mut xTimeOut: time_out = Default::default();
         let mut xTicksToWait = xTicksToWait;
 
@@ -192,7 +180,6 @@ where
                 queue is full. */
                 if self.uxMessagesWaiting < self.uxLength || xCopyPosition == queueOVERWRITE {
                     traceQUEUE_SEND!(&self);
-                    /*xYieldRequired = */
                     self.copy_data_to_queue(pvItemToQueue, xCopyPosition);
                     trace!("Queue can be sent");
 
@@ -237,14 +224,6 @@ where
                                 mtCOVERAGE_TEST_MARKER!();
                             }
                         }
-                        /*when send = semaphore_take, it does not have to yield*/
-                        /*else if xYieldRequired {
-                            /* This path is a special case that will only get
-                               executed if the task was holding multiple mutexes and
-                               the mutexes were given back in an order that is
-                               different to that in which they were taken. */
-                            queueYIELD_IF_USING_PREEMPTION!();
-                        }*/
                         else {
                             mtCOVERAGE_TEST_MARKER!();
                         }
@@ -332,13 +311,19 @@ where
     }
 
     /// # Description
-    ///
+    /// Post an item to a queue. It is safe to use this function from within an interrupt service routine.
+    /// 
     /// * Implemented by:Ning Yuting
     /// * C implementation:queue.c 921-1069
+    /// 
     /// # Argument
+    /// `pvItemToQueue` - the item that is to be placed on the queue.
+    /// `xCopyPosition` - the position that the item is to be placed.
     ///
     /// # Return
-    /// * (BaseType,bool)
+    /// * `Result` -Ok() if the data was successfully sent to the queue, otherwise errQUEUE_FULL.
+    /// * `bool` - pxHigherPriorityTaskWoken is changed to be a return value. it is true if sending to the
+    /// queue caused a task to unblock,otherwise it is false.`
     pub fn queue_generic_send_from_isr(
         &mut self,
         pvItemToQueue: T,
@@ -412,13 +397,16 @@ where
     }
 
     /// # Description
-    /// * lock the queue
+    /// Lock the queue.
+    /// 
     /// * Implemented by:Ning Yuting
     /// * C implementation:queue.c 264-276
+    /// 
     /// # Argument
-    /// * `&self` - queue
+    /// Nothing
+    ///
     /// # Return
-    /// * Nothing
+    /// Nothing
     pub fn lock_queue(&mut self) {
         //源码中为宏，改为Queue的方法
         taskENTER_CRITICAL!();
@@ -434,13 +422,16 @@ where
     }
 
     /// # Description
-    /// * unlock the queue
+    /// Unlock the queue
+    /// 
     /// * Implemented by:Ning Yuting
     /// * C implementation:queue.c 1794-1911
+    /// 
     /// # Argument
-    /// * `&self` - queue
+    /// Nothing
+    /// 
     /// # Return
-    /// * Nothing
+    /// Nothing
     fn unlock_queue(&mut self) {
         taskENTER_CRITICAL!();
         {
@@ -514,13 +505,20 @@ where
     }
 
     /// # Description
-    /// * 原第二个参数pvBuffer是读取到的数据，作为返回值的第二个.
+    /// Receive an item from a queue.
+    /// The item is received by copy and is returned by Ok(T);
+    /// 
     /// * Implemented by:Ning Yuting
     /// * C implementation: queue.c 1237
+    /// 
     /// # Argument
-    /// *
+    /// * `xTicksToWait` - The maximum amount of time the task should block
+    /// waiting for an item to receive should the queue be empty at the time
+    /// of the call.It will return immediately if xTicksToWait is zero and the queue is empty.
+    /// * `xJustPeeking` - whether the item will remain in the queue.
+    ///
     /// # Return
-    /// *
+    /// Ok(T) if an item was successfully received from the queue, otherwise QueueError::QueueEmpty.
     pub fn queue_generic_receive(
         &mut self,
         mut xTicksToWait: TickType,
@@ -537,6 +535,9 @@ where
             !((kernel::task_get_scheduler_state() == SchedulerState::Suspended)
                 && (xTicksToWait != 0))
         );
+        /* This function relaxes the coding standard somewhat to allow return
+	statements within the function itself.  This is done in the interest
+	of execution time efficiency. */
         loop {
             trace!(
                 "Enter function queue_generic_receive, TicksToWait:{}, Peeking: {}!",
@@ -553,6 +554,8 @@ where
                 /* Is there data in the queue now?  To be running the calling task
                 must be the highest priority task wanting to access the queue. */
                 if uxMessagesWaiting > 0 as UBaseType {
+                    /* Remember the read position in case the queue is only being
+                       peeked. */
                     let pcOriginalReadPosition: UBaseType = self.QueueUnion; //QueueUnion represents pcReadFrom
                     buffer = self.copy_data_from_queue(); //
                     if xJustPeeking == false {
@@ -566,16 +569,9 @@ where
                             if self.ucQueueType == QueueType::Mutex
                                 || self.ucQueueType == QueueType::RecursiveMutex
                             {
-                                /////
                                 let task_handle = self.transed_task_handle_for_mutex();
                                 xYieldRequired = task_queue::task_priority_disinherit(task_handle);
                                 self.pcQueue.pop_front();
-                            //let transed_none = transed_task_handle_to_T(None);
-                            //self.pcQueue.insert(0,transed_none);
-                            //let mutex_holder = transed_task_handle_to_T(task_increment_mutex_held_count());
-                            //self.pcQueue.pop_front();
-                            //self.pcQueue.insert(0,mutex_holder);
-                            //self.pxMutexHolder = task_increment_mutex_held_count();
                             } else {
                                 mtCOVERAGE_TEST_MARKER!();
                             }
@@ -590,6 +586,12 @@ where
                                 trace!("queue_generic_receive -- line 504");
                                 mtCOVERAGE_TEST_MARKER!();
                             }
+                        } else if xYieldRequired == true {
+                            /* This path is a special case that will only get
+                             * executed if the task was holding multiple mutexes
+                             * and the mutexes were given back in an order that is
+                             * different to that in which they were taken. */
+                            queueYIELD_IF_USING_PREEMPTION!();
                         } else {
                             trace!("queue_generic_receive -- line 508");
                             mtCOVERAGE_TEST_MARKER!();
@@ -599,6 +601,8 @@ where
                         /* The data is not being removed, so reset the read
                         pointer. */
                         self.QueueUnion = pcOriginalReadPosition; //QueueUnnion represents pcReadFrom
+                        /* The data is being left in the queue, so see if there are
+                           any other tasks waiting for the data. */
                         if list::list_is_empty(&self.xTasksWaitingToReceive) != false {
                             if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive)
                                 != false
@@ -641,22 +645,6 @@ where
             if task_queue::task_check_for_timeout(&mut xTimeOut, &mut xTicksToWait) == false {
                 if self.is_queue_empty() != false {
                     traceBLOCKING_ON_QUEUE_RECEIVE!(&self);
-                    /*{
-                        #![cfg(feature = "configUSE_MUTEXES")]
-                        if self.ucQueueType == QueueType::Mutex
-                            || self.ucQueueType == QueueType::RecursiveMutex
-                        {
-                            /* actually uxQueueType == pcHead */
-                            taskENTER_CRITICAL!();
-                            {
-                                let task_handle = self.transed_task_handle_for_mutex();
-                                task_queue::task_priority_inherit(task_handle);
-                            }
-                            taskEXIT_CRITICAL!();
-                        } else {
-                            mtCOVERAGE_TEST_MARKER!();
-                        }
-                    }*/
                     task_queue::task_place_on_event_list(
                         &self.xTasksWaitingToReceive,
                         xTicksToWait,
@@ -685,9 +673,7 @@ where
         }
     }
 
-    /// 原先是将队列中pcReadFrom处的内容拷贝到第二个参数pvBuffer中，现改为返回值
     pub fn copy_data_from_queue(&mut self) -> Option<T> {
-        //        if self.ucQueueType == QueueType::Base || self.ucQueueType == QueueType::Set {
         self.QueueUnion += 1; //QueueUnion represents pcReadFrom in the original code
         if self.QueueUnion >= self.pcTail {
             self.QueueUnion = self.pcHead;
@@ -696,31 +682,19 @@ where
         }
         let ret_val = self.pcQueue.get(self.QueueUnion as usize).cloned();
         Some(ret_val.unwrap())
-        //        }
-        //        else{
-        //            None
-        //        }
     }
 
     pub fn copy_data_to_queue(&mut self, pvItemToQueue: T, xPosition: BaseType) /*-> bool*/
     {
         /* This function is called from a critical section. */
-        //let mut xReturn:bool = false;
         let mut uxMessagesWaiting: UBaseType = self.uxMessagesWaiting;
 
         {
-            //TODO:understand the usage this part
             #![cfg(feature = "configUSE_MUTEXES")]
             if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex
             {
                 let mutex_holder = transed_task_handle_to_T(task_increment_mutex_held_count());
-                //self.pcQueue.pop_front();
                 self.pcQueue.insert(0, mutex_holder);
-            //let task_handle = self.transed_task_handle_for_mutex();
-            //xReturn = task_queue::task_priority_disinherit(task_handle);
-            //self.pcQueue.pop_front();
-            //self.pcQueue.insert(0,None);
-            //self.pxMutexHolder = None;
             } else {
                 mtCOVERAGE_TEST_MARKER!();
             }
@@ -767,12 +741,19 @@ where
             }
         }
         self.uxMessagesWaiting = uxMessagesWaiting + 1;
-        //xReturn
     }
 
     /// # Description
+    /// To know whether the queue is empty.
+    ///
     /// * Implemented by:Ning Yuting
     /// * C implementation: queue.c 1914
+    ///
+    /// # Argument:
+    /// Nothing
+    ///
+    /// # Return:
+    /// `bool` - true if the queue was empty.
     pub fn is_queue_empty(&self) -> bool {
         let mut xReturn: bool = false;
         taskENTER_CRITICAL!();
@@ -786,12 +767,15 @@ where
     }
 
     /// # Description
+    /// To know whether the queue is full.
     ///
     /// * Implemented by:Lei Siqi
+    /// 
     /// # Argument
+    /// Nothing
     ///
     /// # Return
-    ///
+    /// `bool` - true if the queue if full.
     pub fn is_queue_full(&self) -> bool {
         let mut xReturn: bool = false;
         taskENTER_CRITICAL!();
@@ -831,6 +815,9 @@ where
     /* `new` has two arguments now:length, QueueType.
      * Remember to add QueueType when using it.
      */
+    /// # Description
+    /// Create a new queue. Same to queue_generic_create.
+    /// * Implemented by:Ning Yuting
     pub fn new(uxQueueLength: UBaseType, QueueType: QueueType) -> Self {
         QueueDefinition::queue_generic_create(uxQueueLength, QueueType)
     }
@@ -840,16 +827,21 @@ where
         self.uxQueueNumber
     }
 
-    /// # Description
-    ///
-    /// # Argument
-    ///
-    /// # Return
     #[cfg(feature = "configUSE_QUEUE_SETS")]
     fn notify_queue_set_container(&self, xCopyPosition: BaseType) {
         unimplemented!();
     }
 
+    /// # Description
+    /// Transform pcQueue.0 to Option<task_control::TaskHandle>
+    ///
+    /// * Implemented by:Ning Yuting
+    ///
+    /// # Arguments:
+    /// Nothing
+    ///
+    /// # Return:
+    /// `Option<task_control::TaskHandle>` - the transformed TaskHandle
     pub fn transed_task_handle_for_mutex(&self) -> Option<task_control::TaskHandle> {
         /* use unsafe to get transed_task_handle for mutex
          * inplemented by: Ning Yuting
@@ -874,6 +866,16 @@ where
     }
 }
 
+/// # Description
+/// Transform Option<task_control::TaskHandle> to T
+///
+/// * Implemented by:Ning Yuting
+///
+/// # Arguments:
+/// `task_handle` - the TaskHandle that is to be transformed.
+///
+/// # Return:
+/// `T` - the transformed T.
 fn transed_task_handle_to_T<T>(task_handle: Option<task_control::TaskHandle>) -> T {
     /* use unsafe to transmute Option<TaskHandle> to T type*/
     let mut T_type: T;
