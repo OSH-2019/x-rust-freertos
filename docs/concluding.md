@@ -683,6 +683,135 @@ pub fn send(&self, pvItemToQueue:T,xTicksToWait:TickType) -> Result<(),QueueErro
 
 ### Semaphore 信号量
 
+信号量是操作系统中很重要的一部分，一般涌来进行资源管理和任务同步。FreeRTOS中的信号量又分为二值信号量、计数型信号量、互斥信号量和递归互斥信号量。
+
+#### 数据结构
+
+类似于队列的实现，为信号量实现Interior mutability。
+
+```rust
+pub struct Semaphore(UnsafeCell<QueueDefinition<Option<TaskHandle>>>);
+unsafe impl Send for Semaphore {}
+unsafe impl Sync for Semaphore {}
+```
+
+Semaphore的数据结构其实和C语言实验有较大不同。
+
+在C语言中，
+
+```c
+#define pxMutexHolder					pcTail
+#define uxQueueType						pcHead
+#define queueQUEUE_IS_MUTEX				NULL
+```
+
+若Queue被用作信号量使用，则无需存储消息，`pcTail`被用作`pxMutexHolder`，`pcHead`被用作`uxQueueType`，若`pcHead == NULL`，即表示`uxQueueType == queueQUEUE_IS_MUTEX`。
+
+而在Rust语言中，我们将信号量的Holder保存在消息队列`pcQueue`中，数据结构中原先只在调试时使用的`ucQueueType`现在始终使用，用于保存Queue类型，即判断是否作为队列或信号量使用。
+
+#### 实现方式
+
+由于信号量的数据结构和C语言有较大不同，各个函数的实现也区别较大。
+
+##### 创建
+
+以互斥信号量的创建为例：
+
+```rust
+pub fn new_mutex() -> Self {
+  Semaphore(UnsafeCell::new(QueueDefinition::new(1,QueueType::Mutex)))
+}
+```
+
+各个信号量的创建均类似。
+
+
+
+##### 泛型T和`Option<task_control::TaskHandle>`的转换
+
+由于我们在信号量中仍使用了`QueueDefinition`，但在此`T`应为`TaskHandle`，需要使用一些`TaskHandle`的相关函数，这时就会出现`T`和`Option<task_control::TaskHandle>`之间的类型错误。
+
+我们通过两个函数实现`T`与`Option<task_control::TaskHandle>`之间的转换。
+
+```rust
+pub fn transed_task_handle_for_mutex(&self) -> Option<task_control::TaskHandle>
+```
+
+```rust
+fn transed_task_handle_to_T<T>(task_handle: Option<task_control::TaskHandle>) -> T
+```
+
+我们以`transed_task_handle_for_mutex`为例：
+
+如果`pcQueue`的0号元素非空的话，则使用unsafe进行类型转换，将泛型T转换为`Option<task_control::TaskHandle>`类型。否则直接返回`None`即可。
+
+```rust
+if self.pcQueue.get(0).cloned().is_some() {
+	let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
+	let untransed_task_handle = Box::new(untransed_task_handle);
+	let mut task_handle: Option<task_control::TaskHandle>;
+	unsafe {
+		let transed_task_handle = std::mem::transmute::<
+			Box<T>,
+			Box<Option<task_control::TaskHandle>>,
+		>(untransed_task_handle);
+		task_handle = *transed_task_handle
+	}
+	task_handle
+}
+else {
+	None
+}
+```
+
+
+
+##### 获取信号量
+
+```rust
+pub fn semaphore_down(&self, xBlockTime: TickType) -> Result<(), QueueError>
+```
+
+二值信号量、计数型信号量、互斥信号量均使用此函数获取信号量，此函数其实是调用了`queue_generic_send()`完成。这里与C语言中实现有很大不同，C语言中调用了`queue_generic_receive()`。但由于我们使用`pcQueue`保存`MutexHolder`，使用`send`函数将获取此信号量的`Task Handle`传入队列中，即表示此任务获取了信号量。
+
+下面我们以互斥信号量为例，来看一下在`queue_generic_send()`中对信号量的处理。
+
+获取信号量其实就是将此任务的TaskHandle作为消息传给队列。在`queue_generic_send()`中，主要在函数`copy_data_to_queue()`中进行：
+
+```rust
+if self.ucQueueType == QueueType::Mutex || self.ucQueueType == QueueType::RecursiveMutex
+	{
+		let mutex_holder = transed_task_handle_to_T(task_increment_mutex_held_count());
+		self.pcQueue.insert(0, mutex_holder);
+	} else {
+		mtCOVERAGE_TEST_MARKER!();
+	}
+```
+
+如果是互斥信号量，则需要将当前任务的任务控制块传给`pcQueue`，在这里通过函数`task_increment_mutex_hold_count()`得到当前任务控制块，并给任务控制块中的`uxMutexesHeld`加一，表示任务获取了一个互斥信号量。
+
+如果队列已满，即表示此互斥信号量已被其他任务获取，此时应该调用`task_priority_inherit()`函数处理优先级继承问题，判断当前任务的任务优先级是否比正在拥有互斥信号量的任务优先级高，如果是则把拥有互斥信号量的低优先级任务的优先级调整为与当前任务相同的优先级。
+
+
+
+##### 释放信号量
+
+```rust
+pub fn semaphore_up(&self) -> Result<Option<TaskHandle>, QueueError>
+```
+
+二值信号量、计数型信号量、互斥信号量均使用此函数获取信号量，此函数其实是调用了`queue_generic_receive()`完成。这里与C语言中实现有很大不同，C语言中调用了`queue_generic_send()`。但由于我们使用`pcQueue`保存`MutexHolder`，使用`receive`函数将获取此信号量的`Task Handle`从队列中移除，即表示此任务释放了互斥信号量。
+
+下面我们以互斥信号量为例，来看一下在`queue_generic_receive()`中对信号量的处理。
+
+由于释放互斥信号量后，需要调用`task_priority_disinherit()`函数处理互斥信号量的优先级继承问题。`task_priority_disinherit()`的返回值作为`xYieldRequired`变量的值，若为true则表示需要进行任务调度。
+
+
+
+##### 递归互斥信号量
+
+递归互斥信号量是一种特殊的互斥信号量。获取和释放递归互斥信号量时，需要维护`uxRecursiveCallCount`(在Rust语言实现中为`QueueUnion`)。其余实现和互斥信号量相同。
+
 
 
 ## 测试
