@@ -159,7 +159,7 @@ pub fn task_priority_set(xTask: Option<TaskHandle>, uxNewPriority: UBaseType) {
 /*
    pub fn task_get_system_state(pxTaskStatusArray:&TaskStatus , uxArraySize:UBaseType , pulTotalRunTime:u32) -> UBaseType
    {
-   let mut uxtask:ubasetype = 0 ;
+   let mut uxtask:UBaseType = 0 ;
    let mut uxqueue = configmax_priorities!();
    kernel::task_suspend_all();      // ???
    {
@@ -175,8 +175,8 @@ if uxarraysize >= uxcurrentnumberoftasks
         uxtask += prvlisttaskswithinsinglelist( &( pxtaskstatusarray[ uxtask ] ), &( pxreadytaskslists[ uxqueue ] ), eready );
     }
 
-    uxtask += prvlisttaskswithinsinglelist( &( pxtaskstatusarray[ uxtask ] ), ( list_t * ) pxdelayedtasklist, eblocked );
-    uxtask += prvlisttaskswithinsinglelist( &( pxtaskstatusarray[ uxtask ] ), ( list_t * ) pxoverflowdelayedtasklist, eblocked );
+    uxtask += prvlisttaskswithinsinglelist( &( pxtaskstatusarray[ uxtask ] ), pxdelayedtasklist as &list , eblocked );
+    uxtask += prvlisttaskswithinsinglelist( &( pxtaskstatusarray[ uxtask ] ), pxoverflowdelayedtasklist as &list , eblocked );
 
     #[cfg( feature = "include_vtaskdelete" )]
     uxtask += prvlisttaskswithinsinglelist( &( pxtaskstatusarray[ uxtask ] ), &xtaskswaitingtermination, edeleted );
@@ -189,7 +189,7 @@ if uxarraysize >= uxcurrentnumberoftasks
         if pultotalruntime != null
         {
             #[cfg( feature = "portalt_get_run_time_counter_value" )]
-            portalt_get_run_time_counter_value!( ( *pultotalruntime ) );
+            portalt_get_run_time_counter_value!( ( &pultotalruntime ) );
             #[cfg(not( feature = "portalt_get_run_time_counter_value" ))]
             &pultotalruntime = portget_run_time_counter_value!();
         }
@@ -272,9 +272,9 @@ pub fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetF
     if xGetFreeStackSpace != pdFALSE
     {
         if portSTACK_GROWTH > 0 {
-            pxTaskStatus.usStackHighWaterMark = prvTaskCheckFreeStackSpace( ( uint8_t & ) pxTCB.pxEndOfStack );
+            pxTaskStatus.usStackHighWaterMark = prvTaskCheckFreeStackSpace( pxTCB.pxEndOfStack as &i8 );
         } else {
-            pxTaskStatus.usStackHighWaterMark = prvTaskCheckFreeStackSpace( ( uint8_t & ) pxTCB.pxStack );
+            pxTaskStatus.usStackHighWaterMark = prvTaskCheckFreeStackSpace( pxTCB.pxStack as &i8 );
         }
     }
     else
@@ -284,9 +284,9 @@ pub fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetF
 }
 
 
-pub fn task_get_application_task_tag(xTask:TaskHandle) -> TaskHookFunction
+pub fn task_get_application_task_tag(xTask:TaskHandle) -> UBaseType
 {
-    let mut xReturn:TaskHookFunction = 0 ;      // TaskHookFunction
+    let mut xReturn:UBaseType = 0 ;      // TaskHookFunction
     let mut pxTCB = get_tcb_from_handle_inAPI!(&xTask) ;
     taskENTER_CRITICAL!() ;
     xReturn = pxTCB.get_task_tag ;
@@ -294,7 +294,7 @@ pub fn task_get_application_task_tag(xTask:TaskHandle) -> TaskHookFunction
     xReturn ;
 }
 
-pub fn task_get_handle(pcNameToQuery:&char) -> TaskHandle
+pub fn task_get_handle(pcNameToQuery:&char) -> &TaskHandle
 {
     let mut uxQueue:UBaseType = configMAX_PRIORITIES;
     let mut pxTCB:&TCB = 0 ;
@@ -340,7 +340,7 @@ pub fn task_get_handle(pcNameToQuery:&char) -> TaskHandle
     return pxTCB;
 }
 
-pub fn task_get_idle_task_handle() -> TaskHandle
+pub fn task_get_idle_task_handle() -> &TaskHandle
 {
     /* If xTaskGetIdleTaskHandle() is called before the scheduler has been
        started, then xIdleTaskHandle will be NULL. */
