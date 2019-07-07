@@ -13,7 +13,7 @@
 [TOC]
 
 ## 项目背景
-- Rust语言能够提供极高的代码安全性，能够在编译阶段就规避悬垂引用等危险行为，同时在保证数据正确性的情况下实现高效的无锁并发。    
+- Rust语言能够提供极高的代码安全性，能够在编译阶段就规避悬垂引用等危险行为，同时在保证数据正确性的情况下实现高效的无锁并发。
 - RTOS对程序的响应速度要求、安全性要求很高（如车载电脑，容错率低），因此从代码本身完整性和数据竞争上的安全性优化是比较理想的方式。
 - FreeRTOS原操作系统使用C语言编写，而Rust中有Option、Trait、macro等机制，对应能够实现C语言中的指针和数据结构，并在程序编译阶段有更好的安全性表现。因此用Rust实现FreeRTOS是可行且适宜的方案。
 - 利用Rust进行RTOS的开发，能够在提高性能和安全性的同时不添加额外的资源开销、保持轻量化。
@@ -110,28 +110,28 @@ Port模块是与体系结构相关的，每一个体系结构都有自己的一�
     typedef struct xLIST
     {
     	configLIST_VOLATILE UBaseType_t uxNumberOfItems;
-    	ListItem_t * configLIST_VOLATILE pxIndex;		
-    	MiniListItem_t xListEnd;					
+    	ListItem_t * configLIST_VOLATILE pxIndex;
+    	MiniListItem_t xListEnd;
     } List_t;
     ```
 
-    
+
 
   - ListItem
 
     ```c
     struct xLIST_ITEM
     {
-    	configLIST_VOLATILE TickType_t xItemValue;			
-    	struct xLIST_ITEM * configLIST_VOLATILE pxNext;		
-    	struct xLIST_ITEM * configLIST_VOLATILE pxPrevious;	
-    	void * pvOwner;										
-    	void * configLIST_VOLATILE pvContainer;				
+    	configLIST_VOLATILE TickType_t xItemValue;
+    	struct xLIST_ITEM * configLIST_VOLATILE pxNext;
+    	struct xLIST_ITEM * configLIST_VOLATILE pxPrevious;
+    	void * pvOwner;
+    	void * configLIST_VOLATILE pvContainer;
     };
     typedef struct xLIST_ITEM ListItem_t;
     ```
 
-    
+
 
 - Rust 语言版本：
 
@@ -145,7 +145,7 @@ Port模块是与体系结构相关的，每一个体系结构都有自己的一�
     }
     ```
 
-    
+
 
   - ListItem
 
@@ -500,19 +500,19 @@ pub fn add_current_task_to_delayed_list(ticks_to_wait: TickType, can_block_indef
 #### Rust实现
 - **实现函数**
 ```rust
-pub fn task_priority_get(xTask: Option<TaskHandle>) -> UBaseType   
-pub fn task_priority_set(xTask: Option<TaskHandle>, uxNewPriority: UBaseType)   
-   
-pub fn task_get_handle(pcNameToQuery:&char) -> &TaskHandle   
-pub fn task_get_system_state(pxTaskStatusArray:&TaskStatus , uxArraySize:UBaseType , pulTotalRunTime:u32) -> UBaseType   
-pub fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetFreeStackSpace:BaseType, eState:TaskState)   
-pub fn task_get_application_task_tag(xTask:TaskHandle) -> UBaseType   
-pub fn task_get_idle_task_handle() -> &TaskHandle   
-pub fn task_get_stack_high_water_mark(xtask:Option<&TaskHandle>) -> UBaseType   
+pub fn task_priority_get(xTask: Option<TaskHandle>) -> UBaseType
+pub fn task_priority_set(xTask: Option<TaskHandle>, uxNewPriority: UBaseType)
+
+pub fn task_get_handle(pcNameToQuery:&char) -> &TaskHandle
+pub fn task_get_system_state(pxTaskStatusArray:&TaskStatus , uxArraySize:UBaseType , pulTotalRunTime:u32) -> UBaseType
+pub fn task_test_info(xTask:Option<&TaskHandle>, pxTaskStatus:&TaskStatus, xGetFreeStackSpace:BaseType, eState:TaskState)
+pub fn task_get_application_task_tag(xTask:TaskHandle) -> UBaseType
+pub fn task_get_idle_task_handle() -> &TaskHandle
+pub fn task_get_stack_high_water_mark(xtask:Option<&TaskHandle>) -> UBaseType
 ```
 
 - **技术点**
-在Rust改写过程中，一个比较麻烦的问题是如何实现原函数中TaskHandle的访问。由于Rust对变量的所有权和生命期规定非常严格，因而使用以全局变量为参数的函数的方式会导致混乱。因此我们决定采用灵活的宏定义方式来实现，免除了参数生命期结束的困扰。   
+在Rust改写过程中，一个比较麻烦的问题是如何实现原函数中TaskHandle的访问。由于Rust对变量的所有权和生命期规定非常严格，因而使用以全局变量为参数的函数的方式会导致混乱。因此我们决定采用灵活的宏定义方式来实现，免除了参数生命期结束的困扰。
 如下面的获取任务tcb函数：
 
 ```rust
@@ -539,41 +539,41 @@ macro_rules! get_tcb_from_handle_inAPI {
   ```c
   typedef struct QueueDefinition
   {
-  	int8_t *pcHead;					
-  	int8_t *pcTail;					
-  	int8_t *pcWriteTo;				
-  
-  	union							
+  	int8_t *pcHead;
+  	int8_t *pcTail;
+  	int8_t *pcWriteTo;
+
+  	union
   	{
-  		int8_t *pcReadFrom;			
+  		int8_t *pcReadFrom;
   		UBaseType_t uxRecursiveCallCount;
   	} u;
-  
-  	List_t xTasksWaitingToSend;		
-  	List_t xTasksWaitingToReceive;	
-  
+
+  	List_t xTasksWaitingToSend;
+  	List_t xTasksWaitingToReceive;
+
   	volatile UBaseType_t uxMessagesWaiting;
-  	UBaseType_t uxLength;			
-  	UBaseType_t uxItemSize;			
-  
-  	volatile int8_t cRxLock;		
-  	volatile int8_t cTxLock;		
-  
+  	UBaseType_t uxLength;
+  	UBaseType_t uxItemSize;
+
+  	volatile int8_t cRxLock;
+  	volatile int8_t cTxLock;
+
   	#if( ( configSUPPORT_STATIC_ALLOCATION == 1 ) && ( configSUPPORT_DYNAMIC_ALLOCATION == 1 ) )
-  		uint8_t ucStaticallyAllocated;	
+  		uint8_t ucStaticallyAllocated;
   	#endif
-  
+
   	#if ( configUSE_QUEUE_SETS == 1 )
   		struct QueueDefinition *pxQueueSetContainer;
   	#endif
-  
+
   	#if ( configUSE_TRACE_FACILITY == 1 )
   		UBaseType_t uxQueueNumber;
   		uint8_t ucQueueType;
   	#endif
-  
+
   } xQUEUE;
-  
+
   typedef xQUEUE Queue_t;
   ```
 
@@ -588,31 +588,31 @@ macro_rules! get_tcb_from_handle_inAPI {
         T: Default + Clone,
     {
         pcQueue: VecDeque<T>,
-    
+
         pcHead: UBaseType,
         pcTail: UBaseType,
         pcWriteTo: UBaseType,
-    
+
         /*pcReadFrom & uxRecuriveCallCount*/
         QueueUnion: UBaseType,
-    
+
         xTasksWaitingToSend: ListLink,
         xTasksWaitingToReceive: ListLink,
-    
+
         uxMessagesWaiting: UBaseType,
         uxLength: UBaseType,
         cRxLock: i8,
         cTxLock: i8,
-    
+
         #[cfg(all(
             feature = "configSUPPORT_STATIC_ALLOCATION",
             feature = "configSUPPORT_DYNAMIC_ALLOCATION"
         ))]
         ucStaticallyAllocated: u8,
-    
+
         #[cfg(feature = "configUSE_QUEUE_SETS")]
         pxQueueSetContainer: Option<Box<QueueDefinition>>,
-    
+
         #[cfg(feature = "configUSE_TRACE_FACILITY")]
         uxQueueNumber: UBaseType,
         //#[cfg(feature = "configUSE_TRACE_FACILITY")]
@@ -628,7 +628,7 @@ macro_rules! get_tcb_from_handle_inAPI {
 
     在Rust中将消息类型设为泛型T，无需手动设定`uxItemSize`	，只需传入消息类型即可。
 
-    
+
 
   - Queue
 
@@ -819,15 +819,40 @@ pub fn semaphore_up(&self) -> Result<Option<TaskHandle>, QueueError>
 
 ## 测试
 
-TODO：现在task和queue的基本功能已经测试过，主要还需测试以下内容：
+### 功能正确性
 
-* 任务挂起恢复
-* 任务API里改变任务优先级的那个函数
-* semaphore和mutex
+我们关于功能正确性的测试写在`lib.rs`里。
 
-负责这几部分的同学这两天可以写一些测试代码测试一下，就像`src/lib.rs`里的测试一样，具体测试可以模仿[freertos.rs](https://github.com/hashmismatch/freertos.rs/tree/master/qemu_stm32_tests/examples)里的。
+### 性能测试
 
-如果这几部分测试都比较顺利，我们回头用一些benchmark测一下性能，与C语言的实现对比一下。
+#### 性能指标
+
+为了将`C-FreeRTOS`性能和我们的`Rust-FreeRTOS`性能进行比较，我们这里找了四个具体的算例对他们的性能呢过进行比较，分别是：
+1. 我们自己编写的测试，创建15个任务，计算50的阶乘
+2. Freertos官方Demo里的例子，编号WIN32-WCNM
+3. Freertos官方Demo里的例子，编号ARM-aejs327
+4. Freertos官方Demo里的例子，编号ColdFire-MCF52221
+
+#### C性能测试方法
+计时代码如下：
+``` C++
+inline unsigned long long rdtsc(void)
+{
+        unsigned long hi = 0, lo = 0;
+
+        __asm__ __volatile__ ("lfence;rdtsc" : "=a"(lo), "=d"(hi));
+
+        return (((unsigned long long)lo))|(((unsigned long long)hi)<<32);
+}
+
+start = rdtsc ();
+...
+end = rdtsc ();
+```
+
+#### Rust性能测试方法
+这里使用`Cargo benchtest`工具，设置`#[bench]`块，测试块内代码耗时。
+具体见`lib.rs L60-L163`
 
 ## 总结与不足
 
